@@ -33,11 +33,19 @@ object SyntaxHighlighter:
     area.setStyle(0, text.length, DefaultStyle)
 
     FunctionPattern.findAllMatchIn(text).foreach { m =>
-      area.setStyle(m.start, m.end, FunctionStyle)
+      area.setStyle(
+        textIndexToEditorIndex(area, m.start),
+        textIndexToEditorIndex(area, m.end),
+        FunctionStyle
+      )
     }
 
     StringPattern.findAllMatchIn(text).foreach { m =>
-      area.setStyle(m.start, m.end, StringStyle)
+      area.setStyle(
+        textIndexToEditorIndex(area, m.start),
+        textIndexToEditorIndex(area, m.end),
+        StringStyle
+      )
     }
 
   def applyTo(
@@ -54,3 +62,32 @@ object SyntaxHighlighter:
 
       if start < end then area.setStyle(start, end, PlaybackHighlightStyle)
     }
+
+  private def textIndexToEditorIndex(
+      area: GenericStyledArea[?, ?, String],
+      textIndex: Int
+  ): Int =
+    import scala.jdk.CollectionConverters.*
+
+    var textOffset = 0
+    var editorOffset = 0
+
+    area.getParagraphs.asScala.foreach { paragraph =>
+      val isVisualizerParagraph =
+        paragraph.getSegments.asScala.exists {
+          case segment: org.reactfx.util.Either[?, ?] => segment.isRight
+          case _                                      => false
+        }
+
+      if isVisualizerParagraph then editorOffset += paragraph.length()
+      else
+        val paragraphTextLength = paragraph.getText.length
+
+        if textIndex <= textOffset + paragraphTextLength then
+          return editorOffset + (textIndex - textOffset)
+
+        textOffset += paragraphTextLength + 1
+        editorOffset += paragraph.length() + 1
+    }
+
+    editorOffset

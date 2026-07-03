@@ -142,6 +142,7 @@ final class BlockEditorView(
   applyEditorChrome()
 
   AutoPairingSupport.install(area)
+  AutocompleteSupport.install(area)
 
   area.textProperty().addListener { (_, _, _) =>
     if !replacingCode then scheduleHighlight()
