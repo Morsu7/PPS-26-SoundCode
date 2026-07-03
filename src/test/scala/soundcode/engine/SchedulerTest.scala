@@ -433,7 +433,7 @@ class SchedulerTest extends AnyFunSuite with Matchers {
       ExpEvent("sn", 1 \ 4, 3 \ 4),
       ExpEvent("bd", 3 \ 4, 1 \ 1)
     )
-    
+
     assertCycleUnordered(streams, 1)(
       ExpEvent("bd", 1 \ 1, 5 \ 4),
       ExpEvent("sn", 5 \ 4, 7 \ 4),
@@ -475,6 +475,102 @@ class SchedulerTest extends AnyFunSuite with Matchers {
       ExpEvent("bd", 3 \ 2, 2 \ 1)
     )
   }
+
+  //Aggiunte
+  test("""sound("bd sn hh").reverse""") {
+    val streams = List(Pattern.TimeWarp(PatternModifier.Reverse, seq(bd, sn , hh)))
+
+    // L'inversione specchia il tempo all'interno del ciclo:
+    // Il rullante (sn) passa all'inizio [0.0 -> 0.5] e la cassa (bd) alla fine [0.5 -> 1.0]
+    assertCycle(streams, 0)(
+      ExpEvent("hh", 0 \ 1, 1 \ 3),
+      ExpEvent("sn", 1 \ 3, 2 \ 3),
+      ExpEvent("bd", 2 \ 3, 1 \ 1)
+    )
+  }
+
+  test("""sound("[bd, hh] <sn cp> [rim clap]").note("c4 g4").gain("<1 0.8>").reverse""") {
+    val baseSound = seq(par(bd, hh), alt(sn, cp), seq(rim, clap))
+    val fxNote = seq(c4, g4)
+    val fxGain = alt(gain(1.0), gain(0.8))
+
+    val patternWithEffects = ext(baseSound, fxNote, fxGain)
+    val streams = List(Pattern.TimeWarp(PatternModifier.Reverse, patternWithEffects))
+
+    assertCycleUnordered(streams, 0)(
+      ExpEvent("clap", 0 \ 1, 1 \ 6, List("g4", "1.0")),
+      ExpEvent("rim", 1 \ 6, 1 \ 3, List("g4", "1.0")),
+      ExpEvent("sn", 1 \ 3, 2 \ 3, List("c4", "1.0")),
+      ExpEvent("bd", 2 \ 3, 1 \ 1, List("c4", "1.0")),
+      ExpEvent("hh", 2 \ 3, 1 \ 1, List("c4", "1.0"))
+    )
+
+    assertCycleUnordered(streams, 1)(
+      ExpEvent("clap", 1 \ 1, 7 \ 6, List("g4", "0.8")),
+      ExpEvent("rim", 7 \ 6, 4 \ 3, List("g4", "0.8")),
+      ExpEvent("cp", 4 \ 3, 5 \ 3, List("c4", "0.8")),
+      ExpEvent("bd", 5 \ 3, 2 \ 1, List("c4", "0.8")),
+      ExpEvent("hh", 5 \ 3, 2 \ 1, List("c4", "0.8"))
+    )
+  }
+
+  test("""sound("bd sn").delay(1/4)""") {
+    // Verifica che Delay si comporti esattamente come Late, traslando la fase in avanti
+    val streams = List(Pattern.TimeWarp(PatternModifier.Delay(num(0.25)), seq(bd, sn)))
+
+    assertCycleUnordered(streams, 0)(
+      ExpEvent("sn", 0 \ 1, 1 \ 4),
+      ExpEvent("bd", 1 \ 4, 3 \ 4),
+      ExpEvent("sn", 3 \ 4, 1 \ 1)
+    )
+  }
+
+  test("""sound("bd sn").repetition(2)""") {
+    // Verifica che la ripetizione comprima la sequenza raddoppiandone la frequenza nel ciclo
+    val streams = List(Pattern.TimeWarp(PatternModifier.Repetition(num(2.0)), seq(bd, sn)))
+
+    assertCycle(streams, 0)(
+      ExpEvent("bd", 0 \ 1, 1 \ 4),
+      ExpEvent("sn", 1 \ 4, 1 \ 2),
+      ExpEvent("bd", 1 \ 2, 3 \ 4),
+      ExpEvent("sn", 3 \ 4, 1 \ 1)
+    )
+  }
+
+  test("""sound("bd sn").jux(Reverse)""") {
+    // Juxtaposition: suona il pattern originale in parallelo con la sua versione modificata.
+    // Originale: bd [0, 0.5], sn [0.5, 1]
+    // Reversed:  sn [0, 0.5], bd [0.5, 1]
+    val mods = List(PatternModifier.Reverse)
+    val streams = List(Pattern.TimeWarp(PatternModifier.Juxtaposition(mods), seq(bd, sn)))
+
+    assertCycleUnordered(streams, 0)(
+      ExpEvent("bd", 0 \ 1, 1 \ 2),
+      ExpEvent("sn", 0 \ 1, 1 \ 2),
+      ExpEvent("sn", 1 \ 2, 1 \ 1),
+      ExpEvent("bd", 1 \ 2, 1 \ 1)
+    )
+  }
+
+  test("""sound("bd sn").offset(0.5, Reverse)""") {
+    // Offset: suona l'originale in parallelo con una copia che viene prima ritardata (Late 0.5)
+    // e successivamente modificata (Reverse).
+    // Originale: bd [0, 0.5], sn [0.5, 1]
+    // Copia con Offset: la combinazione geometrica di Late(0.5) + Reverse produce una simmetria
+    // per cui bd e sn si sovrappongono perfettamente alle posizioni dell'originale.
+    val mods = List(PatternModifier.Reverse)
+    val streams = List(Pattern.TimeWarp(PatternModifier.Offset(0.5, mods), seq(bd, sn)))
+
+    assertCycleUnordered(streams, 0)(
+      ExpEvent("bd", 0 \ 1, 1 \ 2),
+      ExpEvent("bd", 0 \ 1, 1 \ 2),
+      ExpEvent("sn", 1 \ 2, 1 \ 1),
+      ExpEvent("sn", 1 \ 2, 1 \ 1)
+    )
+  }
+
+
+
 }
 
 case class ExpEvent(element: String, start: Fraction, end: Fraction, extensions: List[String] = Nil):
