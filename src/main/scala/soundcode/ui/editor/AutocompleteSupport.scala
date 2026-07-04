@@ -1,9 +1,12 @@
 package soundcode.ui.editor
 
-import javafx.scene.control.ListView
+import javafx.scene.control.{Label, ListCell, ListView, OverrunStyle, ScrollBar}
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage.Popup
 import org.fxmisc.richtext.GenericStyledArea
+import javafx.application.Platform
+import javafx.geometry.Orientation
+import javafx.scene.layout.VBox
 import scala.jdk.CollectionConverters.*
 
 private object AutocompleteSupport:
@@ -14,57 +17,199 @@ private object AutocompleteSupport:
   ):
     override def toString: String = s"$label ($detail)"
 
-  private val generativeBlocks = Vector(
-    CompletionItem("note", """note("$0")""", "Generates a note block")
-  )
+  private object CompletionCatalog:
+    val generativeBlocks = Vector(
+      CompletionItem("note", """note("$0")""", "Generates a note block")
+    )
 
-  private val transformations = Vector(
-  )
+    val transformations = Vector(
+      CompletionItem(
+        "transpose",
+        """transpose($0)""",
+        "Transposes the input by a given number of semitones"
+      ),
+      CompletionItem(
+        "invert",
+        """invert($0)""",
+        "Inverts the input around a given pitch"
+      ),
+      CompletionItem(
+        "retrograde",
+        """retrograde($0)""",
+        "Reverses the order of the input"
+      ),
+      CompletionItem(
+        "repeat",
+        """repeat($0)""",
+        "Repeats the input a given number of times"
+      ),
+      CompletionItem(
+        "scale",
+        """scale($0)""",
+        "Scales the input by a given factor"
+      )
+    )
+
+  private final case class CompletionContext(
+      textBeforeCaret: String,
+      prefix: String,
+      lineBeforeCaret: String
+  ):
+    def isInsideQuotes: Boolean =
+      textBeforeCaret.count(_ == '"') % 2 == 1
+
+    def isAfterDot: Boolean =
+      lineBeforeCaret.take(lineBeforeCaret.length - prefix.length).endsWith(".")
+
+    def isAtLineStart: Boolean =
+      lineBeforeCaret.trim == prefix
+
+  private object CompletionContext:
+    def from(area: GenericStyledArea[?, ?, ?]): CompletionContext =
+      val textBeforeCaret = area.getText.take(area.getCaretPosition)
+
+      val prefix =
+        textBeforeCaret.reverse
+          .takeWhile(ch => ch.isLetterOrDigit || ch == '_')
+          .reverse
+
+      val lineBeforeCaret =
+        textBeforeCaret.drop(textBeforeCaret.lastIndexOf('\n') + 1)
+
+      CompletionContext(textBeforeCaret, prefix, lineBeforeCaret)
 
   def install(area: GenericStyledArea[?, ?, ?]): Unit =
     val popup = new Popup()
     val list = new ListView[CompletionItem]()
 
-    list.setPrefWidth(260)
-    list.setPrefHeight(180)
+    popup.setAutoHide(true)
+    popup.setHideOnEscape(true)
+    popup.setConsumeAutoHidingEvents(false)
+    popup.getContent.add(list)
+
+    list.setFocusTraversable(false)
+    list.setPrefWidth(340)
+    list.setMinHeight(132)
+    list.setMaxHeight(156)
+    list.setFixedCellSize(48)
     list.setStyle("""
-      |-fx-background-color: #1f1f24;
-      |-fx-control-inner-background: #1f1f24;
-      |-fx-text-fill: #f4f4f5;
+      |-fx-background-color: #25252b;
+      |-fx-control-inner-background: #25252b;
+      |-fx-background-radius: 6;
+      |-fx-border-color: #3a3a42;
+      |-fx-border-radius: 6;
+      |-fx-padding: 4;
       |-fx-font-family: 'Cascadia Code', 'JetBrains Mono', 'Consolas';
       |-fx-font-size: 13px;
       |""".stripMargin)
 
-    popup.getContent.add(list)
+    def styleScrollBar(): Unit =
+      Platform.runLater(() =>
+        list.lookupAll(".scroll-bar").asScala.foreach {
+          case bar: ScrollBar if bar.getOrientation == Orientation.HORIZONTAL =>
+            bar.setVisible(false)
+            bar.setManaged(false)
+            bar.setOpacity(0)
+            bar.setPrefHeight(0)
+            bar.setMaxHeight(0)
 
-    def currentPrefix(): String =
-      val text = area.getText
-      val caret = area.getCaretPosition
-      text
-        .take(caret)
-        .reverse
-        .takeWhile(ch => ch.isLetterOrDigit || ch == '#')
-        .reverse
+          case bar: ScrollBar if bar.getOrientation == Orientation.VERTICAL =>
+            bar.setPrefWidth(10)
+            bar.setStyle("-fx-background-color: transparent;")
 
-    def insideQuotesBeforeCaret(): Boolean =
-      area.getText.take(area.getCaretPosition).count(_ == '"') % 2 == 1
+            Option(bar.lookup(".thumb")).foreach(
+              _.setStyle("""
+                |-fx-background-color: #5a5a66;
+                |-fx-background-radius: 999;
+                |""".stripMargin)
+            )
 
-    def currentLineBeforeCaret(): String =
-      val text = area.getText.take(area.getCaretPosition)
-      text.drop(text.lastIndexOf('\n') + 1)
+            Option(bar.lookup(".track")).foreach(
+              _.setStyle("-fx-background-color: transparent;")
+            )
+
+            Seq(".increment-button", ".decrement-button").foreach(selector =>
+              Option(bar.lookup(selector)).foreach { button =>
+                button.setStyle("""
+                  |-fx-background-color: transparent;
+                  |-fx-padding: 0;
+                  |""".stripMargin)
+              }
+            )
+
+          case _ =>
+        }
+      )
+
+    list.setCellFactory(_ =>
+      new ListCell[CompletionItem]:
+        private val keyword = new Label()
+        private val detail = new Label()
+        private val content = new VBox(2, keyword, detail)
+
+        content.setFillWidth(true)
+        content.prefWidthProperty().bind(list.widthProperty().subtract(34))
+
+        keyword.setMaxWidth(Double.MaxValue)
+        keyword.setTextOverrun(OverrunStyle.ELLIPSIS)
+        keyword.setStyle("""
+          |-fx-text-fill: #f4f4f5;
+          |-fx-font-size: 13px;
+          |-fx-font-weight: 700;
+          |""".stripMargin)
+
+        detail.setMaxWidth(Double.MaxValue)
+        detail.setTextOverrun(OverrunStyle.ELLIPSIS)
+        detail.setStyle("""
+          |-fx-text-fill: #b8b8c2;
+          |-fx-font-size: 11px;
+          |""".stripMargin)
+
+        private def refreshStyle(): Unit =
+          if isEmpty || getItem == null then
+            setText(null)
+            setGraphic(null)
+            setStyle("-fx-background-color: transparent;")
+          else
+            keyword.setText(getItem.label)
+            detail.setText(getItem.detail)
+
+            setText(null)
+            setGraphic(content)
+            setStyle(
+              if isSelected then """
+                |-fx-background-color: #3a3a42;
+                |-fx-background-radius: 4;
+                |-fx-padding: 5 8;
+                |""".stripMargin
+              else """
+                |-fx-background-color: transparent;
+                |-fx-background-radius: 4;
+                |-fx-padding: 5 8;
+                |""".stripMargin
+            )
+
+        override def updateItem(item: CompletionItem, empty: Boolean): Unit =
+          super.updateItem(item, empty)
+          refreshStyle()
+
+        override def updateSelected(selected: Boolean): Unit =
+          super.updateSelected(selected)
+          refreshStyle()
+    )
 
     def suggestions(): Vector[CompletionItem] =
-      val prefix = currentPrefix()
-      val line = currentLineBeforeCaret()
-      val trimmed = line.trim
+      val context = CompletionContext.from(area)
 
-      val base =
-        if line.take(line.length - prefix.length).endsWith(".") then
-          generativeBlocks ++ transformations
-        else if trimmed == prefix then generativeBlocks
-        else Vector.empty
+      if context.isInsideQuotes then Vector.empty
+      else
+        val candidates =
+          if context.isAfterDot then
+            CompletionCatalog.generativeBlocks ++ CompletionCatalog.transformations
+          else if context.isAtLineStart then CompletionCatalog.generativeBlocks
+          else Vector.empty
 
-      base.filter(_.label.startsWith(prefix))
+        candidates.filter(_.label.startsWith(context.prefix))
 
     def showPopup(): Unit =
       val items = suggestions()
@@ -72,17 +217,26 @@ private object AutocompleteSupport:
       if items.isEmpty then popup.hide()
       else
         list.getItems.setAll(items.asJava)
-        list.getSelectionModel.select(0)
+        list.setPrefHeight(math.max(156, math.min(240, items.size * 48 + 10)))
+        list.getSelectionModel.clearAndSelect(0)
+        list.getFocusModel.focus(0)
+        list.scrollTo(0)
 
         val bounds = area.getCaretBounds
         if bounds.isPresent && area.getScene != null then
           val b = bounds.get()
-          popup.show(area.getScene.getWindow, b.getMinX, b.getMaxY + 4)
+          popup.show(
+            area.getScene.getWindow,
+            b.getMinX,
+            b.getMaxY + 6
+          )
+          styleScrollBar()
 
     def insertSelected(): Unit =
       val selected = list.getSelectionModel.getSelectedItem
+
       if selected != null then
-        val prefix = currentPrefix()
+        val prefix = CompletionContext.from(area).prefix
         val caret = area.getCaretPosition
         val from = caret - prefix.length
 
@@ -95,6 +249,28 @@ private object AutocompleteSupport:
           area.moveTo(placeholderStart)
 
         popup.hide()
+
+    def moveSelection(delta: Int): Unit =
+      val itemCount = list.getItems.size
+
+      if itemCount > 0 then
+        val current = list.getSelectionModel.getSelectedIndex
+        val next =
+          if current < 0 then 0
+          else math.max(0, math.min(itemCount - 1, current + delta))
+
+        list.getSelectionModel.clearAndSelect(next)
+        list.getFocusModel.focus(next)
+        list.scrollTo(next)
+
+    area.focusedProperty().addListener { (_, _, focused) =>
+      if !focused then popup.hide()
+    }
+
+    area.addEventFilter(
+      MouseEvent.MOUSE_PRESSED,
+      (_: MouseEvent) => popup.hide()
+    )
 
     list.addEventFilter(
       MouseEvent.MOUSE_CLICKED,
@@ -118,11 +294,11 @@ private object AutocompleteSupport:
               event.consume()
 
             case KeyCode.DOWN =>
-              list.getSelectionModel.selectNext()
+              moveSelection(1)
               event.consume()
 
             case KeyCode.UP =>
-              list.getSelectionModel.selectPrevious()
+              moveSelection(-1)
               event.consume()
 
             case _ =>

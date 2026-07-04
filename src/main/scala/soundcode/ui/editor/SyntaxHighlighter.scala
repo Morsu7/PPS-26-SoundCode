@@ -3,6 +3,7 @@ package soundcode.ui.editor
 import org.fxmisc.richtext.GenericStyledArea
 import soundcode.ui.UITheme
 import soundcode.domain.TextPosition
+import org.reactfx.util.Either
 
 object SyntaxHighlighter:
   private val StringPattern = "\"([^\"\\\\]|\\\\.)*\"".r
@@ -69,25 +70,30 @@ object SyntaxHighlighter:
   ): Int =
     import scala.jdk.CollectionConverters.*
 
+    val paragraphs = area.getParagraphs.asScala.iterator
+
     var textOffset = 0
     var editorOffset = 0
 
-    area.getParagraphs.asScala.foreach { paragraph =>
-      val isVisualizerParagraph =
-        paragraph.getSegments.asScala.exists {
-          case segment: org.reactfx.util.Either[?, ?] => segment.isRight
-          case _                                      => false
-        }
+    paragraphs
+      .find { paragraph =>
+        val isVisualizerParagraph =
+          paragraph.getSegments.asScala.exists {
+            case segment: Either[?, ?] => segment.isRight
+            case _                     => false
+          }
 
-      if isVisualizerParagraph then editorOffset += paragraph.length()
-      else
-        val paragraphTextLength = paragraph.getText.length
+        if isVisualizerParagraph then
+          editorOffset += paragraph.length() + 1
+          false
+        else
+          val paragraphTextLength = paragraph.getText.length
+          val containsIndex = textIndex <= textOffset + paragraphTextLength
 
-        if textIndex <= textOffset + paragraphTextLength then
-          return editorOffset + (textIndex - textOffset)
+          if !containsIndex then
+            textOffset += paragraphTextLength + 1
+            editorOffset += paragraph.length() + 1
 
-        textOffset += paragraphTextLength + 1
-        editorOffset += paragraph.length() + 1
-    }
-
-    editorOffset
+          containsIndex
+      }
+      .fold(editorOffset)(_ => editorOffset + (textIndex - textOffset))

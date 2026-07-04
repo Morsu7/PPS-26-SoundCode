@@ -1,32 +1,32 @@
 package soundcode.ui.editor
 
 import javafx.scene.Node
-import javafx.scene.text.TextFlow
-import org.fxmisc.richtext.TextExt
+import javafx.scene.input.{KeyEvent, MouseEvent}
+import javafx.scene.text.{FontSmoothingType, TextFlow}
 import org.fxmisc.flowless.VirtualizedScrollPane
-import org.fxmisc.richtext.GenericStyledArea
+import org.fxmisc.richtext.{GenericStyledArea, TextExt}
 import org.fxmisc.richtext.model.{SegmentOps, StyledSegment, TextOps}
 import org.reactfx.util.{Either as RichEither}
 import scalafx.Includes.jfxNode2sfx
 import scalafx.application.Platform
 import scalafx.scene.layout.StackPane
-import soundcode.ui.visualizer.AnimatedView
-
-import javafx.scene.text.FontSmoothingType
-import java.util.function.{BiConsumer, Function}
-import scala.jdk.CollectionConverters.*
-import java.util.Optional
 import soundcode.mvu.AppModel
 import soundcode.ui.UITheme
+import soundcode.ui.visualizer.AnimatedView
+
+import java.util.Optional
+import java.util.function.{BiConsumer, Function, IntFunction}
+import scala.jdk.CollectionConverters.*
 
 final class BlockEditorView(
     initialCode: String = """|note("c4 a4").sound("piano")
-           |sound("hb hd hh")
-           |""".stripMargin.trim
+                             |sound("hb hd hh")
+                             |""".stripMargin.trim
 ):
   private type Segment = RichEither[String, EmbeddedVisualizerSegment]
 
   private val textOps = SegmentOps.styledTextOps[String]()
+
   private val segmentOps: TextOps[Segment, String] =
     TextOps.eitherL[String, EmbeddedVisualizerSegment, String](
       textOps,
@@ -37,6 +37,109 @@ final class BlockEditorView(
   private var visualizers = Vector.empty[AnimatedView]
   private var highlightScheduled = false
   private var replacingCode = false
+
+  private val area: GenericStyledArea[Unit, Segment, String] =
+    new GenericStyledArea[Unit, Segment, String](
+      (),
+      new BiConsumer[TextFlow, Unit]:
+        override def accept(textFlow: TextFlow, style: Unit): Unit = ()
+      ,
+      "",
+      segmentOps,
+      new Function[StyledSegment[Segment, String], Node]:
+        override def apply(styled: StyledSegment[Segment, String]): Node =
+          renderSegment(styled)
+    )
+
+  configureArea()
+  setCodeWithVisualizers(initialCode)
+
+  val root: StackPane = new StackPane:
+    children = Seq(jfxNode2sfx(new VirtualizedScrollPane(area)))
+
+  def render(state: AppModel): Unit =
+    // setCodeWithVisualizers(state.code)
+    SyntaxHighlighter.applyTo(area, state.positions)
+
+  def currentCode: String =
+    normalizeNewlines(
+      area.getParagraphs.asScala
+        .filterNot(paragraph => paragraph.getSegments.asScala.exists(_.isRight))
+        .map(_.getText)
+        .mkString("\n")
+    )
+
+  def play(): Unit =
+    visualizers.foreach(_.play())
+
+  def stop(): Unit =
+    visualizers.foreach(_.stop())
+
+  private def configureArea(): Unit =
+    area.setWrapText(true)
+    area.setParagraphGraphicFactory(lineNumberFactory)
+    area.setStyle(editorStyle)
+
+    applyEditorChrome()
+    installVisualizerInputGuard()
+    AutoPairingSupport.install(area)
+    AutocompleteSupport.install(area)
+
+    area.textProperty().addListener { (_, _, _) =>
+      if !replacingCode then scheduleHighlight()
+    }
+
+  private def renderSegment(styled: StyledSegment[Segment, String]): Node =
+    val segment = styled.getSegment
+
+    if segment.isLeft then
+      val text = new TextExt(segment.getLeft)
+      text.setFontSmoothingType(FontSmoothingType.GRAY)
+      text.setStyle(styled.getStyle)
+      text
+    else
+      segment.getRight match
+        case EmbeddedVisualizerSegment.Empty =>
+          new javafx.scene.Group()
+
+        case EmbeddedVisualizerSegment.View(view) =>
+          visualizerWrapper(view)
+
+  private def visualizerWrapper(view: AnimatedView): Node =
+    val wrapper = new javafx.scene.layout.VBox()
+
+    wrapper.setFillWidth(true)
+    wrapper.setMinWidth(0)
+    wrapper.setMaxWidth(Double.MaxValue)
+    wrapper.prefWidthProperty().bind(area.widthProperty().subtract(48))
+    wrapper.setStyle("-fx-padding: 4 0 8 0;")
+
+    view.root.delegate match
+      case region: javafx.scene.layout.Region =>
+        region.setMinWidth(0)
+        region.setMaxWidth(Double.MaxValue)
+        region.prefWidthProperty().bind(wrapper.widthProperty())
+
+      case _ =>
+
+    wrapper.getChildren.add(view.root.delegate)
+    wrapper
+
+  private def lineNumberFactory: IntFunction[Node] =
+    new IntFunction[Node]:
+      override def apply(line: Int): Node =
+        val label = new javafx.scene.control.Label()
+
+        label.setText(
+          if isVisualizerParagraph(line) then ""
+          else visibleLineNumber(line).toString
+        )
+
+        label.setStyle(lineNumberStyle)
+        label.setMinWidth(24)
+        label.setPrefWidth(24)
+
+        label
 
   private def applyEditorChrome(): Unit =
     Platform.runLater {
@@ -49,129 +152,63 @@ final class BlockEditorView(
       }
     }
 
-  private def isVisualizerParagraph(paragraphIndex: Int): Boolean =
-    area
-      .getParagraph(paragraphIndex)
-      .getSegments
-      .asScala
-      .exists(_.isRight)
-
-  private def visibleLineNumber(paragraphIndex: Int): Int =
-    (0 to paragraphIndex)
-      .count(index => !isVisualizerParagraph(index))
-
-  private val area: GenericStyledArea[Unit, Segment, String] =
-    new GenericStyledArea[Unit, Segment, String](
-      (),
-      new BiConsumer[TextFlow, Unit]:
-        override def accept(t: TextFlow, u: Unit): Unit = ()
-      ,
-      "",
-      segmentOps,
-      new Function[StyledSegment[Segment, String], Node]:
-        override def apply(styled: StyledSegment[Segment, String]): Node =
-          val segment = styled.getSegment
-
-          if segment.isLeft then
-            val text = new TextExt(segment.getLeft)
-            text.setFontSmoothingType(FontSmoothingType.GRAY)
-            text.setStyle(styled.getStyle)
-            text
-          else
-            segment.getRight match
-              case EmbeddedVisualizerSegment.Empty =>
-                new javafx.scene.Group()
-
-              case EmbeddedVisualizerSegment.View(view) =>
-                val wrapper = new javafx.scene.layout.VBox()
-                wrapper.setFillWidth(true)
-                wrapper.setMinWidth(0)
-                wrapper.setMaxWidth(Double.MaxValue)
-                wrapper
-                  .prefWidthProperty()
-                  .bind(area.widthProperty().subtract(48))
-                wrapper.setStyle("-fx-padding: 4 0 8 0;")
-
-                view.root.delegate match
-                  case region: javafx.scene.layout.Region =>
-                    region.setMinWidth(0)
-                    region.setMaxWidth(Double.MaxValue)
-                    region.prefWidthProperty().bind(wrapper.widthProperty())
-                  case _ =>
-
-                wrapper.getChildren.add(view.root.delegate)
-                wrapper
+  private def installVisualizerInputGuard(): Unit =
+    area.addEventFilter(
+      KeyEvent.KEY_TYPED,
+      (event: KeyEvent) =>
+        if isVisualizerParagraph(area.getCurrentParagraph) then
+          moveCaretOutOfVisualizer()
+          event.consume()
     )
 
-  area.setWrapText(true)
-  area.setParagraphGraphicFactory(
-    new java.util.function.IntFunction[Node]:
-      override def apply(line: Int): Node =
-        val label = new javafx.scene.control.Label()
+    area.addEventHandler(
+      MouseEvent.MOUSE_RELEASED,
+      (_: MouseEvent) => Platform.runLater(moveCaretOutOfVisualizer())
+    )
 
-        label.setText(
-          if isVisualizerParagraph(line) then ""
-          else visibleLineNumber(line).toString
-        )
+    area.caretPositionProperty().addListener { (_, _, _) =>
+      Platform.runLater(moveCaretOutOfVisualizer())
+    }
 
-        label.setStyle(
-          s"""
-             |-fx-background-color: ${UITheme.Background};
-             |-fx-text-fill: ${UITheme.Muted};
-             |-fx-font-family: ${UITheme.FontFamily};
-             |-fx-font-size: 13px;
-             |-fx-padding: 0 8 0 4;
-             |-fx-alignment: center-right;
-             |""".stripMargin
-        )
+  private def isVisualizerParagraph(paragraphIndex: Int): Boolean =
+    paragraphIndex >= 0 &&
+      paragraphIndex < area.getParagraphs.size() &&
+      area
+        .getParagraph(paragraphIndex)
+        .getSegments
+        .asScala
+        .exists(_.isRight)
 
-        label.setMinWidth(24)
-        label.setPrefWidth(24)
+  private def visibleLineNumber(paragraphIndex: Int): Int =
+    (0 to paragraphIndex).count(index => !isVisualizerParagraph(index))
 
-        label
-  )
-  area.setStyle(
-    s"""
-      |-fx-font-family: ${UITheme.FontFamily};
-      |-fx-font-size: 15px;
-      |-fx-background-color: ${UITheme.Background};
-      |-fx-control-inner-background: ${UITheme.Background};
-      |-fx-text-fill: ${UITheme.Foreground};
-      |""".stripMargin
-  )
-  applyEditorChrome()
+  private def codePositionNear(paragraphIndex: Int): Int =
+    val previousCodeParagraph =
+      (paragraphIndex - 1 to 0 by -1).find(index =>
+        !isVisualizerParagraph(index)
+      )
 
-  AutoPairingSupport.install(area)
-  AutocompleteSupport.install(area)
+    val nextCodeParagraph =
+      (paragraphIndex + 1 until area.getParagraphs.size())
+        .find(index => !isVisualizerParagraph(index))
 
-  area.textProperty().addListener { (_, _, _) =>
-    if !replacingCode then scheduleHighlight()
-  }
+    previousCodeParagraph
+      .map(index =>
+        area.getAbsolutePosition(index, area.getParagraph(index).length())
+      )
+      .orElse(
+        nextCodeParagraph.map(index => area.getAbsolutePosition(index, 0))
+      )
+      .getOrElse(0)
 
-  val root: StackPane = new StackPane:
-    children = Seq(jfxNode2sfx(new VirtualizedScrollPane(area)))
+  private def moveCaretOutOfVisualizer(): Unit =
+    val paragraphIndex = area.getCurrentParagraph
 
-  def render(state: AppModel): Unit =
-    // setCodeWithVisualizers(state.code)
-
-    SyntaxHighlighter.applyTo(area, state.positions)
-
-  def currentCode: String =
-    area.getParagraphs.asScala
-      .filterNot(paragraph => paragraph.getSegments.asScala.exists(_.isRight))
-      .map(_.getText)
-      .mkString("\n")
-      .replace("\r\n", "\n")
-      .replace("\r", "\n")
-
-  def play(): Unit =
-    visualizers.foreach(_.play())
-
-  def stop(): Unit =
-    visualizers.foreach(_.stop())
+    if isVisualizerParagraph(paragraphIndex) then
+      area.moveTo(codePositionNear(paragraphIndex))
 
   private def setCodeWithVisualizers(code: String): Unit =
-    val normalized = code.replace("\r\n", "\n").replace("\r", "\n")
+    val normalized = normalizeNewlines(code)
 
     replacingCode = true
 
@@ -195,8 +232,6 @@ final class BlockEditorView(
       }
     finally replacingCode = false
 
-  setCodeWithVisualizers(initialCode)
-
   private def visualizerInsertions(code: String): Vector[(Int, AnimatedView)] =
     val lines = code.split("\n", -1).toVector
 
@@ -218,3 +253,27 @@ final class BlockEditorView(
         highlightScheduled = false
         SyntaxHighlighter.applyTo(area)
       }
+
+  private def normalizeNewlines(text: String): String =
+    text
+      .replace("\r\n", "\n")
+      .replace("\r", "\n")
+
+  private def editorStyle: String =
+    s"""
+       |-fx-font-family: ${UITheme.FontFamily};
+       |-fx-font-size: 15px;
+       |-fx-background-color: ${UITheme.Background};
+       |-fx-control-inner-background: ${UITheme.Background};
+       |-fx-text-fill: ${UITheme.Foreground};
+       |""".stripMargin
+
+  private def lineNumberStyle: String =
+    s"""
+       |-fx-background-color: ${UITheme.Background};
+       |-fx-text-fill: ${UITheme.Muted};
+       |-fx-font-family: ${UITheme.FontFamily};
+       |-fx-font-size: 13px;
+       |-fx-padding: 0 8 0 4;
+       |-fx-alignment: center-right;
+       |""".stripMargin
