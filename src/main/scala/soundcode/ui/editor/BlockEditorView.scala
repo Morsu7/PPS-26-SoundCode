@@ -26,18 +26,14 @@ final class BlockEditorView(
   private type Segment = RichEither[String, EmbeddedVisualizerSegment]
 
   private val textOps = SegmentOps.styledTextOps[String]()
-
   private val segmentOps: TextOps[Segment, String] =
     TextOps.eitherL[String, EmbeddedVisualizerSegment, String](
       textOps,
       EmbeddedVisualizerSegmentOps,
       (_, _) => Optional.empty()
     )
-
-  private var visualizers = Vector.empty[AnimatedView]
-  private var highlightScheduled = false
-  private var replacingCode = false
-
+  private lazy val segmentRenderer =
+    new BlockEditorSegmentRenderer(() => area.widthProperty())
   private val area: GenericStyledArea[Unit, Segment, String] =
     new GenericStyledArea[Unit, Segment, String](
       (),
@@ -48,8 +44,13 @@ final class BlockEditorView(
       segmentOps,
       new Function[StyledSegment[Segment, String], Node]:
         override def apply(styled: StyledSegment[Segment, String]): Node =
-          renderSegment(styled)
+          segmentRenderer.render(styled)
     )
+  private val document = new BlockEditorDocument(area, _.isRight)
+
+  private var visualizers = Vector.empty[AnimatedView]
+  private var highlightScheduled = false
+  private var replacingCode = false
 
   configureArea()
   setCodeWithVisualizers(initialCode)
@@ -77,69 +78,19 @@ final class BlockEditorView(
 
   private def configureArea(): Unit =
     area.setWrapText(true)
-    area.setParagraphGraphicFactory(lineNumberFactory)
+    area.setParagraphGraphicFactory(
+      LineNumberFactory(document, lineNumberStyle)
+    )
     area.setStyle(editorStyle)
 
     applyEditorChrome()
-    installVisualizerInputGuard()
+    VisualizerInputGuard.install(area, document)
     AutoPairingSupport.install(area)
     AutocompleteSupport.install(area)
 
     area.textProperty().addListener { (_, _, _) =>
       if !replacingCode then scheduleHighlight()
     }
-
-  private def renderSegment(styled: StyledSegment[Segment, String]): Node =
-    val segment = styled.getSegment
-
-    if segment.isLeft then
-      val text = new TextExt(segment.getLeft)
-      text.setFontSmoothingType(FontSmoothingType.GRAY)
-      text.setStyle(styled.getStyle)
-      text
-    else
-      segment.getRight match
-        case EmbeddedVisualizerSegment.Empty =>
-          new javafx.scene.Group()
-
-        case EmbeddedVisualizerSegment.View(view) =>
-          visualizerWrapper(view)
-
-  private def visualizerWrapper(view: AnimatedView): Node =
-    val wrapper = new javafx.scene.layout.VBox()
-
-    wrapper.setFillWidth(true)
-    wrapper.setMinWidth(0)
-    wrapper.setMaxWidth(Double.MaxValue)
-    wrapper.prefWidthProperty().bind(area.widthProperty().subtract(48))
-    wrapper.setStyle("-fx-padding: 4 0 8 0;")
-
-    view.root.delegate match
-      case region: javafx.scene.layout.Region =>
-        region.setMinWidth(0)
-        region.setMaxWidth(Double.MaxValue)
-        region.prefWidthProperty().bind(wrapper.widthProperty())
-
-      case _ =>
-
-    wrapper.getChildren.add(view.root.delegate)
-    wrapper
-
-  private def lineNumberFactory: IntFunction[Node] =
-    new IntFunction[Node]:
-      override def apply(line: Int): Node =
-        val label = new javafx.scene.control.Label()
-
-        label.setText(
-          if isVisualizerParagraph(line) then ""
-          else visibleLineNumber(line).toString
-        )
-
-        label.setStyle(lineNumberStyle)
-        label.setMinWidth(24)
-        label.setPrefWidth(24)
-
-        label
 
   private def applyEditorChrome(): Unit =
     Platform.runLater {
@@ -151,61 +102,6 @@ final class BlockEditorView(
         _.setStyle(UITheme.backgroundStyle)
       }
     }
-
-  private def installVisualizerInputGuard(): Unit =
-    area.addEventFilter(
-      KeyEvent.KEY_TYPED,
-      (event: KeyEvent) =>
-        if isVisualizerParagraph(area.getCurrentParagraph) then
-          moveCaretOutOfVisualizer()
-          event.consume()
-    )
-
-    area.addEventHandler(
-      MouseEvent.MOUSE_RELEASED,
-      (_: MouseEvent) => Platform.runLater(moveCaretOutOfVisualizer())
-    )
-
-    area.caretPositionProperty().addListener { (_, _, _) =>
-      Platform.runLater(moveCaretOutOfVisualizer())
-    }
-
-  private def isVisualizerParagraph(paragraphIndex: Int): Boolean =
-    paragraphIndex >= 0 &&
-      paragraphIndex < area.getParagraphs.size() &&
-      area
-        .getParagraph(paragraphIndex)
-        .getSegments
-        .asScala
-        .exists(_.isRight)
-
-  private def visibleLineNumber(paragraphIndex: Int): Int =
-    (0 to paragraphIndex).count(index => !isVisualizerParagraph(index))
-
-  private def codePositionNear(paragraphIndex: Int): Int =
-    val previousCodeParagraph =
-      (paragraphIndex - 1 to 0 by -1).find(index =>
-        !isVisualizerParagraph(index)
-      )
-
-    val nextCodeParagraph =
-      (paragraphIndex + 1 until area.getParagraphs.size())
-        .find(index => !isVisualizerParagraph(index))
-
-    previousCodeParagraph
-      .map(index =>
-        area.getAbsolutePosition(index, area.getParagraph(index).length())
-      )
-      .orElse(
-        nextCodeParagraph.map(index => area.getAbsolutePosition(index, 0))
-      )
-      .getOrElse(0)
-
-  private def moveCaretOutOfVisualizer(): Unit =
-    val paragraphIndex = area.getCurrentParagraph
-
-    if isVisualizerParagraph(paragraphIndex) then
-      area.moveTo(codePositionNear(paragraphIndex))
 
   private def setCodeWithVisualizers(code: String): Unit =
     val normalized = normalizeNewlines(code)
