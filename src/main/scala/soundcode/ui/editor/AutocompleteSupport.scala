@@ -8,6 +8,7 @@ import javafx.application.Platform
 import javafx.geometry.Orientation
 import javafx.scene.layout.VBox
 import scala.jdk.CollectionConverters.*
+import soundcode.parser.SoundCodeLanguage
 
 private object AutocompleteSupport:
   private case class CompletionItem(
@@ -18,37 +19,20 @@ private object AutocompleteSupport:
     override def toString: String = s"$label ($detail)"
 
   private object CompletionCatalog:
-    val generativeBlocks = Vector(
-      CompletionItem("note", """note("$0")""", "Generates a note block")
-    )
-
-    val transformations = Vector(
+    private def toCompletionItem(
+        construct: SoundCodeLanguage.Construct
+    ): CompletionItem =
       CompletionItem(
-        "transpose",
-        """transpose($0)""",
-        "Transposes the input by a given number of semitones"
-      ),
-      CompletionItem(
-        "invert",
-        """invert($0)""",
-        "Inverts the input around a given pitch"
-      ),
-      CompletionItem(
-        "retrograde",
-        """retrograde($0)""",
-        "Reverses the order of the input"
-      ),
-      CompletionItem(
-        "repeat",
-        """repeat($0)""",
-        "Repeats the input a given number of times"
-      ),
-      CompletionItem(
-        "scale",
-        """scale($0)""",
-        "Scales the input by a given factor"
+        construct.name,
+        construct.snippet,
+        construct.detail
       )
-    )
+
+    val generativeBlocks: Vector[CompletionItem] =
+      SoundCodeLanguage.Generative.all.map(toCompletionItem)
+
+    val transformations: Vector[CompletionItem] =
+      SoundCodeLanguage.Transformation.all.map(toCompletionItem)
 
   private final case class CompletionContext(
       textBeforeCaret: String,

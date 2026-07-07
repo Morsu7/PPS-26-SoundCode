@@ -4,12 +4,12 @@ import org.fxmisc.richtext.model.SegmentOps
 import soundcode.ui.visualizer.AnimatedView
 import java.util.Optional
 
-sealed trait EmbeddedVisualizerSegment
-object EmbeddedVisualizerSegment:
+private sealed trait EmbeddedVisualizerSegment
+private object EmbeddedVisualizerSegment:
   case object Empty extends EmbeddedVisualizerSegment
   final case class View(view: AnimatedView) extends EmbeddedVisualizerSegment
 
-object EmbeddedVisualizerSegmentOps
+private object EmbeddedVisualizerSegmentOps
     extends SegmentOps[EmbeddedVisualizerSegment, String]:
   override def length(seg: EmbeddedVisualizerSegment): Int =
     seg match
