@@ -9,3 +9,6 @@ enum Msg:
   case PlaybackTick(currentBeat: Double)
   case UpdateHighlightText(positions: Set[TextPosition])
   case UpdateTimelines(timelines: List[Seq[Sound]])
+  // Controllo della riproduzione audio (pulsanti Play/Stop)
+  case PlayRequested
+  case StopRequested

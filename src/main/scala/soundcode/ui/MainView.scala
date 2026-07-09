@@ -31,10 +31,14 @@ class MainView(
     new ToolBar:
       content = Seq(
         new Button("Play"):
-          onAction = _ => editorView.play()
+          onAction = _ =>
+            editorView.play()
+            dispatch(Msg.PlayRequested)
         ,
         new Button("Stop"):
-          onAction = _ => editorView.stop()
+          onAction = _ =>
+            editorView.stop()
+            dispatch(Msg.StopRequested)
         ,
         new Button("Update"):
           onAction =
