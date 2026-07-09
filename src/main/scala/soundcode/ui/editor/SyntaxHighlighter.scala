@@ -5,7 +5,7 @@ import soundcode.ui.UITheme
 import soundcode.domain.TextPosition
 import org.reactfx.util.Either
 
-private object SyntaxHighlighter:
+object SyntaxHighlighter:
   private val StringPattern = "\"([^\"\\\\]|\\\\.)*\"".r
   private val FunctionPattern = """\b[a-zA-Z_][a-zA-Z0-9_]*(?=\()""".r
 
