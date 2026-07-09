@@ -4,7 +4,7 @@ import javafx.scene.input.KeyEvent
 
 import org.fxmisc.richtext.GenericStyledArea
 
-private object AutoPairingSupport:
+object AutoPairingSupport:
   def install(area: GenericStyledArea[?, ?, ?]): Unit =
     area.addEventFilter(
       KeyEvent.KEY_TYPED,
