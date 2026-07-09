@@ -10,7 +10,7 @@ import javafx.scene.layout.VBox
 import scala.jdk.CollectionConverters.*
 import soundcode.parser.SoundCodeLanguage
 
-private object AutocompleteSupport:
+object AutocompleteSupport:
   private case class CompletionItem(
       label: String,
       insertText: String,
