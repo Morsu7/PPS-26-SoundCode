@@ -7,7 +7,7 @@ object Update:
     msg match
       case Msg.CodeUpdateRequested(code) =>
         (
-          model.copy(code = code),
+          model,
           Cmd.ParseAndInterpret(code)
         )
 
@@ -28,6 +28,7 @@ object Update:
 
       case Msg.PlaybackTick(currentBeat) =>
         (
+          // model.copy(currentBeat = currentBeat, isPlaying = true),
           model,
           NoOp
         )

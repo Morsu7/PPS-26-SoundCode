@@ -1,14 +1,8 @@
 package soundcode.ui.visualizer
 
-import scalafx.scene.layout.VBox
-import scalafx.scene.control.Label
-import scalafx.scene.Node
-import scalafx.geometry.Insets
-import scalafx.scene.canvas.Canvas
 import scalafx.scene.canvas.GraphicsContext
 import scalafx.scene.paint.Color
-import scalafx.application.Platform
-import scalafx.animation.AnimationTimer
+import soundcode.ui.UITheme
 
 final class OscilloscopeView extends CanvasAnimatedView:
 
@@ -24,7 +18,7 @@ final class OscilloscopeView extends CanvasAnimatedView:
   private def drawBaseline(gc: GraphicsContext, w: Double, h: Double): Unit =
     val centerY = h * 0.5
 
-    gc.stroke = Color.rgb(80, 80, 88)
+    gc.stroke = Color.web(UITheme.VisualizerLine)
     gc.lineWidth = 1
     gc.strokeLine(0, centerY, w, centerY)
 
@@ -39,7 +33,7 @@ final class OscilloscopeView extends CanvasAnimatedView:
     val centerY = h * 0.5
     var amplitude = (h - config.verticalPadding * 2) * 0.38
 
-    gc.stroke = Color.White
+    gc.stroke = Color.web(UITheme.Foreground)
     gc.lineWidth = 2
     gc.beginPath()
 

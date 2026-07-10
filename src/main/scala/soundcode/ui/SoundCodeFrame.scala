@@ -14,20 +14,17 @@ object SoundCodeFrame extends JFXApp3:
   private var runtime: SoundCodeRuntime = null
 
   override def start(): Unit =
-    given Scheduler = SchedulerImpl
-
-    var mainView: MainView = null
     val initialModel = AppModel()
     val audioPlayer = new MidiAudioPlayer()
 
-    runtime = SoundCodeRuntime(
-      initialModel = initialModel,
-      render =
-        (model: AppModel) => if mainView != null then mainView.render(model),
-      audioPlayer = audioPlayer
-    )
+    lazy val mainView: MainView = MainView(runtime.dispatch)
 
-    mainView = MainView(runtime.dispatch)
+    lazy val runtime: SoundCodeRuntime =
+      SoundCodeRuntime(
+        initialModel = initialModel,
+        render = model => mainView.render(model),
+        audioPlayer = audioPlayer
+      )
     mainView.render(initialModel)
 
     // Arma la timeline con il codice iniziale, così il primo Play produce subito suono.
