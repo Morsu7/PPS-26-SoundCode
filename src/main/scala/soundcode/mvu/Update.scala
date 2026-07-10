@@ -19,6 +19,17 @@ object Update:
           NoOp
         )
 
+      case Msg.PlayRequested =>
+        (
+          model.copy(isPlaying = true),
+          NoOp // TODO: implement engine start
+        )
+      case Msg.StopRequested =>
+        (
+          model.copy(isPlaying = false),
+          NoOp // TODO: implement engine stop
+        )
+
       case Msg.PlaybackTick(currentBeat) =>
         (
           // model.copy(currentBeat = currentBeat, isPlaying = true),
