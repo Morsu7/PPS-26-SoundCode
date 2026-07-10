@@ -24,6 +24,8 @@ class MainView(
     center = editorView.root
     top = toolbar
 
+  def currentCode: String = editorView.currentCode
+
   // to remove this nowarn we should update the scalfx version to a version that supports scala 3
   @nowarn("msg=Implicit parameters should be provided with a `using` clause")
   private def toolbar: ToolBar =
