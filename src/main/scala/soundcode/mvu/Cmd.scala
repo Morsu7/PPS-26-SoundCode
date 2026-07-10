@@ -4,29 +4,37 @@ import soundcode.parser.SoundCodeParser
 import fastparse._
 import soundcode.interpreter.Interpreter
 import soundcode.domain.*
+import soundcode.engine.AudioPlayer
 
 sealed trait Cmd:
-  def run(dispatch: Msg => Unit): Unit
+  def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit
 
 object Cmd:
   case object NoOp extends Cmd:
-    override def run(dispatch: Msg => Unit): Unit = println(
-      "No command to run."
-    )
+    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = ()
 
   case class ParseAndInterpret(code: String) extends Cmd:
-    override def run(dispatch: Msg => Unit): Unit =
+    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit =
       val parser = new SoundCodeParser
-      
+
       val (streams, errors) = parser.parseProgram(code) match {
-        case Right(programAST) => {
-          print(f"Parsing succeeded. AST: $programAST\n")
-        
+        case Right(programAST) =>
           (Interpreter.interpret(programAST), None)
-        }
-          
-        case Left(errorMsg) => 
+
+        case Left(errorMsg) =>
           (List.empty[Stream], Some(s"Parsing failed:\n$errorMsg"))
       }
-      
+
       dispatch(Msg.CodeParsed(streams, errors))
+
+  /** Avvia il loop di riproduzione dell'AudioPlayer. */
+  case object StartPlayback extends Cmd:
+    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.start()
+
+  /** Ferma il loop di riproduzione dell'AudioPlayer. */
+  case object StopPlayback extends Cmd:
+    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.stop()
+
+  /** Arma la timeline dell'AudioPlayer con gli stream appena interpretati. */
+  case class UpdateTimeline(streams: List[Stream]) extends Cmd:
+    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.updateTimeline(streams)
