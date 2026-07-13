@@ -251,6 +251,12 @@ class SchedulerTest extends AnyFunSuite with Matchers {
     assertCycle(streams, 3)(ExpEvent("sn", 3 \ 1, 4 \ 1))
   }
 
+  test("""sound("bd").slow(2)""") {
+    val streams = List(slow(2, seq(bd)))
+    assertCycle(streams, 0)(ExpEvent("bd", 0 \ 1, 1 \ 1))
+    assertCycle(streams, 1)(ExpEvent("bd", 1 \ 1, 2 \ 1))
+  }
+
   test("""sound("bd [hh, cp] sn [rim clap]").slow("<1 2>")""") {
 
     val base = seq(bd, par(hh, cp), sn, seq(rim, clap))
@@ -525,18 +531,6 @@ class SchedulerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  test("""sound("bd sn").repetition(2)""") {
-    // Verifica che la ripetizione comprima la sequenza raddoppiandone la frequenza nel ciclo
-    val streams = List(Pattern.TimeWarp(PatternModifier.Repetition(num(2.0)), seq(bd, sn)))
-
-    assertCycle(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 4),
-      ExpEvent("sn", 1 \ 4, 1 \ 2),
-      ExpEvent("bd", 1 \ 2, 3 \ 4),
-      ExpEvent("sn", 3 \ 4, 1 \ 1)
-    )
-  }
-
   test("""sound("bd sn").jux(Reverse)""") {
     // Juxtaposition: suona il pattern originale in parallelo con la sua versione modificata.
     // Originale: bd [0, 0.5], sn [0.5, 1]
@@ -569,6 +563,48 @@ class SchedulerTest extends AnyFunSuite with Matchers {
     )
   }
 
+  test("sound(\"bd sn\").ply(2)") {
+    // s("bd sn").repeat(2) -> bd da 0 a 0.25 e da 0.25 a 0.5; sn da 0.5 a 0.75 e da 0.75 a 1.0
+    val streams = List(repeat(2.0, seq(bd, sn)))
+
+    assertCycle(streams, 0)(
+      ExpEvent("bd", 0 \ 1, 1 \ 4),
+      ExpEvent("bd", 1 \ 4, 1 \ 2),
+      ExpEvent("sn", 1 \ 2, 3 \ 4),
+      ExpEvent("sn", 3 \ 4, 1 \ 1)
+    )
+  }
+
+  test("sound(\"bd\").deley(0.25)") {
+    // delay(0.25, seq(bd)) -> il bd non inizia a 0, ma a 0.25
+    val streams = List(delay(0.25, seq(bd)))
+
+    assertCycle(streams, 0)(
+      ExpEvent("bd", 1 \ 4, 5 \ 4) // 0.25 -> 1.25 (la coda sborda nel ciclo successivo)
+    )
+  }
+
+  test(" sound(\"bd sn\").ply(<1 2>)") {
+    // Se il parametro cambia, il ply si adatta
+    // Nel ciclo 0 (param 1): bd sn
+    // Nel ciclo 1 (param 2): bd bd sn sn
+    val streams = List(repeat(alt(num(1), num(2)), seq(bd, sn)))
+
+    // Ciclo 0 (param 1)
+    assertCycle(streams, 0)(
+      ExpEvent("bd", 0 \ 1, 1 \ 2),
+      ExpEvent("sn", 1 \ 2, 1 \ 1)
+    )
+
+    // Ciclo 1 (param 2)
+    assertCycle(streams, 1)(
+      ExpEvent("bd", 1 \ 1, 5 \ 4),
+      ExpEvent("bd", 5 \ 4, 6 \ 4),
+      ExpEvent("sn", 6 \ 4, 7 \ 4),
+      ExpEvent("sn", 7 \ 4, 8 \ 4)
+    )
+  }
+
 
 
 }
@@ -584,6 +620,7 @@ extension (e: ScheduledEvent[AudioPayload])
     def extractName(payload: AudioPayload): String = payload match
       case Sound.SampleInText(s, _) => s.value
       case Sound.NoteInText(n, _) => n.value
+      case Sound.Rest(_) => ""
       case AudioEffect.Gain(v) => v.toString
       case AudioEffect.Room(v) => v.toString
       case AudioEffect.Pan(v) => v.toString

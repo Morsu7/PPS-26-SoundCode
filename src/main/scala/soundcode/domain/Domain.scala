@@ -28,7 +28,9 @@ case class Fraction(n: Long, d: Long) extends Ordered[Fraction]:
 
 object Fraction:
   def apply(n: Long): Fraction = Fraction(n, 1)
-  def apply(n: Double): Fraction = Fraction(n.toLong, 1)
+  def apply(n: Double): Fraction =
+    val precision = 10000L
+    Fraction(math.round(n * precision), precision)
   def apply(n: Int): Fraction = Fraction(n.toLong, 1)
 
 case class Interval(start: Fraction, end: Fraction):
