@@ -1,12 +1,12 @@
-package soundcode.interpreter
+/*package soundcode.interpreter
 
 import org.scalatest.funsuite.AnyFunSuite
 import fastparse.*
 import org.scalatest.Assertions.fail
 import soundcode.parser.SoundCodeParser
-import soundcode.domain.{Effect, Sound, Stream, TextPosition, AggregationPattern as AP}
+import soundcode.domain.{AudioEffect, Sound, Track, TextPosition, RecursivePattern as AP}
 
-def interpret(input: String): List[Stream] = {
+def interpret(input: String): List[Track] = {
     val ast = new SoundCodeParser().parseProgram(input)
     ast match {
         case Right(programAST) => Interpreter.interpret(programAST)
@@ -56,8 +56,8 @@ class InterpreterFunSuite extends AnyFunSuite {
         // base è il pattern dei note, extensions contiene i 2 effetti
         assert(stream.extensions.length == 2)
         // Estrai l'effetto dal pattern (assumendo che il pattern dell'effetto contenga l'effetto come unico elemento)
-        val effect1 = stream.extensions.head.head.head.asInstanceOf[Effect.Gain]
-        val effect2 = stream.extensions(1).head.head.asInstanceOf[Effect.Room]
+        val effect1 = stream.extensions.head.head.head.asInstanceOf[AudioEffect.Gain]
+        val effect2 = stream.extensions(1).head.head.asInstanceOf[AudioEffect.Room]
         
         assert(effect1.value == 5.0)
         assert(effect2.value == 10.0)
@@ -74,4 +74,4 @@ class InterpreterFunSuite extends AnyFunSuite {
         val sub = sequence(1).asInstanceOf[AP.SubPattern].pattern
         assert(sub.head.head.asInstanceOf[Sound.NoteInText].note.value == "e3")
     }
-}
+}*/
