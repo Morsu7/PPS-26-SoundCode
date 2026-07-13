@@ -2,6 +2,8 @@ package soundcode.engine
 
 import soundcode.domain.*
 
+import scala.annotation.tailrec
+
 object PatternResolver:
 
   def query[T](pattern: Pattern[T], timeWindow: Interval): List[ScheduledEvent[T]] =
@@ -16,6 +18,7 @@ object PatternResolver:
       case we: Pattern.WithExtensions => resolveExtensions(we.base, we.extensions, timeWindow)
 
 
+  @tailrec
   private def resolveTimeWarp[T](modifier: PatternModifier[T], innerPattern: Pattern[T], timeWindow: Interval): List[ScheduledEvent[T]] =
     modifier match
       case PatternModifier.FastForward(factor) =>
