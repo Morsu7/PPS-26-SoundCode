@@ -9,7 +9,7 @@ import soundcode.parser.AST.Transformations._
 
 class SoundCodeParserSuite extends AnyFunSuite with BeforeAndAfterAll {
 
-    private def DEBUG = true
+    private def DEBUG = false
     private val testReports = ListBuffer[String]()
 
     override def afterAll(): Unit = {

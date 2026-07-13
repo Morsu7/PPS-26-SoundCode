@@ -19,10 +19,10 @@ def rim = Pattern.Atom(Sound.SampleInText(Sample("rim"), dummyPos))
 def clap = Pattern.Atom(Sound.SampleInText(Sample("clap"), dummyPos))
 
 // Note
-def c4 = Pattern.Atom(Sound.NoteInText(Note("c4"), dummyPos))
-def f4 = Pattern.Atom(Sound.NoteInText(Note("f4"), dummyPos))
-def g4 = Pattern.Atom(Sound.NoteInText(Note("g4"), dummyPos))
-def cSharp4 = Pattern.Atom(Sound.NoteInText(Note("c#4"), dummyPos))
+def c4 = Pattern.Atom(Sound.NoteInText(Note("c"), dummyPos))
+def f4 = Pattern.Atom(Sound.NoteInText(Note("f"), dummyPos))
+def g4 = Pattern.Atom(Sound.NoteInText(Note("g"), dummyPos))
+def cSharp4 = Pattern.Atom(Sound.NoteInText(Note("c#"), dummyPos))
 
 // Effetti
 def gain(v: Double) = Pattern.Atom(AudioEffect.Gain(v))

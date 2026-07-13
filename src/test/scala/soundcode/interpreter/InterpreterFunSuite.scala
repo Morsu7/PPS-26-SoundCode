@@ -1,12 +1,19 @@
-/*package soundcode.interpreter
+package soundcode.interpreter
 
 import org.scalatest.funsuite.AnyFunSuite
-import fastparse.*
 import org.scalatest.Assertions.fail
-import soundcode.parser.SoundCodeParser
-import soundcode.domain.{AudioEffect, Sound, Track, TextPosition, RecursivePattern as AP}
+import org.scalatest.matchers.should.Matchers._
+import org.scalatest.Inside._
 
-def interpret(input: String): List[Track] = {
+import fastparse.*
+
+import soundcode.parser.SoundCodeParser
+
+import soundcode.domain.*
+import soundcode.domain.Sound.*
+import soundcode.domain.Pattern.*
+
+def interpret(input: String): List[Pattern[AudioPayload]] = {
     val ast = new SoundCodeParser().parseProgram(input)
     ast match {
         case Parsed.Success(programAST, _) => Interpreter.interpret(programAST)
@@ -17,61 +24,100 @@ def interpret(input: String): List[Track] = {
 class InterpreterFunSuite extends AnyFunSuite {
 
     test("interpret a simple note block") {
-        val streams = interpret("note(\"c# e3\")")
-        assert(streams.length == 1)
-        val stream = streams.head
-        // Il base è un Pattern (List[List[Element]]), prendiamo il primo elemento della prima sequenza
-        val note = stream.base.head.head.asInstanceOf[Sound.NoteInText]
-        assert(note.note.value == "c#4") 
+        val streams = interpret("note(\"c# e3\").note(\"g4\")")
+        
+        streams should matchPattern {
+            case List(Pattern.Sequence(List(Pattern.Atom(NoteInText(Note("C", "#", 4), _)), _))) =>
+        }
     }
 
     test("interpret a simple sound block") {
-        val streams = interpret("sound(\"bd hh\")")
-        assert(streams.length == 1)
-        val sample = streams.head.base.head.head.asInstanceOf[Sound.SampleInText]
-        assert(sample.sample.value == "bd")
-    }
-
-    test("interpret a stream with a note block and a sound extension") {
-        // La base è note, l'estensione è sound
-        val streams = interpret("note(\"c#\").sound(\"bd\").sound(\"hh\").note(\"e3\")")
-        val stream = streams.head
+        val streams = interpret("sound(\"bd hh\").note(\"g4\")")
         
-        assert(stream.base.head.head.isInstanceOf[Sound.NoteInText])
-        assert(stream.extensions.length == 1)
-        assert(stream.extensions.head.head.head.isInstanceOf[Sound.SampleInText])
-    }
+        streams.head should matchPattern {
+            case Pattern.WithExtensions(Pattern.Sequence(_), _) =>
+        }
 
-    test("interpret multiple streams") {
-        val streams = interpret("note(\"c# e3\")\nsound(\"bd hh\")")
-        assert(streams.length == 2)
-        assert(streams.head.base.head.head.isInstanceOf[Sound.NoteInText])
-        assert(streams(1).base.head.head.isInstanceOf[Sound.SampleInText])
+        inside(streams.head) {
+            case Pattern.WithExtensions(Pattern.Sequence(elements), extensions) =>
+                // Verifica base
+                elements.head match {
+                    case Pattern.Atom(SampleInText(Sample("bd"), _)) => // OK
+                    case other => fail(s"Expected bd sample, found $other")
+                }
+                
+                extensions should have size 1
+                extensions.head match {
+                    case Pattern.Atom(note: NoteInText) => note.note.toString() shouldBe "G4"
+                    case _ => fail("Expected NoteInText")
+                }
+        }
     }
 
     test("interpret a stream with transformation effects") {
         val streams = interpret("note(\"c#\").gain(\"5\").room(\"10\")")
-        val stream = streams.head
+        println(streams)
         
-        // base è il pattern dei note, extensions contiene i 2 effetti
-        assert(stream.extensions.length == 2)
-        // Estrai l'effetto dal pattern (assumendo che il pattern dell'effetto contenga l'effetto come unico elemento)
-        val effect1 = stream.extensions.head.head.head.asInstanceOf[AudioEffect.Gain]
-        val effect2 = stream.extensions(1).head.head.asInstanceOf[AudioEffect.Room]
-        
-        assert(effect1.value == 5.0)
-        assert(effect2.value == 10.0)
+        inside(streams.head) {
+            case Pattern.WithExtensions(_, extensions) =>
+                extensions should have size 2
+                
+                // Verifica effetti in modo leggibile e senza cast
+                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0)) => }
+                extensions(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(10.0)) => }
+        }
     }
 
     test("interpret a stream with complex nested patterns") {
         val streams = interpret("note(\"c# [e3 g4]\")")
-        val stream = streams.head
-        val sequence = stream.base.head
         
-        assert(sequence.length == 2)
-        assert(sequence(1).isInstanceOf[AP.SubPattern])
-        
-        val sub = sequence(1).asInstanceOf[AP.SubPattern].pattern
-        assert(sub.head.head.asInstanceOf[Sound.NoteInText].note.value == "e3")
+        inside(streams.head) {
+            case Pattern.Sequence(elements) =>
+                elements should have size 2
+                
+                // Navighiamo nella struttura annidata in modo sicuro
+                inside(elements(1)) {
+                    case Pattern.Sequence(inner) =>
+                        inner.head match {
+                            case Pattern.Atom(n: NoteInText) => n.note.toString() shouldBe "E3"
+                            case other => fail(s"Expected NoteInText, found $other")
+                        }
+                    case other => fail(s"Expected nested sequence, found $other")
+                }
+        }
     }
-}*/
+
+    test("interpret a stream with a transformation") {
+        val streams = interpret("note(\"c#\").rev()")
+        
+        inside(streams.head) {
+            case Pattern.TimeWarp(modifier, pattern) =>
+                modifier shouldBe PatternModifier.Reverse
+                pattern should matchPattern { case Pattern.Atom(NoteInText(Note("C", "#", 4), _)) => }
+        }
+    }
+
+    test("interpret complex chain: note + gain + sound + rev") {
+        val streams = interpret("note(\"c#\").gain(\"5\").sound(\"bd\").rev()")
+        
+        inside(streams.head) {
+            case Pattern.TimeWarp(modifier, pattern) =>
+                modifier shouldBe PatternModifier.Reverse
+                
+                inside(pattern) {
+                    case Pattern.WithExtensions(_, extensions) =>
+                        extensions should have size 2
+                        
+                        // Verifica il Gain
+                        extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0)) => }
+                        
+                        // Verifica il Sound (Sample)
+                        extensions(1) should matchPattern { case Pattern.Atom(s: SampleInText) if s.sample.value == "bd" => }
+                        
+                    case other => fail(s"Expected WithExtensions, but found $other")
+                }
+                
+            case other => fail(s"Expected TimeWarp, but found $other")
+        }
+    }
+}

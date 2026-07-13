@@ -68,10 +68,6 @@ object PatternResolver:
           }
         events.toList.flatten
 
-      case PatternModifier.Delay(offset) =>
-        // Matematicamente, un delay sul pattern globale è identico a "Late"
-        resolveTimeWarp(PatternModifier.Late(offset), innerPattern, timeWindow)
-
       case PatternModifier.Repetition(times) =>
         // Ripetere l'intero pattern N volte nello stesso ciclo equivale a velocizzarlo (FastForward)
         resolveTimeWarp(PatternModifier.FastForward(times), innerPattern, timeWindow)
