@@ -1,6 +1,6 @@
-package soundcode.engine
+package soundcode.engine.support
 
-import soundcode.domain.{AudioEffect, AudioPayload, Fraction, Note, Pattern, PatternModifier, Sample, Sound, TextPosition}
+import soundcode.domain.*
 
 
 extension (n: Int)
