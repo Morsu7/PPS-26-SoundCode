@@ -3,6 +3,7 @@ package soundcode.engine
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import soundcode.domain.*
+import soundcode.engine.support.*
 
 class AudioPlayerTest extends AnyFunSuite with Matchers {
 

@@ -1,6 +1,6 @@
-package soundcode.engine
+package soundcode.engine.support
 
-import soundcode.domain.{AudioEffect, AudioPayload, Fraction, Note, Pattern, PatternModifier, Sample, Sound, TextPosition}
+import soundcode.domain.*
 
 
 extension (n: Int)
@@ -46,3 +46,8 @@ def late[T](offset: Pattern[Double], pattern: Pattern[T]): Pattern[T] = Pattern.
 def late[T](offset: Double, pattern: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Late(Pattern.Atom(offset)), pattern)
 def early[T](offset: Pattern[Double], pattern: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Early(offset), pattern)
 def early[T](offset: Double, pattern: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Early(Pattern.Atom(offset)), pattern)
+
+def repeat[T](times: Double, p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Repetition(Pattern.Atom(times)), p)
+def repeat[T](times: Pattern[Double], p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Repetition(times), p)
+def delay[T](offset: Double, p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Delay(Pattern.Atom(offset)), p)
+def delay[T](offset: Pattern[Double], p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Delay(offset), p)

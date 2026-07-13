@@ -36,8 +36,10 @@ class AudioPlayer(val tempo: Tempo) {
       val expectedTriggerMs = firstTickTimeMs.get + tempo.offsetMs(nextEvent.part.start)
       if (now.toLong >= expectedTriggerMs) {
         eventStream = eventStream.tail
-        val durationMs = tempo.durationMs(nextEvent.part.start, nextEvent.part.end)
-        triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
+        if (nextEvent.part.start == nextEvent.whole.start) {
+          val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
+          triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
+        }
       } else {
         return
       }

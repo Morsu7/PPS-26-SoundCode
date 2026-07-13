@@ -17,7 +17,6 @@ object PatternResolver:
       case Pattern.TimeWarp(modifier, inner) => resolveTimeWarp(modifier, inner, timeWindow)
       case we: Pattern.WithExtensions => resolveExtensions(we.base, we.extensions, timeWindow)
 
-
   @tailrec
   private def resolveTimeWarp[T](modifier: PatternModifier[T], innerPattern: Pattern[T], timeWindow: Interval): List[ScheduledEvent[T]] =
     modifier match
@@ -67,7 +66,31 @@ object PatternResolver:
         events.toList.flatten
 
       case PatternModifier.Repetition(times) =>
-        resolveTimeWarp(PatternModifier.FastForward(times), innerPattern, timeWindow)
+        val events = for
+          // 1. Leggiamo quante ripetizioni fare
+          paramEvent <- query(times, timeWindow)
+          n = math.max(1, math.round(paramEvent.value).toInt)
+
+          // 2. Chiediamo le note originali (niente zoom, tempo reale)
+          activeWindow <- paramEvent.part.intersect(timeWindow).toList
+          innerEvent <- query(innerPattern, activeWindow)
+
+          // 3. Calcoliamo la durata della nota frammentata
+          wholeDur = innerEvent.whole.end - innerEvent.whole.start
+          stepDur = wholeDur / Fraction(n, 1L)
+
+          // 4. Generiamo gli N frammenti
+          i <- 0 until n
+          newWholeStart = innerEvent.whole.start + (stepDur * Fraction(i, 1L))
+          newWholeEnd = newWholeStart + stepDur
+          newWhole = Interval(newWholeStart, newWholeEnd)
+
+          // 5. Teniamo solo i frammenti che cadono nel nostro ascolto
+          newPart <- newWhole.intersect(innerEvent.part).toList
+        yield
+          innerEvent.copy(whole = newWhole, part = newPart)
+
+        events.toList
 
       case PatternModifier.Juxtaposition(modifiers) =>
         val modifiedPatterns = modifiers.map(mod => Pattern.TimeWarp(mod, innerPattern))
@@ -79,9 +102,6 @@ object PatternResolver:
           Pattern.TimeWarp(mod, pat)
         }
         query(Pattern.Parallel(List(innerPattern, finalTransformed)), timeWindow)
-
-      case _ =>
-        query(innerPattern, timeWindow)
 
 
   private def resolveAlternation[T](elements: List[Pattern[T]], timeWindow: Interval): List[ScheduledEvent[T]] =
@@ -149,7 +169,7 @@ object PatternResolver:
   private def applyDynamicModifier[T](parameter: Pattern[Double], innerPattern: Pattern[T], timeWindow: Interval, zoomIn: (Interval, Fraction) => Interval, zoomOut: (ScheduledEvent[T], Fraction) => ScheduledEvent[T]): List[ScheduledEvent[T]] =
     for
       paramEvent <- query(parameter, timeWindow)
-      paramValue = Fraction((paramEvent.value * 100).toLong, 100L)
+      paramValue = Fraction(paramEvent.value)
 
       activeWindow <- paramEvent.part.intersect(timeWindow).toList
       warpedWindow = zoomIn(activeWindow, paramValue)
