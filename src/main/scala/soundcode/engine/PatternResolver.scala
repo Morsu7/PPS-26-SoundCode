@@ -53,14 +53,9 @@ object PatternResolver:
 
           Interval(cycleStart, cycleEnd).intersect(timeWindow).toList.flatMap { activeWindow =>
             val reverseF = (t: Fraction) => cycleStart + cycleEnd - t
-
-            // LA CORREZIONE: Applichiamo la formula ma SCAMBIAMO start ed end!
-            // In questo modo l'intervallo è sempre matematicamente valido (start < end).
             val queryWindow = Interval(reverseF(activeWindow.end), reverseF(activeWindow.start))
 
             query(innerPattern, queryWindow).map { e =>
-              // Quando ricostruiamo l'evento in uscita, dobbiamo scambiare di nuovo
-              // i suoi bordi, per riportarli alla linea temporale in cui ci troviamo.
               val newWhole = Interval(reverseF(e.whole.end), reverseF(e.whole.start))
               val newPart = Interval(reverseF(e.part.end), reverseF(e.part.start))
               e.copy(whole = newWhole, part = newPart)
@@ -69,21 +64,16 @@ object PatternResolver:
         events.toList.flatten
 
       case PatternModifier.Delay(offset) =>
-        // Matematicamente, un delay sul pattern globale è identico a "Late"
         resolveTimeWarp(PatternModifier.Late(offset), innerPattern, timeWindow)
 
       case PatternModifier.Repetition(times) =>
-        // Ripetere l'intero pattern N volte nello stesso ciclo equivale a velocizzarlo (FastForward)
         resolveTimeWarp(PatternModifier.FastForward(times), innerPattern, timeWindow)
 
       case PatternModifier.Juxtaposition(modifiers) =>
-        // JUX: Suona l'originale IN PARALLELO con le versioni modificate!
-        // Trasformiamo al volo l'albero in un Pattern.Parallel
         val modifiedPatterns = modifiers.map(mod => Pattern.TimeWarp(mod, innerPattern))
         query(Pattern.Parallel(innerPattern :: modifiedPatterns), timeWindow)
 
       case PatternModifier.Offset(offset, modifiers) =>
-        // OFF: Suona l'originale IN PARALLELO con una versione ritardata a cui applichiamo i modificatori
         val delayedPattern = Pattern.TimeWarp(PatternModifier.Late(Pattern.Atom(offset)), innerPattern)
         val finalTransformed = modifiers.foldLeft(delayedPattern) { (pat, mod) =>
           Pattern.TimeWarp(mod, pat)

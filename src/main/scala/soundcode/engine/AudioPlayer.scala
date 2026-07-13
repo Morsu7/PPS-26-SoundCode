@@ -48,7 +48,7 @@ class AudioPlayer(val tempo: Tempo) {
     payload match {
       case Sound.Rest(_) => ???
       case Sound.SampleInText(s, _) => ???
-      case soundcode.domain.Sound.NoteInText(_, _) => ???
+      case Sound.NoteInText(_, _) => ???
       case _ => ???
     }
   }

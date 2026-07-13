@@ -3,7 +3,7 @@ package soundcode.domain
 import scala.annotation.tailrec
 
 // ==========================================
-// 1. TIPI BASE E TEMPORALI
+// TIPI BASE E TEMPORALI
 // ==========================================
 
 case class Fraction(n: Long, d: Long) extends Ordered[Fraction]:
@@ -51,7 +51,7 @@ object Sample:
 
 
 // ==========================================
-// 2. Syntax Element
+// Syntax Element
 // ==========================================
 
 case class TextPosition(startIndex: Int, endIndex: Int)
@@ -93,7 +93,7 @@ object Pattern:
   case class WithExtensions(base: Pattern[AudioPayload], extensions: List[Pattern[AudioPayload]]) extends Pattern[AudioPayload]
 
 // ==========================================
-// 4. ESECUZIONE E SCHEDULING
+// ESECUZIONE E SCHEDULING
 // ==========================================
 
 case class ScheduledEvent[+T](whole: Interval, part: Interval, value: T, appliedExtensions: List[AudioPayload] = Nil):

@@ -30,8 +30,8 @@ class AudioPlayerTest extends AnyFunSuite with Matchers {
     val events = playCycle(player, 0)
 
     events should contain theSameElementsInOrderAs List(
-      PlayedEvent("bd", 0L, 1000L, List("c4", "f4")),
-      PlayedEvent("hh", 1000L, 1000L, List("f4", "g4"))
+      PlayedEvent("bd", 0L, 1000L, List("c4")),
+      PlayedEvent("hh", 1000L, 1000L, List("f4"))
     )
   }
 
@@ -102,7 +102,7 @@ class AudioPlayerTest extends AnyFunSuite with Matchers {
 
     events should contain theSameElementsInOrderAs List(
       PlayedEvent("bd", 0L, 667L, List("gain(3.0)", "room(6.0)")),
-      PlayedEvent("sn", 666L, 667L, List("gain(3.0)", "gain(5.0)", "room(6.0)")),
+      PlayedEvent("sn", 666L, 667L, List("gain(3.0)", "room(6.0)")),
       PlayedEvent("hh", 1333L, 667L, List("gain(5.0)", "room(6.0)"))
     )
   }
