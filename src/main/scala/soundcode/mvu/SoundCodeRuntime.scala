@@ -1,8 +1,11 @@
 package soundcode.mvu;
 
+import soundcode.engine.MidiAudioPlayer
+
 class SoundCodeRuntime(
     initialModel: AppModel,
-    render: AppModel => Unit
+    render: AppModel => Unit,
+    audioPlayer: MidiAudioPlayer
 ):
   private var model: AppModel = initialModel
 
@@ -13,6 +16,9 @@ class SoundCodeRuntime(
       model = nextModel
       render(model)
 
-    cmd.run(dispatch)
+    cmd.run(dispatch, audioPlayer)
 
   def currentModel: AppModel = model
+
+  /** Da invocare alla chiusura dell'app: ferma la riproduzione e rilascia le risorse MIDI. */
+  def shutdown(): Unit = audioPlayer.close()
