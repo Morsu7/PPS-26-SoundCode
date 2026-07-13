@@ -31,8 +31,8 @@ class AudioPlayerTest extends AnyFunSuite with Matchers {
     val events = playCycle(player, 0)
 
     events should contain theSameElementsInOrderAs List(
-      PlayedEvent("bd", 0L, 1000L, List("c4")),
-      PlayedEvent("hh", 1000L, 1000L, List("f4"))
+      PlayedEvent("bd", 0L, 1000L, List("C")),
+      PlayedEvent("hh", 1000L, 1000L, List("F"))
     )
   }
 
@@ -122,7 +122,7 @@ class AudioPlayerTest extends AnyFunSuite with Matchers {
     override protected def triggerSound(payload: AudioPayload, durationMs: Long, extensions: List[AudioPayload]): Unit = {
       def extractName(p: AudioPayload): String = p match {
         case Sound.SampleInText(s, _) => s.value
-        case Sound.NoteInText(n, _) => n.toString
+        case Sound.NoteInText(n, _) => n.name
         case AudioEffect.Gain(v) => s"gain($v)"
         case AudioEffect.Room(v) => s"room($v)"
         case _ => "unknown"

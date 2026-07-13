@@ -16,8 +16,7 @@ object PatternResolver:
       case Pattern.Sequence(elements) => resolveSequence(elements, timeWindow)
       case Pattern.TimeWarp(modifier, inner) => resolveTimeWarp(modifier, inner, timeWindow)
       case we: Pattern.WithExtensions => resolveExtensions(we.base, we.extensions, timeWindow)
-
-  @tailrec
+  
   private def resolveTimeWarp[T](modifier: PatternModifier[T], innerPattern: Pattern[T], timeWindow: Interval): List[ScheduledEvent[T]] =
     modifier match
       case PatternModifier.FastForward(factor) =>

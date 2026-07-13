@@ -11,12 +11,12 @@ object Update:
           Cmd.ParseAndInterpret(code)
         )
 
-      case Msg.CodeParsed(streams, errors) =>
+      /*case Msg.CodeParsed(streams, errors) =>
         println(s"Code parsed with errors: $errors")
         (
           model.copy(streams = streams),
           Cmd.UpdateTimeline(streams)
-        )
+        )*/
 
       // Play/Stop non modificano il model (evitano un re-render che sovrascriverebbe
       // il testo non ancora confermato con "Update"): eseguono solo il comando audio.

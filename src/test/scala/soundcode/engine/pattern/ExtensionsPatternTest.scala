@@ -11,19 +11,19 @@ class ExtensionsPatternTest extends SchedulerTestBase {
     val streams = List(ext(base, extSound, extRoom))
 
     assertCycle(streams, 0)(
-      ExpEvent("c4", 0 \ 1, 1 \ 3, List("bd", "4.0", "4.0")),
-      ExpEvent("f4", 1 \ 3, 2 \ 3, List("bd", "5.0", "4.0")),
-      ExpEvent("g4", 2 \ 3, 7 \ 9, List("cp", "4.0", "4.0")),
-      ExpEvent("c4", 7 \ 9, 8 \ 9, List("cp", "4.0", "4.0")),
-      ExpEvent("c#4", 8 \ 9, 1 \ 1, List("cp", "4.0", "4.0"))
+      ExpEvent("C", 0 \ 1, 1 \ 3, List("bd", "4.0", "4.0")),
+      ExpEvent("F", 1 \ 3, 2 \ 3, List("bd", "5.0", "4.0")),
+      ExpEvent("G", 2 \ 3, 7 \ 9, List("cp", "4.0", "4.0")),
+      ExpEvent("C", 7 \ 9, 8 \ 9, List("cp", "4.0", "4.0")),
+      ExpEvent("C#", 8 \ 9, 1 \ 1, List("cp", "4.0", "4.0"))
     )
 
     assertCycle(streams, 1)(
-      ExpEvent("c4", 1 \ 1, 4 \ 3, List("hh", "4.0", "5.0")),
-      ExpEvent("f4", 4 \ 3, 5 \ 3, List("sn", "5.0", "5.0")),
-      ExpEvent("g4", 5 \ 3, 16 \ 9, List("cp", "4.0", "5.0")),
-      ExpEvent("c4", 16 \ 9, 17 \ 9, List("cp", "4.0", "5.0")),
-      ExpEvent("c#4", 17 \ 9, 2 \ 1, List("cp", "4.0", "5.0"))
+      ExpEvent("C", 1 \ 1, 4 \ 3, List("hh", "4.0", "5.0")),
+      ExpEvent("F", 4 \ 3, 5 \ 3, List("sn", "5.0", "5.0")),
+      ExpEvent("G", 5 \ 3, 16 \ 9, List("cp", "4.0", "5.0")),
+      ExpEvent("C", 16 \ 9, 17 \ 9, List("cp", "4.0", "5.0")),
+      ExpEvent("C#", 17 \ 9, 2 \ 1, List("cp", "4.0", "5.0"))
     )
   }
 
@@ -54,8 +54,8 @@ class ExtensionsPatternTest extends SchedulerTestBase {
 
     // Essendo due alternanze lunghe rispettivamente 2 e 3 cicli, il minimo comune multiplo è 6 cicli.
     val expectedElements = Vector(
-      ("bd", "c4"), ("cp", "f4"), ("bd", "g4"),
-      ("cp", "c4"), ("bd", "f4"), ("cp", "g4")
+      ("bd", "C"), ("cp", "F"), ("bd", "G"),
+      ("cp", "C"), ("bd", "F"), ("cp", "G")
     )
 
     for (i <- 0 until 6) {
@@ -81,8 +81,8 @@ class ExtensionsPatternTest extends SchedulerTestBase {
     val streams = List(ext(bd, alt(c4, f4), alt(gain(3), gain(4), gain(5))))
 
     val expected = Vector(
-      ("c4", "3.0"), ("f4", "4.0"), ("c4", "5.0"),
-      ("f4", "3.0"), ("c4", "4.0"), ("f4", "5.0")
+      ("C", "3.0"), ("F", "4.0"), ("C", "5.0"),
+      ("F", "3.0"), ("C", "4.0"), ("F", "5.0")
     )
 
     for (i <- 0 until 6) {
@@ -97,10 +97,10 @@ class ExtensionsPatternTest extends SchedulerTestBase {
 
     // La sequenza interna cade a frazioni, la nota "c4" viene presa al volo come estensione
     assertCycle(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 1, List("c4"))
+      ExpEvent("bd", 0 \ 1, 1 \ 1, List("C"))
     )
     assertCycle(streams, 1)(
-      ExpEvent("cp", 1 \ 1, 2 \ 1, List("c4"))
+      ExpEvent("cp", 1 \ 1, 2 \ 1, List("C"))
     )
   }
 
@@ -138,17 +138,17 @@ class ExtensionsPatternTest extends SchedulerTestBase {
 
     // Ciclo 0 (Indici: bd=0, c4=0, gain=0)
     assertCycle(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 1, List("c4", "1.0"))
+      ExpEvent("bd", 0 \ 1, 1 \ 1, List("C", "1.0"))
     )
 
     // Ciclo 14 (Indici: 14%2=0 -> bd, 14%3=2 -> g4, 14%5=4 -> 5.0)
     assertCycle(streams, 14)(
-      ExpEvent("bd", 14 \ 1, 15 \ 1, List("g4", "5.0"))
+      ExpEvent("bd", 14 \ 1, 15 \ 1, List("G", "5.0"))
     )
 
     // Ciclo 29 - Ultimo giro (Indici: 29%2=1 -> cp, 29%3=2 -> g4, 29%5=4 -> 5.0)
     assertCycle(streams, 29)(
-      ExpEvent("cp", 29 \ 1, 30 \ 1, List("g4", "5.0"))
+      ExpEvent("cp", 29 \ 1, 30 \ 1, List("G", "5.0"))
     )
   }
 
@@ -164,7 +164,7 @@ class ExtensionsPatternTest extends SchedulerTestBase {
     // Essendo tutti pattern fissi (Atom) della durata di 1 ciclo,
     // avremo un singolo evento perfetto da 0 a 1 con tutte le estensioni applicate.
     assertCycle(streams, 0)(
-      ExpEvent("c#4", 0 \ 1, 1 \ 1, List("5.0", "bd", "7.0"))
+      ExpEvent("C#", 0 \ 1, 1 \ 1, List("5.0", "bd", "7.0"))
     )
   }
 }

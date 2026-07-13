@@ -39,7 +39,7 @@ extension (e: ScheduledEvent[AudioPayload])
   def toExp: ExpEvent =
     def extractName(payload: AudioPayload): String = payload match
       case Sound.SampleInText(s, _) => s.value
-      case Sound.NoteInText(n, _) => n.value
+      case Sound.NoteInText(n, _) => n.name
       case Sound.Rest(_) => ""
       case AudioEffect.Gain(v) => v.toString
       case AudioEffect.Room(v) => v.toString

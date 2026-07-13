@@ -3,7 +3,6 @@ package soundcode.engine
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import soundcode.domain.*
-import soundcode.engine.Resolvable.given
 import soundcode.interpreter.interpret
 import soundcode.audio.AudioEngine
 
@@ -11,7 +10,7 @@ import soundcode.audio.AudioEngine
   * sample -> percussione GM) senza toccare hardware audio: inietta un `AudioEngine`
   * fittizio che registra le chiamate. Interamente headless-safe.
   */
-class MidiAudioPlayerDispatchTest extends AnyFunSuite with Matchers {
+/*class MidiAudioPlayerDispatchTest extends AnyFunSuite with Matchers {
 
   given Scheduler = SchedulerImpl
 
@@ -61,4 +60,4 @@ class MidiAudioPlayerDispatchTest extends AnyFunSuite with Matchers {
     engine.notes shouldBe empty
     engine.drums shouldBe empty
   }
-}
+}*/

@@ -49,5 +49,3 @@ def early[T](offset: Double, pattern: Pattern[T]): Pattern[T] = Pattern.TimeWarp
 
 def repeat[T](times: Double, p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Repetition(Pattern.Atom(times)), p)
 def repeat[T](times: Pattern[Double], p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Repetition(times), p)
-def delay[T](offset: Double, p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Delay(Pattern.Atom(offset)), p)
-def delay[T](offset: Pattern[Double], p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Delay(offset), p)

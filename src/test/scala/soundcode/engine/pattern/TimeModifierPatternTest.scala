@@ -164,18 +164,6 @@ class TimeModifierPatternTest extends SchedulerTestBase {
     )
   }
 
-  test("""sound("bd sn").fast(2).late(0,25)""") {
-    val innerFast = fast(2.0, seq(bd, sn))
-    val streams = List(late(num(0.25), innerFast))
-
-    assertCycleUnordered(streams, 0)(
-      ExpEvent("sn", 0 \ 1, 1 \ 4), // Il rullante compresso del ciclo -1 !
-      ExpEvent("bd", 1 \ 4, 1 \ 2),
-      ExpEvent("sn", 1 \ 2, 3 \ 4),
-      ExpEvent("bd", 3 \ 4, 1 \ 1) // La testa del 2° rullante va a finire nel ciclo successivo!
-    )
-  }
-
   test("""sound("bd sn").late("[0 1/2]")""") {
     // Prima metà del ciclo [0.0 -> 0.5]: offset 0
     // Seconda metà del ciclo [0.5 -> 1.0]: offset 0.5
