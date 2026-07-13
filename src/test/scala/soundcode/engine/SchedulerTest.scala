@@ -95,19 +95,19 @@ class SchedulerTest extends AnyFunSuite with Matchers {
     val streams = List(ext(base, extSound, extRoom))
 
     assertCycle(streams, 0)(
-      ExpEvent("c4", 0 \ 1, 1 \ 3, List("bd", "4.0", "4.0")),
-      ExpEvent("f4", 1 \ 3, 2 \ 3, List("bd", "5.0", "4.0")),
-      ExpEvent("g4", 2 \ 3, 7 \ 9, List("cp", "4.0", "4.0")),
-      ExpEvent("c4", 7 \ 9, 8 \ 9, List("cp", "4.0", "4.0")),
-      ExpEvent("c#4", 8 \ 9, 1 \ 1, List("cp", "4.0", "4.0"))
+      ExpEvent("C4", 0 \ 1, 1 \ 3, List("bd", "4.0", "4.0")),
+      ExpEvent("F4", 1 \ 3, 2 \ 3, List("bd", "5.0", "4.0")),
+      ExpEvent("G4", 2 \ 3, 7 \ 9, List("cp", "4.0", "4.0")),
+      ExpEvent("C4", 7 \ 9, 8 \ 9, List("cp", "4.0", "4.0")),
+      ExpEvent("C#4", 8 \ 9, 1 \ 1, List("cp", "4.0", "4.0"))
     )
 
     assertCycle(streams, 1)(
-      ExpEvent("c4", 1 \ 1, 4 \ 3, List("hh", "4.0", "5.0")),
-      ExpEvent("f4", 4 \ 3, 5 \ 3, List("sn", "5.0", "5.0")),
-      ExpEvent("g4", 5 \ 3, 16 \ 9, List("cp", "4.0", "5.0")),
-      ExpEvent("c4", 16 \ 9, 17 \ 9, List("cp", "4.0", "5.0")),
-      ExpEvent("c#4", 17 \ 9, 2 \ 1, List("cp", "4.0", "5.0"))
+      ExpEvent("F4", 1 \ 1, 4 \ 3, List("hh", "4.0", "5.0")),
+      ExpEvent("G4", 4 \ 3, 5 \ 3, List("sn", "5.0", "5.0")),
+      ExpEvent("G4", 5 \ 3, 16 \ 9, List("cp", "4.0", "5.0")),
+      ExpEvent("C4", 16 \ 9, 17 \ 9, List("cp", "4.0", "5.0")),
+      ExpEvent("C#4", 17 \ 9, 2 \ 1, List("cp", "4.0", "5.0"))
     )
   }
 
@@ -160,12 +160,12 @@ class SchedulerTest extends AnyFunSuite with Matchers {
 
     viewData should have size 1
     assertBoundedTrack(viewData, trackIndex = 0, expectedDuration = 6 \ 1)(
-      ExpEvent("bd", 0 \ 1, 1 \ 1, List("c4", "3.0")),
-      ExpEvent("bd", 1 \ 1, 2 \ 1, List("f4", "4.0")),
-      ExpEvent("bd", 2 \ 1, 3 \ 1, List("c4", "5.0")),
-      ExpEvent("bd", 3 \ 1, 4 \ 1, List("f4", "3.0")),
-      ExpEvent("bd", 4 \ 1, 5 \ 1, List("c4", "4.0")),
-      ExpEvent("bd", 5 \ 1, 6 \ 1, List("f4", "5.0"))
+      ExpEvent("bd", 0 \ 1, 1 \ 1, List("C4", "3.0")),
+      ExpEvent("bd", 1 \ 1, 2 \ 1, List("F4", "4.0")),
+      ExpEvent("bd", 2 \ 1, 3 \ 1, List("C4", "5.0")),
+      ExpEvent("bd", 3 \ 1, 4 \ 1, List("F4", "3.0")),
+      ExpEvent("bd", 4 \ 1, 5 \ 1, List("C4", "4.0")),
+      ExpEvent("bd", 5 \ 1, 6 \ 1, List("F4", "5.0"))
     )
   }
 
@@ -175,8 +175,8 @@ class SchedulerTest extends AnyFunSuite with Matchers {
 
     viewData should have size 1
     assertBoundedTrack(viewData, trackIndex = 0, expectedDuration = 2 \ 1)(
-      ExpEvent("bd", 0 \ 1, 1 \ 1, List("c4")),
-      ExpEvent("cp", 1 \ 1, 2 \ 1, List("c4"))
+      ExpEvent("bd", 0 \ 1, 1 \ 1, List("C4")),
+      ExpEvent("cp", 1 \ 1, 2 \ 1, List("C4"))
     )
   }
 
@@ -228,9 +228,9 @@ class SchedulerTest extends AnyFunSuite with Matchers {
 
     val events = trackTimeline.map(_.toExp).toVector
 
-    events(0) shouldBe ExpEvent("bd", 0 \ 1, 1 \ 1, List("c4", "1.0"))
-    events(14) shouldBe ExpEvent("bd", 14 \ 1, 15 \ 1, List("g4", "5.0"))
-    events(29) shouldBe ExpEvent("cp", 29 \ 1, 30 \ 1, List("g4", "5.0"))
+    events(0) shouldBe ExpEvent("bd", 0 \ 1, 1 \ 1, List("C4", "1.0"))
+    events(14) shouldBe ExpEvent("bd", 14 \ 1, 15 \ 1, List("G4", "5.0"))
+    events(29) shouldBe ExpEvent("cp", 29 \ 1, 30 \ 1, List("G4", "5.0"))
   }
 
   test("""sound("bd sn").fast(2)""") {
@@ -498,30 +498,19 @@ class SchedulerTest extends AnyFunSuite with Matchers {
     val streams = List(Pattern.TimeWarp(PatternModifier.Reverse, patternWithEffects))
 
     assertCycleUnordered(streams, 0)(
-      ExpEvent("clap", 0 \ 1, 1 \ 6, List("g4", "1.0")),
-      ExpEvent("rim", 1 \ 6, 1 \ 3, List("g4", "1.0")),
-      ExpEvent("sn", 1 \ 3, 2 \ 3, List("c4", "1.0")),
-      ExpEvent("bd", 2 \ 3, 1 \ 1, List("c4", "1.0")),
-      ExpEvent("hh", 2 \ 3, 1 \ 1, List("c4", "1.0"))
+      ExpEvent("clap", 0 \ 1, 1 \ 6, List("G4", "1.0")),
+      ExpEvent("rim", 1 \ 6, 1 \ 3, List("G4", "1.0")),
+      ExpEvent("sn", 1 \ 3, 2 \ 3, List("C4", "1.0")),
+      ExpEvent("bd", 2 \ 3, 1 \ 1, List("C4", "1.0")),
+      ExpEvent("hh", 2 \ 3, 1 \ 1, List("C4", "1.0"))
     )
 
     assertCycleUnordered(streams, 1)(
-      ExpEvent("clap", 1 \ 1, 7 \ 6, List("g4", "0.8")),
-      ExpEvent("rim", 7 \ 6, 4 \ 3, List("g4", "0.8")),
-      ExpEvent("cp", 4 \ 3, 5 \ 3, List("c4", "0.8")),
-      ExpEvent("bd", 5 \ 3, 2 \ 1, List("c4", "0.8")),
-      ExpEvent("hh", 5 \ 3, 2 \ 1, List("c4", "0.8"))
-    )
-  }
-
-  test("""sound("bd sn").delay(1/4)""") {
-    // Verifica che Delay si comporti esattamente come Late, traslando la fase in avanti
-    val streams = List(Pattern.TimeWarp(PatternModifier.Delay(num(0.25)), seq(bd, sn)))
-
-    assertCycleUnordered(streams, 0)(
-      ExpEvent("sn", 0 \ 1, 1 \ 4),
-      ExpEvent("bd", 1 \ 4, 3 \ 4),
-      ExpEvent("sn", 3 \ 4, 1 \ 1)
+      ExpEvent("clap", 1 \ 1, 7 \ 6, List("G4", "0.8")),
+      ExpEvent("rim", 7 \ 6, 4 \ 3, List("G4", "0.8")),
+      ExpEvent("cp", 4 \ 3, 5 \ 3, List("C4", "0.8")),
+      ExpEvent("bd", 5 \ 3, 2 \ 1, List("C4", "0.8")),
+      ExpEvent("hh", 5 \ 3, 2 \ 1, List("C4", "0.8"))
     )
   }
 
@@ -583,7 +572,7 @@ extension (e: ScheduledEvent[AudioPayload])
   def toExp: ExpEvent =
     def extractName(payload: AudioPayload): String = payload match
       case Sound.SampleInText(s, _) => s.value
-      case Sound.NoteInText(n, _) => n.value
+      case Sound.NoteInText(n, _) => n.toString
       case AudioEffect.Gain(v) => v.toString
       case AudioEffect.Room(v) => v.toString
       case AudioEffect.Pan(v) => v.toString

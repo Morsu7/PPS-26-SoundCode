@@ -4,6 +4,7 @@ import soundcode.parser.AST.{Pattern, Atom}
 object Transformations {
     sealed trait TransformationBlock extends Block
 
+    // audio effects
     case class Gain(pattern: Pattern[Config]) extends TransformationBlock
     case class Pan(pattern: Pattern[Config]) extends TransformationBlock
     case class Room(pattern: Pattern[Config]) extends TransformationBlock

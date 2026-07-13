@@ -39,14 +39,34 @@ case class Interval(start: Fraction, end: Fraction):
     if (newStart < newEnd) Some(Interval(newStart, newEnd)) else None
   def map(f: Fraction => Fraction): Interval = Interval(f(start), f(end))
 
-opaque type Note = String
+enum Accidental:
+  case Sharp, Flat, Natural
+extension (a: Accidental)
+  def symbol: String = a match
+    case Accidental.Sharp   => "#"
+    case Accidental.Flat    => "b"
+    case Accidental.Natural => ""
+
+opaque type Note = NoteData
+private case class NoteData(name: String, accidental: Accidental, octave: Int) {
+  override def toString: String = s"${name}${accidental.symbol}${octave}"
+}
 object Note:
-  def apply(value: String): Note = value
-  extension (n: Note) def value: String = n
+  def apply(name: String): Note = NoteData(name.toUpperCase(), Accidental.Natural, 4)
+  def apply(name: String, accidental: Accidental): Note = NoteData(name.toUpperCase(), accidental, 4)
+  def apply(name: String, octave: Int): Note = NoteData(name.toUpperCase(), Accidental.Natural, octave)
+  def apply(name: String, accidental: Accidental, octave: Int): Note = NoteData(name.toUpperCase(), accidental, octave)
+  def unapply(n: Note): Some[(String, String, Int)] = Some((n.name.toUpperCase(), n.accidental.symbol, n.octave))
+
+  extension (n: Note)
+    def name: String = n.name
+    def accidental: String = n.accidental.symbol
+    def octave: Int = n.octave
 
 opaque type Sample = String
 object Sample:
   def apply(value: String): Sample = value
+  def unapply(s: Sample): Some[String] = Some(s)
   extension (s: Sample) def value: String = s
 
 
@@ -69,14 +89,13 @@ enum AudioEffect extends AudioPayload:
   case Room(value: Double)
   case LowPass(value: Double)
   case HighPass(value: Double)
-
+  case Delay(volume: Double, time: Double, feedback: Double)
 
 enum PatternModifier[+T]:
   case Reverse
   case FastForward(factor: Pattern[Double])
   case SlowMotion(factor: Pattern[Double])
   case Late(offset: Pattern[Double])
-  case Delay(offset: Pattern[Double])
   case Early(offset: Pattern[Double])
   case Repetition(times: Pattern[Double])
   case Juxtaposition(modifiers: List[PatternModifier[T]])

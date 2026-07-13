@@ -121,7 +121,7 @@ class AudioPlayerTest extends AnyFunSuite with Matchers {
     override protected def triggerSound(payload: AudioPayload, durationMs: Long, extensions: List[AudioPayload]): Unit = {
       def extractName(p: AudioPayload): String = p match {
         case Sound.SampleInText(s, _) => s.value
-        case Sound.NoteInText(n, _) => n.value
+        case Sound.NoteInText(n, _) => n.toString
         case AudioEffect.Gain(v) => s"gain($v)"
         case AudioEffect.Room(v) => s"room($v)"
         case _ => "unknown"

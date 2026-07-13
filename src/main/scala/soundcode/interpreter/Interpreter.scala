@@ -1,101 +1,125 @@
-/*package soundcode.interpreter
+package soundcode.interpreter
 
-import soundcode.parser.AST._
-import soundcode.parser.AST.Transformations._
-import soundcode.domain
+import soundcode.parser.AST
+import soundcode.parser.AST.Transformations
+import soundcode.domain.*
+import soundcode.domain.Pattern.*
+import soundcode.domain.Sound.SampleInText
 
 object Interpreter {
 
-    private def interpretGenerative(block: GenerativeBlock): (domain.Pattern, String) = block match {
-        case SoundBlock(pattern) => (interpretPattern(pattern)(interpretSoundAtom), "sound")
-        case NoteBlock(pattern)  => (interpretPattern(pattern)(interpretSoundAtom), "note")
-    }
+    // temp
+    var found = false
 
-    def interpret(tree: ProgramAST): List[domain.Track] = {
-        tree.blocks.map { case StreamBlock(base, extensions) =>
-            // note: only one sound and note block are allowed per stream, we will take the first and ignore the rest
-            // the first generative block is the base and dictate the main cycle division, the rest are extensions
-            // if the extensions contains a generative block, it will be a different type (sound vs note) and placed at pos 0 of the list
-            
-            val (basePattern, baseType): (domain.Pattern, String) = interpretGenerative(base)
+    def interpret(tree: AST.ProgramAST): List[Pattern[AudioPayload]] = {
+        tree.blocks.collect {
+            case sb: AST.StreamBlock =>
+            val (basePattern, baseType) = interpretGenerativeBlock(sb.base)
 
-            // 2. Find the extension that is NOT the same type as the base
-            val generativeExtensionPattern = extensions.collectFirst {
-                case GenerativeExtensionBlock(gBlock) =>
-                    val (pattern, gType) = interpretGenerative(gBlock)
-                    if (gType != baseType) Some(pattern) else None
-            }.flatten
-
-            val effectPatterns: List[domain.Pattern] = extensions.collect {
-                case TransformationExtensionBlock(transBlock) => interpretTransformationBlock(transBlock)
-            }
-
-            domain.Track(
-                base = basePattern,
-                extensions = generativeExtensionPattern.toList ++ effectPatterns
-            )
+            applyExtensions(basePattern, baseType, sb.extensions)
         }
     }
 
-    private def interpretTransformationBlock(block: TransformationBlock): domain.Pattern = {
-        block match {
-            //case Reverse() => List(Seq(domain.PatternModifier.Reverse))
-            case Juxtaposition(ts) => ts.flatMap(interpretTransformationBlock)
-            case Offset(_, ts)     => ts.flatMap(interpretTransformationBlock)
-            case Unknown(name, _)  => throw new IllegalArgumentException(s"Unknown: $name")
-            
-            // Gestiamo le trasformazioni come BUILDER di intere strutture Pattern
-            case effectBlock =>
-            block match {
-                // Se nel tuo dominio Gain vuole direttamente il Pattern[Double] o Pattern[Effect],
-                // usiamo interpretPattern per convertire l'albero di Config in elementi del dominio
-                case Gain(p)           => interpretPattern(p)(c => domain.AudioEffect.Gain(c.value))
-                case Pan(p)            => interpretPattern(p)(c => domain.AudioEffect.Pan(c.value))
-                case Room(p)           => interpretPattern(p)(c => domain.AudioEffect.Room(c.value))
-                //case Delay(p)          => interpretPattern(p)(c => domain.PatternModifier.Delay(c.value))
-                case LowPassFilter(p)  => interpretPattern(p)(c => domain.AudioEffect.LowPass(c.value))
-                case HighPassFilter(p) => interpretPattern(p)(c => domain.AudioEffect.HighPass(c.value))
-                //case Repetition(p)     => interpretPattern(p)(c => domain.PatternModifier.Repetition(c.value))
-                //case FastForward(p)    => interpretPattern(p)(c => domain.PatternModifier.FastForward(c.value))
-                //case SlowMotion(p)     => interpretPattern(p)(c => domain.PatternModifier.SlowMotion(c.value))
-                //case Early(p)          => interpretPattern(p)(c => domain.PatternModifier.Early(c.value))
-                //case Late(p)           => interpretPattern(p)(c => domain.PatternModifier.Late(c.value))
-                case _                 => throw new MatchError(effectBlock)
+    private def interpretGenerativeBlock(block: AST.GenerativeBlock): (Pattern[AudioPayload], String) = block match {
+        case AST.SoundBlock(pattern) => (interpretPattern(pattern)(c => interpretSoundAtom(c)), "sound")
+        case AST.NoteBlock(pattern)  => (interpretPattern(pattern)(c => interpretSoundAtom(c)), "note")
+    }
+
+    private def applyExtensions(basePattern: Pattern[AudioPayload], baseType: String, extensions: List[AST.ExtensionBlock]): Pattern[AudioPayload] = {
+        val (finalBase, finalEffects, _) = extensions.foldLeft((basePattern, List.empty[Pattern[AudioPayload]], false)) {
+            case ((currentBase, accEffects, foundGen), ext) => ext match {
+
+            case AST.GenerativeExtensionBlock(block) if !foundGen =>
+                val (pattern, gType) = interpretGenerativeBlock(block)
+                if (gType != baseType) (currentBase, accEffects :+ pattern, true)
+                else (currentBase, accEffects, false)
+
+            case AST.TransformationExtensionBlock(transBlock) =>
+                val transformed = applyTransformation(currentBase, transBlock)
+                
+                transformed match {
+                case tw: Pattern.TimeWarp[_] =>
+                    val baseWithEffects = if (accEffects.isEmpty) currentBase else Pattern.WithExtensions(currentBase, accEffects)
+                    // Applichiamo il TimeWarp sopra il blocco precedente
+                    (Pattern.TimeWarp(tw.modifier, baseWithEffects), List.empty, foundGen)
+                    
+                case atom => 
+                    (currentBase, accEffects :+ atom, foundGen)
+                }
+
+            case _ => (currentBase, accEffects, foundGen)
             }
         }
+
+        // Applichiamo gli effetti rimasti dopo l'ultima trasformazione
+        if (finalEffects.isEmpty) finalBase 
+        else Pattern.WithExtensions(finalBase, finalEffects)
     }
 
-    private def interpretPattern[A <: Atom](pattern: Pattern[A])(buildAtom: A => domain.Element): domain.Pattern = {
-        pattern.elems.map { sequence => 
-            sequence.elems.map { element => interpretElement(element)(buildAtom) }
+    private def applyTransformation(basePattern: Pattern[AudioPayload], transBlock: AST.Transformations.TransformationBlock): Pattern[AudioPayload] = transBlock match {
+        case AST.Transformations.Gain(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value)))
+        case AST.Transformations.Pan(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value)))
+        case AST.Transformations.Room(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value)))
+        case AST.Transformations.Delay(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Delay(c.value, c.value, c.value))) // TODO fix parsing for delay
+        case AST.Transformations.LowPassFilter(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value)))
+        case AST.Transformations.HighPassFilter(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value)))
+
+        case AST.Transformations.Reverse() => Pattern.TimeWarp(PatternModifier.Reverse, basePattern)
+        case AST.Transformations.Repetition(pattern) => Pattern.TimeWarp(PatternModifier.Repetition(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
+        case AST.Transformations.FastForward(pattern) => Pattern.TimeWarp(PatternModifier.FastForward(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
+        case AST.Transformations.SlowMotion(pattern) => Pattern.TimeWarp(PatternModifier.SlowMotion(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
+        case AST.Transformations.Early(pattern) => Pattern.TimeWarp(PatternModifier.Early(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
+        case AST.Transformations.Late(pattern) => Pattern.TimeWarp(PatternModifier.Late(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
+
+        case _ => ???
+    }
+
+    private def interpretPattern[A <: AST.Atom, B](pattern: AST.Pattern[A])(buildAtom: A => Pattern[B]): Pattern[B] = {
+        pattern.elems match {
+            case head :: Nil => interpretSequence(head)(buildAtom)
+            case seqs => Pattern.Parallel(seqs.map(interpretSequence(_)(buildAtom)))
         }
     }
 
-    private def interpretElement[A <: Atom](element: Element[A])(buildAtom: A => domain.Element): domain.Element = {
-        element match {
-        case AtomElement(atom) => buildAtom(atom)
-        case SubPatternElement(p) => domain.RecursivePattern.SubPattern(interpretPattern(p)(buildAtom))
-        case AlternationElement(p) => domain.RecursivePattern.AlternationPattern(interpretPattern(p)(buildAtom))
-        // TODO implement speed modifiers
-        case SpeedModifiedElement(base, _, _) => interpretElement(base)(buildAtom)
+    private def interpretSequence[A <: AST.Atom, B](sequence: AST.Sequence[A])(buildAtom: A => Pattern[B]): Pattern[B] = {
+        sequence.elems match {
+            case head :: Nil => interpretElement(head)(buildAtom)
+            case elems => Pattern.Sequence(elems.map(interpretElement(_)(buildAtom)))
         }
     }
 
-    private def interpretSoundAtom(atom: Atom): domain.Sound = atom match {
-        case Sample(_, _, _) => interpretSampleAtom(atom)
-        case Note(_, _, _, _, _) => interpretNoteAtom(atom)
+    private def interpretElement[A <: AST.Atom, B](element: AST.Element[A])(buildAtom: A => Pattern[B]): Pattern[B] = element match {
+        case AST.AlternationElement(pattern) => {
+            pattern.elems match {
+                case head :: Nil => interpretSequence(head)(buildAtom)
+                case seqs => Pattern.Alternation(seqs.map(interpretSequence(_)(buildAtom)))
+            }
+        }
+        case AST.SubPatternElement(pattern) => {
+            pattern.elems match {
+                case head :: Nil => interpretSequence(head)(buildAtom)
+                case seqs => Pattern.Sequence(seqs.map(interpretSequence(_)(buildAtom)))
+            }
+        }
+        case AST.AtomElement(atom) => buildAtom(atom)
+
+        case AST.SpeedModifiedElement(_, _, _) => ???
+    }
+
+    private def interpretSoundAtom(atom: AST.Atom): Pattern[AudioPayload] = atom match {
+        case AST.Sample(value, startPos, endPos) => Pattern.Atom(Sound.SampleInText(Sample(value), TextPosition(startPos, endPos)))
+        case AST.Note(name, accidental, octave, startPos, endPos) =>
+            val acc: Accidental = accidental match {
+                case Some("#") | Some("s") => Accidental.Sharp
+                case Some("b") => Accidental.Flat
+                case _ => Accidental.Natural
+            }
+            Pattern.Atom(Sound.NoteInText(Note(name, acc, octave), TextPosition(startPos, endPos)))
         case _ => throw new IllegalArgumentException("Expected Sample or Note")
     }
 
-    private def interpretSampleAtom(atom: Atom): domain.Sound = atom match {
-        case Sample(value, startIndex, endIndex) => domain.Sound.SampleInText(domain.Sample(value), domain.TextPosition(startIndex, endIndex))
-        case _ => throw new IllegalArgumentException("Expected Sample")
+    private def interpretConfigAtom(atom: AST.Atom): Pattern[Double] = atom match {
+        case AST.Config(value, startPos, endPos) => Pattern.Atom(value)
+        case _ => throw new IllegalArgumentException("Expected Config")
     }
-
-    private def interpretNoteAtom(atom: Atom): domain.Sound = atom match {
-        case Note(name, accidental, octave, startIndex, endIndex) => 
-        val noteStr = s"$name${accidental.getOrElse("")}${octave}"
-        domain.Sound.NoteInText(domain.Note(noteStr), domain.TextPosition(startIndex, endIndex))
-        case _ => throw new IllegalArgumentException("Expected Note")
-    }
-}*/
+}

@@ -66,9 +66,6 @@ object PatternResolver:
           }
         events.toList.flatten
 
-      case PatternModifier.Delay(offset) =>
-        resolveTimeWarp(PatternModifier.Late(offset), innerPattern, timeWindow)
-
       case PatternModifier.Repetition(times) =>
         resolveTimeWarp(PatternModifier.FastForward(times), innerPattern, timeWindow)
 
