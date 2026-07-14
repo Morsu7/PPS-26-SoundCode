@@ -2,11 +2,12 @@ package soundcode.ui
 
 import scalafx.application.JFXApp3
 import scalafx.scene.Scene
+import soundcode.domain.Tempo
 import soundcode.mvu.SoundCodeRuntime
 import soundcode.mvu.AppModel
 import soundcode.mvu.Msg
 import soundcode.mvu.Update
-import soundcode.engine.{Scheduler, SchedulerImpl}
+import soundcode.engine.{Scheduler, SchedulerImpl, SuperDirtBackend}
 
 object SoundCodeFrame extends JFXApp3:
 
@@ -16,14 +17,15 @@ object SoundCodeFrame extends JFXApp3:
     given Scheduler = SchedulerImpl
 
     val initialModel = AppModel()
-    // val audioPlayer = new MidiAudioPlayer()
+    //val audioPlayer = new MidiAudioPlayer()
 
     lazy val mainView: MainView = MainView(runtime.dispatch)
 
     runtime = SoundCodeRuntime(
       initialModel = initialModel,
-      render = model => mainView.render(model)
-      // audioPlayer = audioPlayer
+      render = model => mainView.render(model),
+      tempo = Tempo(0.5),
+      backend = SuperDirtBackend()
     )
     mainView.render(initialModel)
 
