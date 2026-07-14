@@ -1,7 +1,7 @@
 package soundcode.engine
 
 import soundcode.domain.*
-import soundcode.audio.{AudioEngine, GmDrumMap, MidiNote}
+import soundcode.audio.{AudioEngine, GmDrumMap, GmInstrumentMap, MidiNote}
 
 /** Backend audio MIDI per [[AudioPlayer]]: traduce ogni evento schedulato in comandi
   * per un [[AudioEngine]] basato su `javax.sound.midi`.
@@ -16,15 +16,26 @@ import soundcode.audio.{AudioEngine, GmDrumMap, MidiNote}
 class MidiBackend(engine: AudioEngine = AudioEngine.default()) extends AudioBackend:
 
   private val DefaultVelocity = 96
+  private val DefaultProgram = 0 // Acoustic Grand Piano
 
   override def triggerSound(payload: AudioPayload, durationMs: Long, extensions: List[AudioPayload]): Unit =
     payload match
       case Sound.NoteInText(note, _) =>
         val noteStr = s"${note.name}${note.accidental}${note.octave}" // es. "C#4"
-        MidiNote.toMidi(noteStr).foreach(engine.playNote(_, DefaultVelocity, durationMs))
+        val program = instrumentFrom(extensions)
+        MidiNote.toMidi(noteStr).foreach(engine.playNote(_, DefaultVelocity, durationMs, program))
       case Sound.SampleInText(sample, _) =>
         GmDrumMap.toGmNote(sample.value).foreach(engine.playDrum(_, DefaultVelocity, durationMs))
       case _ => () // Sound.Rest, AudioEffect
+
+  /** Ricava il programma GM da un'eventuale estensione sound
+    * (es. `note("c").sound("piano")` porta un `SampleInText("piano")`); default: piano.
+    */
+  private def instrumentFrom(extensions: List[AudioPayload]): Int =
+    extensions
+      .collectFirst { case Sound.SampleInText(s, _) => GmInstrumentMap.toProgram(s.value) }
+      .flatten
+      .getOrElse(DefaultProgram)
 
   /** Rilascia le risorse del motore audio (synth + executor). */
   def close(): Unit = engine.close()
