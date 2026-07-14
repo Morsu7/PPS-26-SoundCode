@@ -2,7 +2,9 @@ package soundcode.engine
 
 import soundcode.domain.*
 
-class AudioPlayer(val tempo: Tempo, backend: AudioBackend) {
+import scala.concurrent.duration.Duration
+
+class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Set[TextPosition] => Unit = _ => ()) {
 
   private val loopResolutionMs = 1L
 
@@ -12,7 +14,14 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend) {
   @volatile private var eventStream: LazyList[ScheduledEvent[AudioPayload]] = LazyList.empty
   @volatile private var firstTickTimeMs: Option[Long] = None
 
-  def updateTimeline(stream: LazyList[ScheduledEvent[AudioPayload]]): Unit = this.eventStream = stream ; this.firstTickTimeMs = None
+  private var activeHighlights: Map[TextPosition, Long] = Map.empty
+  private var currentHighlightSet: Set[TextPosition] = Set.empty
+
+  def updateTimeline(stream: LazyList[ScheduledEvent[AudioPayload]]): Unit =
+    this.eventStream = stream
+    this.firstTickTimeMs = None
+    this.activeHighlights = Map.empty
+    notifyHighlightsChanged()
 
   def start(): Unit = if (!isRunning) {
     isRunning = true
@@ -26,10 +35,22 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend) {
     thread.get.start()
   }
 
-  def stop(): Unit = isRunning = false; thread.foreach(_.join())
+  def stop(): Unit =
+    isRunning = false
+    thread.foreach(_.join())
+    activeHighlights = Map.empty
+    notifyHighlightsChanged()
 
   def tick(now: AbsoluteTime): Unit = {
     if (firstTickTimeMs.isEmpty) firstTickTimeMs = Some(now.toLong)
+    //controllo per highLight
+    var highlightsChanged = false
+
+    val initialSize = activeHighlights.size
+    activeHighlights = activeHighlights.filter { case (_, expireAtMs) => expireAtMs > now.toLong }
+    if activeHighlights.size != initialSize then highlightsChanged = true
+    //-----------------------
+
 
     while (eventStream.nonEmpty) {
       val nextEvent = eventStream.head
@@ -39,12 +60,30 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend) {
         eventStream = eventStream.tail
         if (nextEvent.part.start == nextEvent.whole.start) {
           val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
-          
           backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
+          //aggiunta highLight
+          val positionOpt = nextEvent.value match
+            case Sound.NoteInText(_, pos)   => Some(pos)
+            case Sound.SampleInText(_, pos) => Some(pos)
+            case Sound.Rest(pos)            => Some(pos)
+            case _                          => None
+
+          positionOpt.foreach { pos =>
+            activeHighlights = activeHighlights + (pos -> (now.toLong + durationMs))
+            highlightsChanged = true
+          }
+          //-----------------------
         }
-      } else {
-        return
       }
     }
+
+    if highlightsChanged then notifyHighlightsChanged()
   }
+
+  private def notifyHighlightsChanged(): Unit =
+    val newSet = activeHighlights.keySet
+    if newSet != currentHighlightSet then
+      currentHighlightSet = newSet
+      onHighlightChange(currentHighlightSet)
+
 }

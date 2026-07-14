@@ -1,13 +1,14 @@
-package soundcode.mvu;
+package soundcode.mvu
 
+import soundcode.domain.Tempo
 import soundcode.engine.*
 
-class SoundCodeRuntime(
-    initialModel: AppModel,
-    render: AppModel => Unit,
-    //audioPlayer: MidiAudioPlayer
-):
+class SoundCodeRuntime(initialModel: AppModel, render: AppModel => Unit, tempo: Tempo, backend: AudioBackend):
   private var model: AppModel = initialModel
+
+  private val audioPlayer = new AudioPlayer(tempo, backend, positions => {
+    dispatch(Msg.UpdateHighlightText(positions))
+  })
 
   def dispatch(msg: Msg): Unit =
     val (nextModel, cmd) = Update.update(model, msg)
@@ -16,9 +17,8 @@ class SoundCodeRuntime(
       model = nextModel
       render(model)
 
-    //cmd.run(dispatch, audioPlayer)
+    cmd.run(dispatch, audioPlayer)
 
   def currentModel: AppModel = model
 
-  /** Da invocare alla chiusura dell'app: ferma la riproduzione e rilascia le risorse MIDI. */
-  //def shutdown(): Unit = audioPlayer.close()
+  def shutdown(): Unit = audioPlayer.stop()
