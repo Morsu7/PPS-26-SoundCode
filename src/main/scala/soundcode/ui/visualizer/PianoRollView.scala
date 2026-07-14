@@ -3,7 +3,32 @@ package soundcode.ui.visualizer
 import scalafx.scene.paint.Color
 import scalafx.scene.canvas.GraphicsContext
 import soundcode.ui.UITheme
-final class PianoRollView extends CanvasAnimatedView:
+import soundcode.domain.{ScheduledEvent, AudioPayload, Sound}
+
+final class PianorollView(
+    timeline: Seq[ScheduledEvent[AudioPayload]] = List.empty,
+    loopLength: Double = 1.0
+) extends CanvasAnimatedView:
+  val visualEvents: Seq[VisualEvent] = toVisualEvents()
+
+  private def toVisualEvents(): Seq[VisualEvent] =
+    val notes = timeline.collect {
+      case ScheduledEvent(_, part, Sound.NoteInText(note, _), _) =>
+        (note.value, part)
+    }
+
+    val laneByNote = notes.map(_._1).distinct.sorted.zipWithIndex.toMap
+
+    notes.map { case (note, interval) =>
+      VisualEvent(
+        label = note,
+        start = interval.start.toDouble,
+        duration = interval.duration.toDouble,
+        lane = laneByNote(note),
+        color = Color.web(UITheme.Foreground)
+      )
+    }
+
   val laneCount = visualEvents.map(_.lane).maxOption.getOrElse(0) + 1
   val laneHeight = (canvasHeight - config.verticalPadding * 2) / laneCount
 
@@ -28,7 +53,6 @@ final class PianoRollView extends CanvasAnimatedView:
       currentBeat: Double,
       playheadX: Double
   ): Unit =
-    val length = loopLength
     val canvasWidth = gc.canvas.width.value
     val maxDuration = visualEvents.map(_.duration).maxOption.getOrElse(0.0)
 
@@ -39,16 +63,16 @@ final class PianoRollView extends CanvasAnimatedView:
       currentBeat + (canvasWidth - playheadX) / pixelsPerBeat
 
     val firstLoop =
-      Math.floor(firstVisibleBeat / length).toInt.max(0)
+      Math.floor(firstVisibleBeat / loopLength).toInt.max(0)
 
     val lastLoop =
-      Math.ceil(lastVisibleBeat / length).toInt
+      Math.ceil(lastVisibleBeat / loopLength).toInt
 
     val repeatedEvents =
       for
         loop <- firstLoop to lastLoop
         event <- visualEvents
-      yield event.copy(start = event.start + loop * length)
+      yield event.copy(start = event.start + loop * loopLength)
 
     repeatedEvents.foreach { event =>
       val x = playheadX + (event.start - currentBeat) * pixelsPerBeat

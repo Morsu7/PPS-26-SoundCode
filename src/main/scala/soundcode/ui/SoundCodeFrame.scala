@@ -7,7 +7,6 @@ import soundcode.mvu.AppModel
 import soundcode.mvu.Msg
 import soundcode.mvu.Update
 import soundcode.engine.{MidiAudioPlayer, Scheduler, SchedulerImpl}
-import soundcode.engine.Resolvable.given
 
 object SoundCodeFrame extends JFXApp3:
 
@@ -21,12 +20,11 @@ object SoundCodeFrame extends JFXApp3:
 
     lazy val mainView: MainView = MainView(runtime.dispatch)
 
-    lazy val runtime: SoundCodeRuntime =
-      SoundCodeRuntime(
-        initialModel = initialModel,
-        render = model => mainView.render(model),
-        audioPlayer = audioPlayer
-      )
+    runtime = SoundCodeRuntime(
+      initialModel = initialModel,
+      render = model => mainView.render(model),
+      audioPlayer = audioPlayer
+    )
     mainView.render(initialModel)
 
     // Arma la timeline con il codice iniziale, così il primo Play produce subito suono.

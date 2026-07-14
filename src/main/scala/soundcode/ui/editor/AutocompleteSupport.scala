@@ -79,6 +79,7 @@ object AutocompleteSupport:
     list.setStyle("""
       |-fx-background-color: #25252b;
       |-fx-control-inner-background: #25252b;
+      |-fx-text-background-color: #f4f4f5;
       |-fx-background-radius: 6;
       |-fx-border-color: #3a3a42;
       |-fx-border-radius: 6;
@@ -224,13 +225,16 @@ object AutocompleteSupport:
         val caret = area.getCaretPosition
         val from = caret - prefix.length
 
-        area.replaceText(from, caret, selected.insertText)
-
         val placeholderIndex = selected.insertText.indexOf("$0")
-        if placeholderIndex >= 0 then
-          val placeholderStart = from + placeholderIndex
-          area.replaceText(placeholderStart, placeholderStart + 2, "")
-          area.moveTo(placeholderStart)
+        val textToInsert =
+          if placeholderIndex >= 0 then
+            selected.insertText.patch(placeholderIndex, "", "$0".length)
+          else selected.insertText
+
+        area.replaceText(from, caret, textToInsert)
+
+        if placeholderIndex >= 0 then area.moveTo(from + placeholderIndex)
+        else area.moveTo(from + textToInsert.length)
 
         popup.hide()
 
@@ -291,9 +295,12 @@ object AutocompleteSupport:
     area.addEventFilter(
       KeyEvent.KEY_RELEASED,
       (event: KeyEvent) =>
-        event.getCode match
-          case KeyCode.ENTER | KeyCode.TAB | KeyCode.ESCAPE | KeyCode.UP |
-              KeyCode.DOWN | KeyCode.LEFT | KeyCode.RIGHT =>
-          case _ =>
-            showPopup()
+        if event.isControlDown || event.isMetaDown || event.isAltDown then
+          popup.hide()
+        else
+          event.getCode match
+            case KeyCode.ENTER | KeyCode.TAB | KeyCode.ESCAPE | KeyCode.UP |
+                KeyCode.DOWN | KeyCode.LEFT | KeyCode.RIGHT =>
+            case _ =>
+              showPopup()
     )
