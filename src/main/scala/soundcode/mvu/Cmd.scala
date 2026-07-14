@@ -25,6 +25,7 @@ object Cmd:
           (List.empty[Pattern[AudioPayload]], Some(s"Parsing failed:\n$errorMsg"))
       }
 
+
       dispatch(Msg.CodeParsed(streams, errors))
 
   /** Avvia il loop di riproduzione dell'AudioPlayer. */
@@ -37,4 +38,7 @@ object Cmd:
 
   /** Arma la timeline dell'AudioPlayer con gli stream appena interpretati. */
   case class UpdateTimeline(streams: List[Pattern[AudioPayload]]) extends Cmd :
-    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.updateTimeline(SchedulerImpl.generateInfiniteTimeline(streams))
+    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = {
+      audio.updateTimeline(SchedulerImpl.generateInfiniteTimeline(streams))
+      dispatch(Msg.UpdateTimelines(SchedulerImpl.generateBoundedTimelines(streams)))
+    }
