@@ -35,6 +35,6 @@ object SoundCodeFrame extends JFXApp3:
       scene = new Scene(800, 500):
         root = mainView.root
 
-  override def stopApp(): Unit = ???
-  /*if runtime != null then runtime.shutdown()
-    super.stopApp()*/
+  override def stopApp(): Unit =
+    // if runtime != null then runtime.shutdown()
+    super.stopApp()

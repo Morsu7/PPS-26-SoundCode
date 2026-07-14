@@ -21,14 +21,13 @@ object Update:
       // Play/Stop non modificano il model (evitano un re-render che sovrascriverebbe
       // il testo non ancora confermato con "Update"): eseguono solo il comando audio.
       case Msg.PlayRequested =>
-        (model, Cmd.StartPlayback)
+        (model.copy(isPlaying = true), Cmd.StartPlayback)
 
       case Msg.StopRequested =>
-        (model, Cmd.StopPlayback)
+        (model.copy(isPlaying = false), Cmd.StopPlayback)
 
       case Msg.PlaybackTick(currentBeat) =>
         (
-          // model.copy(currentBeat = currentBeat, isPlaying = true),
           model,
           NoOp
         )
