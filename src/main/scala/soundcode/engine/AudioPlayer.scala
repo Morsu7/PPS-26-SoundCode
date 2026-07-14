@@ -2,64 +2,56 @@ package soundcode.engine
 
 import soundcode.domain.*
 
-// Usiamo Contextual Abstraction (using) per iniettare lo scheduler puro e il risolutore
-class AudioPlayer(val cps: Double = 0.5)(using scheduler: Scheduler, res: Resolvable[Pattern]) {
+class AudioPlayer(val tempo: Tempo) {
 
-  private val cycleDurationMs: Long = (1000.0 / cps).toLong
   private val loopResolutionMs = 1L
-
-  private case class PlayerState(cycleStart: Option[AbsoluteTime] = None, pending: List[(AbsoluteTime, ScheduledEvent)] = Nil, cycleCount: Int = 0)
 
   @volatile private var isRunning = false
   private var thread: Option[Thread] = None
-  private var state = PlayerState()
 
-  @volatile private var activeStreams: List[Stream] = Nil
+  @volatile private var eventStream: LazyList[ScheduledEvent[AudioPayload]] = LazyList.empty
+  @volatile private var firstTickTimeMs: Option[Long] = None
 
-
-  def updateTimeline(streams: List[Stream]): Unit = {
-    this.activeStreams = streams
-  }
+  def updateTimeline(stream: LazyList[ScheduledEvent[AudioPayload]]): Unit = this.eventStream = stream; this.firstTickTimeMs = None
 
   def start(): Unit = if (!isRunning) {
     isRunning = true
-    state = PlayerState()
     thread = Some(new Thread(() => while (isRunning) {
-      val startTime = System.currentTimeMillis()
-      tick(AbsoluteTime(startTime))
-      val sleepTime = loopResolutionMs - (System.currentTimeMillis() - startTime)
+      val now = System.currentTimeMillis()
+      tick(AbsoluteTime(now))
+
+      val sleepTime = loopResolutionMs - (System.currentTimeMillis() - now)
       if (sleepTime > 0) Thread.sleep(sleepTime)
     }))
     thread.get.start()
   }
 
-  def stop(): Unit = { isRunning = false; thread.foreach(_.join()) }
-
-  private def computeNextState(now: AbsoluteTime, s: PlayerState): (PlayerState, List[ScheduledEvent]) = {
-    val stateWithNewCycle = s.cycleStart match {
-      case Some(start) if (now.toLong - start.toLong) < cycleDurationMs => s
-      case _ =>
-        val newStart = s.cycleStart.map(st => AbsoluteTime(st.toLong + cycleDurationMs)).getOrElse(now)
-
-        val newEvents = scheduler.generateEvents(activeStreams, s.cycleCount).map { e =>
-          val triggerTimeMs = newStart.toLong + (e.startTime.toDouble * cycleDurationMs).toLong
-          (AbsoluteTime(triggerTimeMs), e)
-        }
-        PlayerState(Some(newStart), s.pending ::: newEvents, s.cycleCount + 1)
-    }
-
-    val (ready, waiting) = stateWithNewCycle.pending.partition { case (time, _) => time <= now }
-    (stateWithNewCycle.copy(pending = waiting), ready.map(_._2))
-  }
+  def stop(): Unit = isRunning = false; thread.foreach(_.join())
 
   def tick(now: AbsoluteTime): Unit = {
-    val (newState, eventsToPlay) = computeNextState(now, state)
-    this.state = newState
-    eventsToPlay.foreach { event =>
-      val realDurationMs = Math.round((event.endTime.toDouble - event.startTime.toDouble) * cycleDurationMs)
-      triggerSound(event.element, realDurationMs, event.appliedExtensions)
+    if (firstTickTimeMs.isEmpty) firstTickTimeMs = Some(now.toLong)
+
+    while (eventStream.nonEmpty) {
+      val nextEvent = eventStream.head
+      val expectedTriggerMs = firstTickTimeMs.get + tempo.offsetMs(nextEvent.part.start)
+      if (now.toLong >= expectedTriggerMs) {
+        eventStream = eventStream.tail
+        if (nextEvent.part.start == nextEvent.whole.start) {
+          val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
+          triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
+        }
+      } else {
+        return
+      }
     }
   }
 
-  protected def triggerSound(element: Element, durationMs: Long, extensions: List[Element]): Unit = {}
+  protected def triggerSound(payload: AudioPayload, durationMs: Long, extensions: List[AudioPayload]): Unit = {
+    payload match {
+      case Sound.Rest(_) => ???
+      case Sound.SampleInText(s, _) => ???
+      case Sound.NoteInText(_, _) => ???
+      case _ => ???
+    }
+  }
 }

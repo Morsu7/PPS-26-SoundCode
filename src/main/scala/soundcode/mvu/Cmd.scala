@@ -22,7 +22,7 @@ object Cmd:
           (Interpreter.interpret(programAST), None)
 
         case Left(errorMsg) =>
-          (List.empty[Stream], Some(s"Parsing failed:\n$errorMsg"))
+          (List.empty[Pattern[AudioPayload]], Some(s"Parsing failed:\n$errorMsg"))
       }
 
       dispatch(Msg.CodeParsed(streams, errors))
@@ -36,5 +36,5 @@ object Cmd:
     override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.stop()
 
   /** Arma la timeline dell'AudioPlayer con gli stream appena interpretati. */
-  case class UpdateTimeline(streams: List[Stream]) extends Cmd:
-    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.updateTimeline(streams)
+  //case class UpdateTimeline(streams: List[Pattern[AudioPayload]]) extends Cmd : 
+    //override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.updateTimeline(streams)

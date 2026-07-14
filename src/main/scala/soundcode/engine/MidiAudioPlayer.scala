@@ -12,7 +12,7 @@ import soundcode.audio.{AudioEngine, GmDrumMap, MidiNote}
   * La classe base `AudioPlayer` resta invariata, così i test esistenti che fanno override di
   * `triggerSound` continuano a funzionare senza modifiche.
   */
-final class MidiAudioPlayer(cps: Double = 0.5, engine: AudioEngine = AudioEngine.default())(using
+/*final class MidiAudioPlayer(cps: Double = 0.5, engine: AudioEngine = AudioEngine.default())(using
     Scheduler,
     Resolvable[Pattern]
 ) extends AudioPlayer(cps):
@@ -30,4 +30,4 @@ final class MidiAudioPlayer(cps: Double = 0.5, engine: AudioEngine = AudioEngine
   /** Ferma la riproduzione e rilascia le risorse dell'engine. */
   def close(): Unit =
     stop()
-    engine.close()
+    engine.close()*/

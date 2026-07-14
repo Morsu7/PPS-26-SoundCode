@@ -34,12 +34,6 @@ abstract class CanvasAnimatedView extends AnimatedView:
   protected val canvasHeight = 120.0
   protected val canvas = new Canvas(0, canvasHeight)
 
-  protected val visualEvents: Seq[VisualEvent] = Seq(
-    VisualEvent("C4", 0.0, 1.0 / 3.0, 0, Color.web(UITheme.Foreground)),
-    VisualEvent("E4", 1.0 / 3.0, 1.0 / 3.0, 1, Color.web(UITheme.Foreground)),
-    VisualEvent("G4", 2.0 / 3.0, 1.0 / 3.0, 2, Color.web(UITheme.Foreground))
-  )
-
   private val canvasPane = new Pane:
     minWidth = 0
     prefWidth = 0
@@ -72,11 +66,6 @@ abstract class CanvasAnimatedView extends AnimatedView:
   private var running = false
   private var startNano: Long = 0L
   private var lastBeat = 0.0
-
-  // TODO: toVisualEvents and modify loopLength
-  protected def loopLength: Double =
-    if visualEvents.isEmpty then 1.0
-    else visualEvents.map(event => event.start + event.duration).max
 
   protected def clear(gc: GraphicsContext, w: Double, h: Double): Unit =
     gc.fill = Color.web(UITheme.Background)
