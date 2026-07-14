@@ -1,10 +1,10 @@
 package soundcode.mvu
 
 import soundcode.parser.SoundCodeParser
-import fastparse._
+import fastparse.*
 import soundcode.interpreter.Interpreter
 import soundcode.domain.*
-import soundcode.engine.AudioPlayer
+import soundcode.engine.{AudioPlayer, SchedulerImpl}
 
 sealed trait Cmd:
   def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit
@@ -36,5 +36,5 @@ object Cmd:
     override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.stop()
 
   /** Arma la timeline dell'AudioPlayer con gli stream appena interpretati. */
-  case class UpdateTimeline(streams: LazyList[ScheduledEvent[AudioPayload]]) extends Cmd :
-    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.updateTimeline(streams)
+  case class UpdateTimeline(streams: List[Pattern[AudioPayload]]) extends Cmd :
+    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.updateTimeline(SchedulerImpl.generateInfiniteTimeline(streams))

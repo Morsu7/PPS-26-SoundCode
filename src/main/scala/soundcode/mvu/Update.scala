@@ -6,7 +6,7 @@ object Update:
   def update(model: AppModel, msg: Msg): (AppModel, Cmd) =
     msg match
       case Msg.CodeUpdateRequested(code) => (model, Cmd.ParseAndInterpret(code))
-      //case Msg.CodeParsed(streams, errors) => (model.copy(streams = streams), Cmd.UpdateTimeline(streams))
+      case Msg.CodeParsed(streams, errors) => (model.copy(streams = streams), Cmd.UpdateTimeline(streams))
       case Msg.PlayRequested => (model.copy(isPlaying = true), Cmd.StartPlayback)
       case Msg.StopRequested => (model.copy(isPlaying = false), Cmd.StopPlayback)
       case Msg.PlaybackTick(currentBeat) => (model, NoOp)
