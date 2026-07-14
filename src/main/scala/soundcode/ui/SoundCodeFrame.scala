@@ -7,7 +7,7 @@ import soundcode.mvu.SoundCodeRuntime
 import soundcode.mvu.AppModel
 import soundcode.mvu.Msg
 import soundcode.mvu.Update
-import soundcode.engine.{Scheduler, SchedulerImpl, SuperDirtBackend}
+import soundcode.engine.{Scheduler, SchedulerImpl, MidiBackend}
 
 object SoundCodeFrame extends JFXApp3:
 
@@ -17,7 +17,6 @@ object SoundCodeFrame extends JFXApp3:
     given Scheduler = SchedulerImpl
 
     val initialModel = AppModel()
-    //val audioPlayer = new MidiAudioPlayer()
 
     lazy val mainView: MainView = MainView(runtime.dispatch)
 
@@ -25,7 +24,7 @@ object SoundCodeFrame extends JFXApp3:
       initialModel = initialModel,
       render = model => mainView.render(model),
       tempo = Tempo(0.5),
-      backend = SuperDirtBackend()
+      backend = MidiBackend()
     )
     mainView.render(initialModel)
 
@@ -38,5 +37,5 @@ object SoundCodeFrame extends JFXApp3:
         root = mainView.root
 
   override def stopApp(): Unit =
-    // if runtime != null then runtime.shutdown()
+    if runtime != null then runtime.shutdown()
     super.stopApp()
