@@ -3,7 +3,7 @@ package soundcode.ui.editor
 import org.fxmisc.richtext.GenericStyledArea
 import soundcode.ui.UITheme
 import soundcode.domain.TextPosition
-import org.reactfx.util.Either
+import scala.jdk.CollectionConverters.*
 
 object SyntaxHighlighter:
   private val StringPattern = "\"([^\"\\\\]|\\\\.)*\"".r
@@ -29,24 +29,8 @@ object SyntaxHighlighter:
        |""".stripMargin
 
   def applyTo(area: GenericStyledArea[?, ?, String]): Unit =
-    val text = area.getText
-
-    area.setStyle(0, text.length, DefaultStyle)
-
-    FunctionPattern.findAllMatchIn(text).foreach { m =>
-      area.setStyle(
-        textIndexToEditorIndex(area, m.start),
-        textIndexToEditorIndex(area, m.end),
-        FunctionStyle
-      )
-    }
-
-    StringPattern.findAllMatchIn(text).foreach { m =>
-      area.setStyle(
-        textIndexToEditorIndex(area, m.start),
-        textIndexToEditorIndex(area, m.end),
-        StringStyle
-      )
+    (0 until area.getParagraphs.size()).foreach { paragraphIndex =>
+      applyToParagraph(area, paragraphIndex)
     }
 
   def applyTo(
@@ -55,45 +39,52 @@ object SyntaxHighlighter:
   ): Unit =
     applyTo(area)
 
-    val textLength = area.getText.length
+    val textLength = area.getLength
 
     playbackPositions.foreach { position =>
       val start = Math.max(0, position.startIndex)
       val end = Math.min(textLength, position.endIndex)
 
-      if start < end then area.setStyle(start, end, PlaybackHighlightStyle)
+      if start < end then
+        area.setStyle(
+          start,
+          end,
+          PlaybackHighlightStyle
+        )
     }
 
-  private def textIndexToEditorIndex(
+  def applyToParagraph(
       area: GenericStyledArea[?, ?, String],
-      textIndex: Int
-  ): Int =
-    import scala.jdk.CollectionConverters.*
+      paragraphIndex: Int
+  ): Unit =
+    if paragraphIndex < 0 || paragraphIndex >= area.getParagraphs.size() then
+      return
 
-    val paragraphs = area.getParagraphs.asScala.iterator
+    val paragraph = area.getParagraph(paragraphIndex)
 
-    var textOffset = 0
-    var editorOffset = 0
+    val text = paragraph.getText
 
-    paragraphs
-      .find { paragraph =>
-        val isVisualizerParagraph =
-          paragraph.getSegments.asScala.exists {
-            case segment: Either[?, ?] => segment.isRight
-            case _                     => false
-          }
+    area.setStyle(
+      paragraphIndex,
+      0,
+      text.length,
+      DefaultStyle
+    )
 
-        if isVisualizerParagraph then
-          editorOffset += paragraph.length() + 1
-          false
-        else
-          val paragraphTextLength = paragraph.getText.length
-          val containsIndex = textIndex <= textOffset + paragraphTextLength
+    FunctionPattern.findAllMatchIn(text).foreach { m =>
+      area.setStyle(
+        paragraphIndex,
+        m.start,
+        m.end,
+        FunctionStyle
+      )
+    }
 
-          if !containsIndex then
-            textOffset += paragraphTextLength + 1
-            editorOffset += paragraph.length() + 1
-
-          containsIndex
-      }
-      .fold(editorOffset)(_ => editorOffset + (textIndex - textOffset))
+    StringPattern.findAllMatchIn(text).foreach { m =>
+      area.setStyle(
+        paragraphIndex,
+        m.start,
+        m.end,
+        StringStyle
+      )
+    }
