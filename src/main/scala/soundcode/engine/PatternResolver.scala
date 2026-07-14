@@ -20,71 +20,46 @@ object PatternResolver:
   private def resolveTimeWarp[T](modifier: PatternModifier[T], innerPattern: Pattern[T], timeWindow: Interval): List[ScheduledEvent[T]] =
     modifier match
       case PatternModifier.FastForward(factor) =>
-        applyDynamicModifier(factor, innerPattern, timeWindow,
-          zoomIn  = (w, f) => w.map(t => t * f),
-          zoomOut = (e, f) => e.mapTime(t => t / f)
-        )
-
+        applyDynamicModifier(factor, innerPattern, timeWindow, zoomIn = _ * _, zoomOut = (e, f) => e.mapTime(_ / f))
       case PatternModifier.SlowMotion(factor) =>
-        applyDynamicModifier(factor, innerPattern, timeWindow,
-          zoomIn  = (w, f) => w.map(t => t / f),
-          zoomOut = (e, f) => e.mapTime(t => t * f)
-        )
-
+        applyDynamicModifier(factor, innerPattern, timeWindow, zoomIn = _ / _, zoomOut = (e, f) => e.mapTime(_ * f))
       case PatternModifier.Late(offset) =>
-        applyDynamicModifier(offset, innerPattern, timeWindow,
-          zoomIn  = (w, o) => w.map(t => t - o),
-          zoomOut = (e, o) => e.mapTime(t => t + o)
-        )
-
+        applyDynamicModifier(offset, innerPattern, timeWindow, zoomIn = _ - _, zoomOut = (e, o) => e.mapTime(_ + o))
       case PatternModifier.Early(offset) =>
-        applyDynamicModifier(offset, innerPattern, timeWindow,
-          zoomIn  = (w, o) => w.map(t => t + o),
-          zoomOut = (e, o) => e.mapTime(t => t - o)
-        )
+        applyDynamicModifier(offset, innerPattern, timeWindow, zoomIn = _ + _, zoomOut = (e, o) => e.mapTime(_ - o))
 
       //Nuove aggiunte
       case PatternModifier.Reverse =>
-        val startCycle = timeWindow.start.toDouble.floor.toLong
-        val endCycle = timeWindow.end.toDouble.ceil.toLong
-
-        val events = for cycle <- startCycle until endCycle yield
-          val cycleStart = Fraction(cycle, 1L)
-          val cycleEnd = cycleStart + Fraction(1L, 1L)
+        val events = for cycle <- timeWindow.spanningCycles yield
+          val cycleStart = Fraction(cycle)
+          val cycleEnd = cycleStart + 1
 
           Interval(cycleStart, cycleEnd).intersect(timeWindow).toList.flatMap { activeWindow =>
             val reverseF = (t: Fraction) => cycleStart + cycleEnd - t
             val queryWindow = Interval(reverseF(activeWindow.end), reverseF(activeWindow.start))
 
             query(innerPattern, queryWindow).map { e =>
-              val newWhole = Interval(reverseF(e.whole.end), reverseF(e.whole.start))
-              val newPart = Interval(reverseF(e.part.end), reverseF(e.part.start))
-              e.copy(whole = newWhole, part = newPart)
+              e.copy(
+                whole = Interval(reverseF(e.whole.end), reverseF(e.whole.start)),
+                part = Interval(reverseF(e.part.end), reverseF(e.part.start))
+              )
             }
           }
         events.toList.flatten
 
       case PatternModifier.Repetition(times) =>
         val events = for
-          // 1. Leggiamo quante ripetizioni fare
           paramEvent <- query(times, timeWindow)
           n = math.max(1, math.round(paramEvent.value).toInt)
-
-          // 2. Chiediamo le note originali (niente zoom, tempo reale)
           activeWindow <- paramEvent.part.intersect(timeWindow).toList
           innerEvent <- query(innerPattern, activeWindow)
 
-          // 3. Calcoliamo la durata della nota frammentata
-          wholeDur = innerEvent.whole.end - innerEvent.whole.start
-          stepDur = wholeDur / Fraction(n, 1L)
+          wholeDur = innerEvent.whole.duration
+          stepDur = wholeDur / n   // Boom! Niente più Fraction(n, 1L)
 
-          // 4. Generiamo gli N frammenti
           i <- 0 until n
-          newWholeStart = innerEvent.whole.start + (stepDur * Fraction(i, 1L))
-          newWholeEnd = newWholeStart + stepDur
-          newWhole = Interval(newWholeStart, newWholeEnd)
-
-          // 5. Teniamo solo i frammenti che cadono nel nostro ascolto
+          newWholeStart = innerEvent.whole.start + (stepDur * i)
+          newWhole = Interval(newWholeStart, newWholeStart + stepDur)
           newPart <- newWhole.intersect(innerEvent.part).toList
         yield
           innerEvent.copy(whole = newWhole, part = newPart)
@@ -97,63 +72,53 @@ object PatternResolver:
 
       case PatternModifier.Offset(offset, modifiers) =>
         val delayedPattern = Pattern.TimeWarp(PatternModifier.Late(Pattern.Atom(offset)), innerPattern)
-        val finalTransformed = modifiers.foldLeft(delayedPattern) { (pat, mod) =>
-          Pattern.TimeWarp(mod, pat)
-        }
+        val finalTransformed = modifiers.foldLeft(delayedPattern)((pat, mod) => Pattern.TimeWarp(mod, pat))
         query(Pattern.Parallel(List(innerPattern, finalTransformed)), timeWindow)
 
 
   private def resolveAlternation[T](elements: List[Pattern[T]], timeWindow: Interval): List[ScheduledEvent[T]] =
     if elements.isEmpty then return Nil
 
-    val startCycle = timeWindow.start.toDouble.floor.toLong
-    val endCycle = timeWindow.end.toDouble.ceil.toLong
+    val events = for cycle <- timeWindow.spanningCycles yield
+      val cycleStart = Fraction(cycle)
 
-    val events = for cycle <- startCycle until endCycle yield
-      val cycleStart = Fraction(cycle, 1L)
-      val cycleEnd = cycleStart + Fraction(1L, 1L)
-
-      Interval(cycleStart, cycleEnd).intersect(timeWindow).toList.flatMap { activeWindow =>
+      Interval(cycleStart, cycleStart + 1).intersect(timeWindow).toList.flatMap { activeWindow =>
         val activeIndex = (cycle.abs % elements.size).toInt
-        val timeOffset = Fraction(cycle - (cycle / elements.size), 1L)
+        
+        val timeOffset = Fraction(cycle - (cycle / elements.size))
 
-        query(elements(activeIndex), activeWindow.map(t => t - timeOffset))
-          .map(event => event.mapTime(t => t + timeOffset))
+        query(elements(activeIndex), activeWindow.map(_ - timeOffset))
+          .map(_.mapTime(_ + timeOffset))
       }
 
     events.toList.flatten
 
-
   private def resolveSequence[T](elements: List[Pattern[T]], timeWindow: Interval): List[ScheduledEvent[T]] =
     if elements.isEmpty then return Nil
     val n = elements.size
-    val zoomF = Fraction(n.toLong, 1L)
     val step = Fraction(1, n)
 
-    val startCycle = timeWindow.start.toDouble.floor.toLong
-    val endCycle = timeWindow.end.toDouble.ceil.toLong
-
     val events = for
-      cycle <- startCycle until endCycle
-      cycleStart = Fraction(cycle, 1L)
+      cycle <- timeWindow.spanningCycles
+      cycleStart = Fraction(cycle)
       (element, index) <- elements.zipWithIndex
-      slotStart = cycleStart + (step * Fraction(index.toLong, 1L))
+
+      slotStart = cycleStart + (step * index)
       slot = Interval(slotStart, slotStart + step)
 
       overlap <- slot.intersect(timeWindow).toList
-
-      zoomedInWindow = overlap.map(t => (t - slotStart) * zoomF + cycleStart)
+      
+      zoomedInWindow = overlap.map(t => (t - slotStart) * n + cycleStart)
 
       childEvent <- query(element, zoomedInWindow)
 
       finalEvent <- childEvent
-        .mapTime(t => ((t - cycleStart) / zoomF) + slotStart)
+        .mapTime(t => ((t - cycleStart) / n) + slotStart)
         .clipTo(overlap)
         .toList
     yield finalEvent
 
     events.toList
-
 
   private def resolveExtensions(base: Pattern[AudioPayload], extensions: List[Pattern[AudioPayload]], timeWindow: Interval): List[ScheduledEvent[AudioPayload]] =
     query(base, timeWindow).map { baseEvent =>
@@ -164,7 +129,6 @@ object PatternResolver:
       baseEvent.copy(appliedExtensions = baseEvent.appliedExtensions ++ activeExts)
     }
 
-
   private def applyDynamicModifier[T](parameter: Pattern[Double], innerPattern: Pattern[T], timeWindow: Interval, zoomIn: (Interval, Fraction) => Interval, zoomOut: (ScheduledEvent[T], Fraction) => ScheduledEvent[T]): List[ScheduledEvent[T]] =
     for
       paramEvent <- query(parameter, timeWindow)
@@ -173,15 +137,10 @@ object PatternResolver:
       activeWindow <- paramEvent.part.intersect(timeWindow).toList
       warpedWindow = zoomIn(activeWindow, paramValue)
 
-      startCycle = warpedWindow.start.toDouble.floor.toLong
-      endCycle = warpedWindow.end.toDouble.ceil.toLong
-      cycle <- startCycle until endCycle
+      cycle <- warpedWindow.spanningCycles
+      cycleStart = Fraction(cycle)
 
-      cycleStart = Fraction(cycle, 1L)
-      cycleEnd = cycleStart + Fraction(1L, 1L)
-
-      cycleWindow <- Interval(cycleStart, cycleEnd).intersect(warpedWindow).toList
-
+      cycleWindow <- Interval(cycleStart, cycleStart + 1).intersect(warpedWindow).toList
       innerEvent <- query(innerPattern, cycleWindow)
 
     yield zoomOut(innerEvent, paramValue)

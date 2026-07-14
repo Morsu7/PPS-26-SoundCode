@@ -17,21 +17,37 @@ case class Fraction(n: Long, d: Long) extends Ordered[Fraction]:
     case that: Fraction => this.num == that.num && this.den == that.den
     case _ => false
   override def hashCode(): Int = (num, den).##
+
   @tailrec
   private def gcd(a: Long, b: Long): Long = if (b == 0) a else gcd(b, a % b)
+
+  // Operazioni con altre frazioni
   def +(that: Fraction): Fraction = Fraction(num * that.den + that.num * den, den * that.den)
   def -(that: Fraction): Fraction = Fraction(num * that.den - that.num * den, den * that.den)
   def *(that: Fraction): Fraction = Fraction(num * that.num, den * that.den)
   def /(that: Fraction): Fraction = Fraction(num * that.den, den * that.num)
+
+  def +(n: Long): Fraction = this + Fraction(n)
+  def -(n: Long): Fraction = this - Fraction(n)
+  def *(n: Long): Fraction = Fraction(num * n, den)
+  def /(n: Long): Fraction = Fraction(num, den * n)
+  def +(n: Int): Fraction = this + Fraction(n)
+  def -(n: Int): Fraction = this - Fraction(n)
+  def *(n: Int): Fraction = Fraction(num * n, den)
+  def /(n: Int): Fraction = Fraction(num, den * n)
+
+  def floor: Long = if (num >= 0) num / den else (num - den + 1) / den
+  def ceil: Long  = if (num >= 0) (num + den - 1) / den else num / den
+
   def toDouble: Double = num.toDouble / den.toDouble
   def compare(that: Fraction): Int = (this.num * that.den).compare(that.num * this.den)
 
 object Fraction:
-  def apply(n: Long): Fraction = Fraction(n, 1)
+  def apply(n: Long): Fraction = Fraction(n, 1L)
+  def apply(n: Int): Fraction = Fraction(n.toLong, 1L)
   def apply(n: Double): Fraction =
     val precision = 10000L
     Fraction(math.round(n * precision), precision)
-  def apply(n: Int): Fraction = Fraction(n.toLong, 1)
 
 case class Interval(start: Fraction, end: Fraction):
   def duration: Fraction = end - start
@@ -40,6 +56,11 @@ case class Interval(start: Fraction, end: Fraction):
     val newEnd = if (end < other.end) end else other.end
     if (newStart < newEnd) Some(Interval(newStart, newEnd)) else None
   def map(f: Fraction => Fraction): Interval = Interval(f(start), f(end))
+  def spanningCycles: Seq[Long] = start.floor until end.ceil
+  def +(f: Fraction): Interval = this.map(_ + f)
+  def -(f: Fraction): Interval = this.map(_ - f)
+  def *(f: Fraction): Interval = this.map(_ * f)
+  def /(f: Fraction): Interval = this.map(_ / f)
 
 enum Accidental:
   case Sharp, Flat, Natural
