@@ -17,7 +17,8 @@ final class MidiAudioEngine private (
     scheduler: ScheduledExecutorService
 ) extends AudioEngine:
 
-  def playNote(midiNote: Int, velocity: Int, durationMs: Long): Unit =
+  def playNote(midiNote: Int, velocity: Int, durationMs: Long, program: Int): Unit =
+    noteChannel.programChange(program) // seleziona lo strumento GM per il canale melodico
     fire(noteChannel, midiNote, velocity, durationMs)
 
   def playDrum(gmNote: Int, velocity: Int, durationMs: Long): Unit =

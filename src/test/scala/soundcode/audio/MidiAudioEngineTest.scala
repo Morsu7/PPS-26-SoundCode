@@ -13,7 +13,7 @@ class MidiAudioEngineTest extends AnyFunSuite {
 
     val engine = maybeEngine.get
     try {
-      engine.playNote(60, 96, 50)
+      engine.playNote(60, 96, 50, 0) // program 0 = piano
       engine.playDrum(36, 96, 50)
     } finally {
       engine.close()
