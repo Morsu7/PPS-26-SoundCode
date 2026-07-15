@@ -11,6 +11,13 @@ import scala.jdk.CollectionConverters.*
 import soundcode.parser.SoundCodeLanguage
 
 object AutocompleteSupport:
+  private final case class Completion(
+      from: Int,
+      to: Int,
+      text: String,
+      caretPosition: Int
+  )
+
   private case class CompletionItem(
       label: String,
       insertText: String,
@@ -50,7 +57,11 @@ object AutocompleteSupport:
 
   private object CompletionContext:
     def from(area: GenericStyledArea[?, ?, ?]): CompletionContext =
-      val textBeforeCaret = area.getText.take(area.getCaretPosition)
+      val textBeforeCaret =
+        area.getText(
+          0,
+          area.getCaretPosition
+        )
 
       val prefix =
         textBeforeCaret.reverse
@@ -61,6 +72,79 @@ object AutocompleteSupport:
         textBeforeCaret.drop(textBeforeCaret.lastIndexOf('\n') + 1)
 
       CompletionContext(textBeforeCaret, prefix, lineBeforeCaret)
+
+  private def suggestionsFor(
+      area: GenericStyledArea[?, ?, ?]
+  ): Vector[CompletionItem] =
+    val context = CompletionContext.from(area)
+
+    if context.isInsideQuotes then Vector.empty
+    else
+      val candidates =
+        if context.isAfterDot then
+          CompletionCatalog.generativeBlocks ++
+            CompletionCatalog.transformations
+        else if context.isAtLineStart then CompletionCatalog.generativeBlocks
+        else Vector.empty
+
+      candidates.filter(
+        _.label.startsWith(context.prefix)
+      )
+
+  private def completionFor(
+      area: GenericStyledArea[?, ?, ?],
+      item: CompletionItem
+  ): Completion =
+    val context = CompletionContext.from(area)
+    val caret = area.getCaretPosition
+    val from = caret - context.prefix.length
+    val placeholderIndex = item.insertText.indexOf("$0")
+
+    val text =
+      if placeholderIndex >= 0 then
+        item.insertText.patch(
+          placeholderIndex,
+          "",
+          "$0".length
+        )
+      else item.insertText
+
+    val finalCaret =
+      if placeholderIndex >= 0 then from + placeholderIndex
+      else from + text.length
+
+    Completion(
+      from = from,
+      to = caret,
+      text = text,
+      caretPosition = finalCaret
+    )
+
+  private def applyCompletion(
+      area: GenericStyledArea[?, ?, ?],
+      completion: Completion
+  ): Unit =
+    area.replaceText(
+      completion.from,
+      completion.to,
+      completion.text
+    )
+
+    area.moveTo(completion.caretPosition)
+
+  private[ui] def completeFirst(
+      area: GenericStyledArea[?, ?, ?]
+  ): Boolean =
+    suggestionsFor(area).headOption match
+      case Some(item) =>
+        applyCompletion(
+          area,
+          completionFor(area, item)
+        )
+        true
+
+      case None =>
+        false
 
   def install(area: GenericStyledArea[?, ?, ?]): Unit =
     val popup = new Popup()
@@ -183,21 +267,8 @@ object AutocompleteSupport:
           refreshStyle()
     )
 
-    def suggestions(): Vector[CompletionItem] =
-      val context = CompletionContext.from(area)
-
-      if context.isInsideQuotes then Vector.empty
-      else
-        val candidates =
-          if context.isAfterDot then
-            CompletionCatalog.generativeBlocks ++ CompletionCatalog.transformations
-          else if context.isAtLineStart then CompletionCatalog.generativeBlocks
-          else Vector.empty
-
-        candidates.filter(_.label.startsWith(context.prefix))
-
     def showPopup(): Unit =
-      val items = suggestions()
+      val items = suggestionsFor(area)
 
       if items.isEmpty then popup.hide()
       else
@@ -218,25 +289,16 @@ object AutocompleteSupport:
           styleScrollBar()
 
     def insertSelected(): Unit =
-      val selected = list.getSelectionModel.getSelectedItem
-
-      if selected != null then
-        val prefix = CompletionContext.from(area).prefix
-        val caret = area.getCaretPosition
-        val from = caret - prefix.length
-
-        val placeholderIndex = selected.insertText.indexOf("$0")
-        val textToInsert =
-          if placeholderIndex >= 0 then
-            selected.insertText.patch(placeholderIndex, "", "$0".length)
-          else selected.insertText
-
-        area.replaceText(from, caret, textToInsert)
-
-        if placeholderIndex >= 0 then area.moveTo(from + placeholderIndex)
-        else area.moveTo(from + textToInsert.length)
+      Option(
+        list.getSelectionModel.getSelectedItem
+      ).foreach { selected =>
+        applyCompletion(
+          area,
+          completionFor(area, selected)
+        )
 
         popup.hide()
+      }
 
     def moveSelection(delta: Int): Unit =
       val itemCount = list.getItems.size

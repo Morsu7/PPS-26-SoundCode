@@ -2,7 +2,7 @@ package soundcode.ui
 
 import scalafx.application.JFXApp3
 import scalafx.scene.Scene
-import soundcode.domain.Tempo
+import scalafx.application.Platform
 import soundcode.mvu.SoundCodeRuntime
 import soundcode.mvu.AppModel
 import soundcode.mvu.Msg
@@ -18,12 +18,15 @@ object SoundCodeFrame extends JFXApp3:
 
     val initialModel = AppModel()
 
-    lazy val mainView: MainView = MainView(runtime.dispatch)
+    lazy val mainView: MainView = MainView(runtime.dispatch, initialModel.tempo)
 
     runtime = SoundCodeRuntime(
       initialModel = initialModel,
-      render = model => mainView.render(model),
-      tempo = Tempo(0.5),
+      // Il render puo' essere invocato dal thread audio (callback di highlight):
+      // marshalliamo sempre sul thread JavaFX per non toccare la UI fuori da esso.
+      render = model =>
+        if Platform.isFxApplicationThread then mainView.render(model)
+        else Platform.runLater(() => mainView.render(model)),
       backend = MidiBackend()
     )
     mainView.render(initialModel)

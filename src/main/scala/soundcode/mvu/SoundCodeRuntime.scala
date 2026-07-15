@@ -3,12 +3,20 @@ package soundcode.mvu
 import soundcode.domain.Tempo
 import soundcode.engine.*
 
-class SoundCodeRuntime(initialModel: AppModel, render: AppModel => Unit, tempo: Tempo, backend: AudioBackend):
+class SoundCodeRuntime(
+    initialModel: AppModel,
+    render: AppModel => Unit,
+    backend: AudioBackend
+):
   private var model: AppModel = initialModel
 
-  private val audioPlayer = new AudioPlayer(tempo, backend, positions => {
-    dispatch(Msg.UpdateHighlightText(positions))
-  })
+  private val audioPlayer = new AudioPlayer(
+    initialModel.tempo,
+    backend,
+    positions => {
+      dispatch(Msg.UpdateHighlightText(positions))
+    }
+  )
 
   def dispatch(msg: Msg): Unit =
     val (nextModel, cmd) = Update.update(model, msg)

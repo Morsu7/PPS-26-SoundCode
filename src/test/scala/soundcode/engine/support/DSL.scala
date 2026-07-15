@@ -22,6 +22,8 @@ def clap = Pattern.Atom(Sound.SampleInText(Sample("clap"), dummyPos))
 def c4 = Pattern.Atom(Sound.NoteInText(Note("c"), dummyPos))
 def f4 = Pattern.Atom(Sound.NoteInText(Note("f"), dummyPos))
 def g4 = Pattern.Atom(Sound.NoteInText(Note("g"), dummyPos))
+def e4 = Pattern.Atom(Sound.NoteInText(Note("e"), dummyPos))
+def b4 = Pattern.Atom(Sound.NoteInText(Note("b"), dummyPos))
 def cSharp4 = Pattern.Atom(Sound.NoteInText(Note("c#"), dummyPos))
 
 // Effetti
