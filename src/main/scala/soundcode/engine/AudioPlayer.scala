@@ -62,15 +62,20 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
           val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
           backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
           //aggiunta highLight
-          val positionOpt = nextEvent.value match
-            case Sound.NoteInText(_, pos)   => Some(pos)
-            case Sound.SampleInText(_, pos) => Some(pos)
-            case Sound.Rest(pos)            => Some(pos)
-            case _                          => None
+          val allPayloads = nextEvent.value :: nextEvent.appliedExtensions
 
-          positionOpt.foreach { pos =>
-            activeHighlights = activeHighlights + (pos -> (now.toLong + durationMs))
-            highlightsChanged = true
+          // Cicliamo su tutti i payload (principale + estensioni)
+          allPayloads.foreach { payload =>
+            val positionOpt = payload match
+              case Sound.NoteInText(_, pos) => Some(pos)
+              case Sound.SampleInText(_, pos) => Some(pos)
+              case Sound.Rest(pos) => Some(pos)
+              case _ => None // Ignora gli AudioEffect senza posizione
+
+            positionOpt.foreach { pos =>
+              activeHighlights = activeHighlights + (pos -> (now.toLong + durationMs))
+              highlightsChanged = true
+            }
           }
           //-----------------------
         }
