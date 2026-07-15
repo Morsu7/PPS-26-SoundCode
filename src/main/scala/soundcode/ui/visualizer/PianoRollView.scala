@@ -3,23 +3,28 @@ package soundcode.ui.visualizer
 import scalafx.scene.paint.Color
 import scalafx.scene.canvas.GraphicsContext
 import soundcode.ui.UITheme
-import soundcode.domain.{ScheduledEvent, AudioPayload, Sound}
-import soundcode.domain.Tempo
-import soundcode.domain.Timeline
+import soundcode.domain.{ScheduledEvent, AudioPayload, Sound, Tempo}
 import scalafx.scene.text.TextAlignment
 import scalafx.scene.text.Font
 import scalafx.geometry.VPos
+import soundcode.domain.TextPosition
+import soundcode.domain.Interval
+import soundcode.domain.{Note, Fraction}
 
 final class PianorollView(
-    timeline: Timeline[AudioPayload],
+    timeline: Seq[ScheduledEvent[AudioPayload]],
     tempo: Tempo
 ) extends CanvasAnimatedView(tempo):
   val visualEvents: Seq[VisualEvent] = toVisualEvents()
 
-  private val loopLength = timeline.loopLength.toDouble
+  private val loopLength = timeline
+    .map(_.whole.end)
+    .maxOption
+    .map(_.toDouble)
+    .getOrElse(0.0)
 
   private def toVisualEvents(): Seq[VisualEvent] =
-    val events = timeline.events.collect {
+    val events = timeline.collect {
       case ScheduledEvent(_, part, Sound.NoteInText(note, _), _) =>
         (note.toString, part)
       case ScheduledEvent(_, part, Sound.SampleInText(sample, _), _) =>

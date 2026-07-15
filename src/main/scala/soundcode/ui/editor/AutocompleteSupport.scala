@@ -41,6 +41,9 @@ object AutocompleteSupport:
     val transformations: Vector[CompletionItem] =
       SoundCodeLanguage.Transformation.all.map(toCompletionItem)
 
+    val visualizations: Vector[CompletionItem] =
+      SoundCodeLanguage.Visualization.all.map(toCompletionItem)
+
   private final case class CompletionContext(
       textBeforeCaret: String,
       prefix: String,
@@ -83,7 +86,8 @@ object AutocompleteSupport:
       val candidates =
         if context.isAfterDot then
           CompletionCatalog.generativeBlocks ++
-            CompletionCatalog.transformations
+            CompletionCatalog.transformations ++ 
+            CompletionCatalog.visualizations
         else if context.isAtLineStart then CompletionCatalog.generativeBlocks
         else Vector.empty
 

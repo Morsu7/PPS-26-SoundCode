@@ -18,16 +18,19 @@ import scala.jdk.CollectionConverters.*
 import soundcode.domain.ScheduledEvent
 import soundcode.domain.AudioPayload
 import soundcode.domain.Tempo
-import soundcode.domain.Timeline
+import soundcode.domain.VisualizerRequest
+import soundcode.domain.VisualizerKind
+import soundcode.ui.visualizer.PianorollView
 
 private final case class EditorParagraphStyle(
     visualizerSpace: Double = 0
 )
 
 final class BlockEditorView(
-    initialCode: String = """|note("c4 a4").sound("piano")
-                             |sound("hb hd hh")
-                             |""".stripMargin.trim,
+    initialCode: String =
+      """|note("<c4 e4 g4 e4> <a3 c4 e4 c4> <f3 a3 c4 a3> <g3 b3 d4 b3>").sound("piano")
+     |sound("bd hh [cp, hh] hh")
+     |""".stripMargin.trim,
     baseTempo: Tempo
 ):
   private final case class VisualizerDecoration(
@@ -81,10 +84,12 @@ final class BlockEditorView(
   private[ui] def editorArea = area
 
   private var visualizers = Vector.empty[AnimatedView]
-  private var renderedTimelines = List.empty[Timeline[AudioPayload]]
+  private var renderedTimelines = List.empty[Seq[ScheduledEvent[AudioPayload]]]
   private var renderedTempo = baseTempo
+  private var renderedVisualizerRequests = List.empty[VisualizerRequest]
   private var highlightScheduled = false
   private var replacingCode = false
+  private var playbackHighlightsEnabled = true
 
   private val scrollPane =
     new VirtualizedScrollPane(area)
@@ -227,12 +232,20 @@ final class BlockEditorView(
     }
 
   def render(state: AppModel): Unit =
-    if state.timelines != renderedTimelines || state.tempo != renderedTempo then
-      refreshVisualizers(state.timelines, state.tempo)
+    if state.timelines != renderedTimelines || state.visualizers != renderedVisualizerRequests || state.tempo != renderedTempo
+    then
+      refreshVisualizers(state.timelines, state.visualizers, state.tempo)
+
       renderedTimelines = state.timelines
+      renderedVisualizerRequests = state.visualizers
       renderedTempo = state.tempo
 
-    SyntaxHighlighter.applyTo(area, state.positions)
+    if state.positions.isEmpty then
+      playbackHighlightsEnabled = true
+      SyntaxHighlighter.applyTo(area)
+    else if playbackHighlightsEnabled then
+      SyntaxHighlighter.applyTo(area, state.positions)
+    else SyntaxHighlighter.applyTo(area)
 
   def currentCode: String =
     normalizeNewlines(
@@ -258,7 +271,11 @@ final class BlockEditorView(
 
     area
       .plainTextChanges()
-      .subscribe(_ => scheduleHighlight())
+      .subscribe { _ =>
+        if !replacingCode then playbackHighlightsEnabled = false
+
+        scheduleHighlight()
+      }
 
     area.textProperty().addListener { (_, _, _) =>
       Platform.runLater {
@@ -306,30 +323,41 @@ final class BlockEditorView(
     finally replacingCode = false
 
   private def refreshVisualizers(
-      timelines: List[Timeline[AudioPayload]],
+      timelines: List[Seq[ScheduledEvent[AudioPayload]]],
+      requests: List[VisualizerRequest],
       tempo: Tempo
   ): Unit =
     visualizers.foreach(_.stop())
 
-    decorations = area.getText
-      .split("\n", -1)
-      .indices
-      .flatMap { lineIndex =>
-        BlockEditorVisualizers
-          .forLine(lineIndex, timelines, tempo)
-          .map(view =>
-            VisualizerDecoration(
-              anchorLine = lineIndex,
-              view = view
-            )
+    decorations = requests.flatMap { request =>
+      timelines
+        .lift(request.streamIndex)
+        .map { timeline =>
+          val view =
+            request.kind match
+              case VisualizerKind.PianoRoll =>
+                new PianorollView(timeline, tempo)
+
+          VisualizerDecoration(
+            anchorLine = lineForStream(request.streamIndex),
+            view = view
           )
-      }
-      .toVector
+        }
+    }.toVector
 
     visualizers = decorations.map(_.view)
 
     applyDecorationSpacing()
     installVisualizerNodes()
+
+  private def lineForStream(streamIndex: Int): Int =
+    area.getText
+      .split("\n", -1)
+      .zipWithIndex
+      .filter { case (line, _) => line.trim.nonEmpty }
+      .lift(streamIndex)
+      .map(_._2)
+      .getOrElse(-1)
 
   private def scheduleHighlight(): Unit =
     if !highlightScheduled && !replacingCode then

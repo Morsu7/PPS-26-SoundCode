@@ -2,7 +2,7 @@ package soundcode.parser
 
 object SoundCodeLanguage:
   enum ConstructKind:
-    case Generative, Transformation
+    case Generative, Transformation, Visualization
 
   final case class Construct(
       name: String,
@@ -133,5 +133,17 @@ object SoundCodeLanguage:
       )
     )
 
+  object Visualization:
+    val Pianoroll = "_pianoroll"
+
+    val all: Vector[Construct] = Vector(
+      Construct(
+        Pianoroll,
+        """_pianoroll()""",
+        "Visualizes the pattern as a pianoroll",
+        ConstructKind.Visualization
+      )
+    )
+
   val all: Vector[Construct] =
-    Generative.all ++ Transformation.all
+    Generative.all ++ Transformation.all ++ Visualization.all
