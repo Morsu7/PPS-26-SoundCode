@@ -94,7 +94,7 @@ object Interpreter {
 
     private def interpretElement[A <: AST.Atom, B](element: AST.Element[A])(buildAtom: A => Pattern[B]): Pattern[B] = element match {
         case AST.AlternationElement(pattern) =>
-            Pattern.Alternation(pattern.elems.map(interpretSequence(_)(buildAtom)))
+            Pattern.Alternation(List(interpretPattern(pattern)(buildAtom)))
         case AST.SubPatternElement(pattern) => {
             smartSequence(pattern.elems.map(interpretSequence(_)(buildAtom)))
         }

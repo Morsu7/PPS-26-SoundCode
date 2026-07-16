@@ -14,14 +14,14 @@ class CorePatternsTest extends SchedulerTestBase {
     )
   }
 
-  test("""note("<e4 g4, g4 b4>")""") {
+  test("""note("<e4 g4, f4 b4>")""") {
     // L'AST corretto generato dal tuo parser:
     // Un parallelo di due alternazioni!
-    val streams = List(par(alt(e4, g4), alt(g4, b4)))
+    val streams = List(par(alt(e4, g4), alt(f4, b4)))
 
     assertCycleUnordered(streams, 0)(
       ExpEvent("E", 0 \ 1, 1 \ 1),
-      ExpEvent("G", 0 \ 1, 1 \ 1)
+      ExpEvent("F", 0 \ 1, 1 \ 1)
     )
     assertCycleUnordered(streams, 1)(
       ExpEvent("G", 1 \ 1, 2 \ 1),
@@ -29,7 +29,7 @@ class CorePatternsTest extends SchedulerTestBase {
     )
     assertCycleUnordered(streams, 2)(
       ExpEvent("E", 2 \ 1, 3 \ 1),
-      ExpEvent("G", 2 \ 1, 3 \ 1)
+      ExpEvent("F", 2 \ 1, 3 \ 1)
     )
   }
 
