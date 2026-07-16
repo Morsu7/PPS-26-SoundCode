@@ -1,11 +1,12 @@
 package soundcode.parser.AST
 
 import soundcode.parser.AST.Transformations._
+import soundcode.parser.AST.Visualizers._
 
 trait Block
 
 // Each block contains a pattern
-case class StreamBlock(base: GenerativeBlock, extensions: List[ExtensionBlock]) extends Block
+case class StreamBlock(base: GenerativeBlock, extensions: List[ExtensionBlock], visualizer: Option[VisualizerBlock]) extends Block
 sealed trait ExtensionBlock extends Block
 case class GenerativeExtensionBlock(block: GenerativeBlock) extends ExtensionBlock
 case class TransformationExtensionBlock(block: TransformationBlock) extends ExtensionBlock

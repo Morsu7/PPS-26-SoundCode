@@ -1,15 +1,24 @@
 package soundcode.interpreter
 
 import soundcode.parser.AST
-import soundcode.parser.AST.Transformations
 import soundcode.domain.*
 import soundcode.domain.Pattern.*
 import soundcode.domain.Sound.SampleInText
 
 object Interpreter {
 
-    // temp
-    var found = false
+    def extractVisualizerRequests(tree: AST.ProgramAST): List[VisualizerRequest] =
+        tree.blocks.zipWithIndex.flatMap {
+            case (sb: AST.StreamBlock, index) =>
+            sb.visualizer.map(v => interpretVisualizerRequest(v, index)).toList
+
+            case _ =>
+            Nil
+        }
+
+    def interpretVisualizerRequest(block: AST.Visualizers.VisualizerBlock, index: Int): VisualizerRequest = block match {
+        case AST.Visualizers.PianoRollBlock(_) => VisualizerRequest(index, VisualizerKind.PianoRoll)
+    }
 
     def interpret(tree: AST.ProgramAST): List[Pattern[AudioPayload]] = {
         tree.blocks.collect {

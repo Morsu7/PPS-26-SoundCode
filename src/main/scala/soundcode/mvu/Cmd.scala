@@ -17,16 +17,15 @@ object Cmd:
     override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit =
       val parser = new SoundCodeParser
 
-      val (streams, errors) = parser.parseProgram(code) match {
+      val (streams, requests, errors) = parser.parseProgram(code) match {
         case Right(programAST) =>
-          (Interpreter.interpret(programAST), None)
+          (Interpreter.interpret(programAST), Interpreter.extractVisualizerRequests(programAST), None)
 
         case Left(errorMsg) =>
-          (List.empty[Pattern[AudioPayload]], Some(s"Parsing failed:\n$errorMsg"))
+          (List.empty[Pattern[AudioPayload]], List.empty[VisualizerRequest], Some(s"Parsing failed:\n$errorMsg"))
       }
 
-
-      dispatch(Msg.CodeParsed(streams, errors))
+      dispatch(Msg.CodeParsed(streams, requests, errors))
 
   /** Avvia il loop di riproduzione dell'AudioPlayer. */
   case object StartPlayback extends Cmd:

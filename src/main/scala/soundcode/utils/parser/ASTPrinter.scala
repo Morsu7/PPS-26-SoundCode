@@ -2,6 +2,7 @@ package soundcode.utils.parser
 
 import soundcode.parser.AST._
 import soundcode.parser.AST.Transformations._
+import soundcode.parser.AST.Visualizers._
 
 object ASTPrinter {
   extension (program: ProgramAST) {
@@ -20,21 +21,34 @@ object ASTPrinter {
     val nextIndent = indent + (if (isLast) "    " else "|   ")
     
     block match {
-      case StreamBlock(base, extensions) =>
-        val baseStr = s"$indent${marker}StreamBlock\n" + formatBlock(base, nextIndent, extensions.isEmpty)
-        if (extensions.isEmpty) baseStr
-        else {
-          val extStr = extensions.zipWithIndex.map { case (ext, idx) =>
-            formatBlock(ext, nextIndent, idx == extensions.size - 1)
-          }.mkString("\n")
-          s"$baseStr\n$extStr"
-        }
+      case StreamBlock(base, extensions, visualizer) =>
+      val children: List[Block] =
+        extensions ++ visualizer.toList
+
+      val baseStr =
+        s"$indent${marker}StreamBlock\n" +
+          formatBlock(base, nextIndent, children.isEmpty)
+
+      if (children.isEmpty) {
+        baseStr
+      } else {
+        val childrenStr = children.zipWithIndex.map { case (child, idx) =>
+          formatBlock(child, nextIndent, idx == children.size - 1)
+        }.mkString("\n")
+
+        s"$baseStr\n$childrenStr"
+      }
 
       case GenerativeExtensionBlock(genBlock) =>
         s"$indent${marker}GenerativeExtensionBlock (.)\n${formatBlock(genBlock, nextIndent, isLast = true)}"
 
       case TransformationExtensionBlock(transBlock) =>
         s"$indent${marker}TransformationExtensionBlock (.)\n${formatBlock(transBlock, nextIndent, isLast = true)}"
+
+      case v: VisualizerBlock => v match {
+        case PianoRollBlock(startIndex) =>
+          s"$indent${marker}VisualizerBlock: PianoRollBlock(startIndex=$startIndex)"
+      }
 
       case t: TransformationBlock =>
         t match {

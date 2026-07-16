@@ -3,8 +3,10 @@ package soundcode.parser
 import fastparse._, NoWhitespace._
 import soundcode.parser.AST._
 import soundcode.parser.AST.Transformations._
+import soundcode.parser.AST.Visualizers._
 
 import soundcode.utils.parser.formatParseError
+import soundcode.domain.VisualizerRequest
 
 class SoundCodeParser {
 
@@ -20,15 +22,15 @@ class SoundCodeParser {
   }
 
   private def prog(using P[?]): P[ProgramAST] =
-    P(streamBlock.rep(1, sep = P("\n".rep())) ~ End).map(streams =>
+    P(streamBlock.rep(1, sep = P("\n".rep(1))) ~ End).map(streams =>
       ProgramAST(streams.toList)
     ) // One or more audio Streams
 
   // A "stream" is a generative block optionally chained with generative or transformation blocks
   private def streamBlock(using P[?]): P[StreamBlock] =
-    P(generativeBlock ~ ("." ~/ extensionBlock).rep).map {
-      case (baseBlock, extensionSeq) =>
-        StreamBlock(baseBlock, extensionSeq.toList)
+    P(generativeBlock ~ ("." ~ extensionBlock).rep  ~ ("." ~/ visualizerBlock).?).map {
+      case (baseBlock, extensionSeq, visualizerSeq) =>
+        StreamBlock(baseBlock, extensionSeq.toList, visualizerSeq)
     }
 
   private def generativeBlock(using P[?]): P[GenerativeBlock] =
@@ -39,6 +41,13 @@ class SoundCodeParser {
       generativeBlock.map(GenerativeExtensionBlock.apply) | transformationBlock
         .map(TransformationExtensionBlock.apply)
     )
+
+  private def visualizerBlock(using P[?]): P[VisualizerBlock] =
+    P(
+      Index ~ SoundCodeLanguage.Visualization.Pianoroll ~/ "(" ~ ws ~ ")"
+    ).map { startIndex =>
+      PianoRollBlock(startIndex)
+  }
 
   private def noteBlock(using P[?]): P[NoteBlock] =
     P(
