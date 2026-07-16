@@ -122,7 +122,7 @@ class InterpreterFunSuite extends AnyFunSuite {
     }
 
     test("interpret a stream with alternation") {
-        val streams = interpret("note(\"<e3 g4, a5 b6>\")")
+        val streams = interpret("sound(\"<bd [hh sn]> cp\")")
         
         println(streams.head)
     }

@@ -88,13 +88,24 @@ object Interpreter {
         }
     }
 
+    private def smartParallel[B](elements: List[Pattern[B]]): Pattern[B] = elements match {
+        case head :: Nil => head
+        case elems       => Pattern.Parallel(elems)
+    }
+
     private def interpretSequence[A <: AST.Atom, B](sequence: AST.Sequence[A])(buildAtom: A => Pattern[B]): Pattern[B] = {
         smartSequence(sequence.elems.map(interpretElement(_)(buildAtom)))
     }
 
     private def interpretElement[A <: AST.Atom, B](element: AST.Element[A])(buildAtom: A => Pattern[B]): Pattern[B] = element match {
         case AST.AlternationElement(pattern) =>
-            Pattern.Alternation(List(interpretPattern(pattern)(buildAtom)))
+            smartParallel(
+                pattern.elems.map { seq =>
+                    Pattern.Alternation(
+                        seq.elems.map(interpretElement(_)(buildAtom))
+                    )
+                }
+            )
         case AST.SubPatternElement(pattern) => {
             smartSequence(pattern.elems.map(interpretSequence(_)(buildAtom)))
         }
