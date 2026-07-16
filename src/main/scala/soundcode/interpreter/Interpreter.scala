@@ -106,9 +106,8 @@ object Interpreter {
                     )
                 }
             )
-        case AST.SubPatternElement(pattern) => {
-            smartSequence(pattern.elems.map(interpretSequence(_)(buildAtom)))
-        }
+        case AST.SubPatternElement(pattern) => interpretPattern(pattern)(buildAtom)
+
         case AST.AtomElement(atom) => buildAtom(atom)
 
         case AST.SpeedModifiedElement(_, _, _) => ???
