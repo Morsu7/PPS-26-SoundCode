@@ -43,16 +43,20 @@ class SoundCodeParser {
   private def noteBlock(using P[?]): P[NoteBlock] =
     P(
       SoundCodeLanguage.Generative.Note ~/ "(" ~ ws ~ wrappedPattern(
-        noteAtom
+        notePatternAtom
       ) ~ ws ~ ")"
     ).map(NoteBlock.apply)
 
   private def soundBlock(using P[?]): P[SoundBlock] =
     P(
       SoundCodeLanguage.Generative.Sound ~/ "(" ~ ws ~ wrappedPattern(
-        sampleAtom
+        samplePatternAtom
       ) ~ ws ~ ")"
     ).map(SoundBlock.apply)
+
+  private def notePatternAtom(using P[?]): P[Note | Silence] = P(noteAtom | silenceAtom)
+
+  private def samplePatternAtom(using P[?]): P[Sample | Silence] = P(sampleAtom | silenceAtom)
 
   private def wrappedPattern[T <: Atom](atom: => P[T])(using
       P[?]
@@ -117,12 +121,12 @@ class SoundCodeParser {
   ).map { case (name, pat) => Unknown(name, pat) }
 
   private def gain(using P[?]): P[Gain] =
-
     P(
       SoundCodeLanguage.Transformation.Gain ~/ "(" ~ ws ~ wrappedPattern(
         configAtom
       ) ~ ws ~ ")"
     ).map(Gain.apply)
+
   private def pan(using P[?]): P[Pan] =
     P(
       SoundCodeLanguage.Transformation.Pan ~/ "(" ~ ws ~ wrappedPattern(
@@ -250,6 +254,16 @@ class SoundCodeParser {
       Config(value.toDouble, startIndex, endIndex)
     }.opaque("Numeric Value (integer or decimal)")
 
+
+  private def silenceAtom(using P[?]): P[Silence] =
+    P(Index ~ tilde ~ Index)
+      .map { case (startIndex, endIndex) =>
+        Silence(startIndex, endIndex)
+      }
+      .opaque("Silence Atom (keyword 'silence')")
+
+  
+
   /*
     ---------- UTILS PARSER ----------
    */
@@ -261,4 +275,7 @@ class SoundCodeParser {
 
   // parser for quote character
   private def quote(using P[?]): P[Unit] = P("\"").opaque("quotes (\")")
+
+  // parser for tilde character
+  private def tilde(using P[?]): P[Unit] = P("~").opaque("tilde (~)")
 }

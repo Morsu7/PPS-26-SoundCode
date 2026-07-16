@@ -120,4 +120,17 @@ class InterpreterFunSuite extends AnyFunSuite {
             case other => fail(s"Expected TimeWarp, but found $other")
         }
     }
+
+    test("interpret a stream with silence") {
+        val streams = interpret("note(\"c# ~ ~\").sound(\"piano ~\")")
+        
+        inside(streams.head) {
+            case Pattern.WithExtensions(base, extensions) =>
+                println(s"Base: $base")
+                base should matchPattern { case Pattern.Sequence(List(_, Pattern.Atom(Rest(_)), _)) => }
+                extensions(0) should matchPattern { case Pattern.Sequence(List(_, Pattern.Atom(Rest(_)))) => }
+                
+            case other => fail(s"Expected WithExtensions, but found $other")
+        }
+    }
 }

@@ -122,6 +122,7 @@ object Interpreter {
                 case _ => Accidental.Natural
             }
             Pattern.Atom(Sound.NoteInText(Note(name, acc, octave), TextPosition(startPos, endPos)))
+        case AST.Silence(startPos, endPos) => Pattern.Atom(Sound.Rest(TextPosition(startPos, endPos)))
         case _ => throw new IllegalArgumentException("Expected Sample or Note")
     }
 
