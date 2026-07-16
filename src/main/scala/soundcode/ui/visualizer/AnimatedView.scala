@@ -10,6 +10,7 @@ import scalafx.animation.AnimationTimer
 import scalafx.application.Platform
 import scalafx.scene.layout.Pane
 import soundcode.ui.UITheme
+import soundcode.domain.Tempo
 
 private case class VisualEvent(
     label: String,
@@ -24,14 +25,14 @@ trait AnimatedView:
   def play(): Unit
   def stop(): Unit
 
-abstract class CanvasAnimatedView extends AnimatedView:
-  // TODO: just mockup bpm for now, fetch from global state later
-  protected val bpm = 120.0
-  protected val pixelsPerBeat = 96.0
+abstract class CanvasAnimatedView(
+    protected val tempo: Tempo
+) extends AnimatedView:
+  protected val pixelsPerCycle = 130.0
+  protected val canvasHeight = 100.0
 
   protected val config = VisualizerConfig.default
 
-  protected val canvasHeight = 120.0
   protected val canvas = new Canvas(0, canvasHeight)
 
   private val canvasPane = new Pane:
@@ -58,14 +59,16 @@ abstract class CanvasAnimatedView extends AnimatedView:
   canvas.widthProperty().bind(canvasPane.widthProperty())
 
   canvas.width.onChange {
-    redraw(lastBeat)
+    redraw(lastCycle)
   }
 
   override val root: Node = view
 
   private var running = false
   private var startNano: Long = 0L
-  private var lastBeat = 0.0
+  private var lastCycle = 0.0
+
+  private[ui] def isRunning: Boolean = running
 
   protected def clear(gc: GraphicsContext, w: Double, h: Double): Unit =
     gc.fill = Color.web(UITheme.Background)
@@ -73,13 +76,13 @@ abstract class CanvasAnimatedView extends AnimatedView:
 
   protected def draw(
       gc: GraphicsContext,
-      currentBeat: Double,
+      currentCycle: Double,
       w: Double,
       h: Double
   ): Unit
 
-  private def redraw(currentBeat: Double): Unit =
-    lastBeat = currentBeat
+  private def redraw(currentCycle: Double): Unit =
+    lastCycle = currentCycle
 
     val gc = canvas.graphicsContext2D
     val w = canvas.width.value
@@ -88,7 +91,7 @@ abstract class CanvasAnimatedView extends AnimatedView:
     if w <= 0 || h <= 0 then return
 
     clear(gc, w, h)
-    draw(gc, currentBeat, w, h)
+    draw(gc, lastCycle, w, h)
 
   Platform.runLater {
     redraw(0.0)
@@ -99,15 +102,16 @@ abstract class CanvasAnimatedView extends AnimatedView:
       if startNano == 0L then startNano = now
 
       val elapsedSeconds = (now - startNano) / 1e9
-      val currentBeat = elapsedSeconds * bpm / 60.0
+      val currentCycle = elapsedSeconds * tempo.cps
 
-      redraw(currentBeat)
+      redraw(currentCycle)
   }
 
   override def play(): Unit =
-    running = true
-    startNano = 0L
-    timer.start()
+    if !running then
+      running = true
+      startNano = 0L
+      timer.start()
 
   override def stop(): Unit =
     running = false

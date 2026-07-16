@@ -8,7 +8,7 @@ enum Msg:
   // possible implementation of a tick message to update the current beat in the piano roll view
   case PlaybackTick(currentBeat: Double)
   case UpdateHighlightText(positions: Set[TextPosition])
-  case UpdateTimelines(timelines: List[Seq[ScheduledEvent[AudioPayload]]])
+  case UpdateTimelines(timelines: List[Timeline[AudioPayload]])
   // Controllo della riproduzione audio (pulsanti Play/Stop)
   case PlayRequested
   case StopRequested

@@ -3,8 +3,11 @@ package soundcode.ui.visualizer
 import scalafx.scene.canvas.GraphicsContext
 import scalafx.scene.paint.Color
 import soundcode.ui.UITheme
+import soundcode.domain.Tempo
 
-final class OscilloscopeView extends CanvasAnimatedView:
+final class OscilloscopeView(
+    tempo: Tempo
+) extends CanvasAnimatedView(tempo):
 
   override protected def draw(
       gc: GraphicsContext,
@@ -29,7 +32,7 @@ final class OscilloscopeView extends CanvasAnimatedView:
       h: Double
   ): Unit =
     val samples = 256
-    val visibleBeats = w / pixelsPerBeat
+    val visibleCycles = w / pixelsPerCycle
     val centerY = h * 0.5
     var amplitude = (h - config.verticalPadding * 2) * 0.38
 
@@ -39,7 +42,7 @@ final class OscilloscopeView extends CanvasAnimatedView:
 
     for sample <- 0 until samples do
       val progress = sample.toDouble / (samples - 1)
-      val beat = currentBeat + progress * visibleBeats
+      val beat = currentBeat + progress * visibleCycles
       val x = progress * w
       val y = centerY + signalAt(beat) * amplitude
 

@@ -15,6 +15,10 @@ import soundcode.ui.visualizer.AnimatedView
 
 import java.util.function.{BiConsumer, Function, IntFunction}
 import scala.jdk.CollectionConverters.*
+import soundcode.domain.ScheduledEvent
+import soundcode.domain.AudioPayload
+import soundcode.domain.Tempo
+import soundcode.domain.Timeline
 
 private final case class EditorParagraphStyle(
     visualizerSpace: Double = 0
@@ -23,7 +27,8 @@ private final case class EditorParagraphStyle(
 final class BlockEditorView(
     initialCode: String = """|note("c4 a4").sound("piano")
                              |sound("hb hd hh")
-                             |""".stripMargin.trim
+                             |""".stripMargin.trim,
+    baseTempo: Tempo
 ):
   private final case class VisualizerDecoration(
       anchorLine: Int,
@@ -72,12 +77,14 @@ final class BlockEditorView(
           text
     )
 
+  // for testing purposes expose the underlying area
+  private[ui] def editorArea = area
+
   private var visualizers = Vector.empty[AnimatedView]
+  private var renderedTimelines = List.empty[Timeline[AudioPayload]]
+  private var renderedTempo = baseTempo
   private var highlightScheduled = false
   private var replacingCode = false
-
-  def refreshVisualizersAfterUpdate(): Unit =
-    refreshVisualizers()
 
   private val scrollPane =
     new VirtualizedScrollPane(area)
@@ -109,7 +116,6 @@ final class BlockEditorView(
 
   configureArea()
   setCode(initialCode)
-  refreshVisualizers()
   area.getUndoManager.forgetHistory()
 
   private def installVisualizerNodes(): Unit =
@@ -197,8 +203,6 @@ final class BlockEditorView(
     }
 
   private def applyDecorationSpacing(): Unit =
-    // Quando Enter divide un paragrafo, RichTextFX può propagare
-    // lo stile: prima azzeriamo tutti i paragrafi.
     (0 until area.getParagraphs.size()).foreach { paragraphIndex =>
       area.setParagraphStyle(
         paragraphIndex,
@@ -223,7 +227,11 @@ final class BlockEditorView(
     }
 
   def render(state: AppModel): Unit =
-    // setCodeWithVisualizers(state.code)
+    if state.timelines != renderedTimelines || state.tempo != renderedTempo then
+      refreshVisualizers(state.timelines, state.tempo)
+      renderedTimelines = state.timelines
+      renderedTempo = state.tempo
+
     SyntaxHighlighter.applyTo(area, state.positions)
 
   def currentCode: String =
@@ -297,7 +305,10 @@ final class BlockEditorView(
       SyntaxHighlighter.applyTo(area)
     finally replacingCode = false
 
-  private def refreshVisualizers(): Unit =
+  private def refreshVisualizers(
+      timelines: List[Timeline[AudioPayload]],
+      tempo: Tempo
+  ): Unit =
     visualizers.foreach(_.stop())
 
     decorations = area.getText
@@ -305,7 +316,7 @@ final class BlockEditorView(
       .indices
       .flatMap { lineIndex =>
         BlockEditorVisualizers
-          .forLine(lineIndex)
+          .forLine(lineIndex, timelines, tempo)
           .map(view =>
             VisualizerDecoration(
               anchorLine = lineIndex,

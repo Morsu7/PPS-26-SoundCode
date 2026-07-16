@@ -13,11 +13,13 @@ import soundcode.ui.editor.BlockEditorView
 import soundcode.mvu.Msg
 import soundcode.mvu.AppModel
 import scala.annotation.nowarn
+import soundcode.domain.Tempo
 
 class MainView(
-    dispatch: Msg => Unit
+    dispatch: Msg => Unit,
+    baseTempo: Tempo
 ):
-  private val editorView = new BlockEditorView
+  private val editorView = new BlockEditorView(baseTempo = baseTempo)
 
   private def requestPlay(): Unit =
     dispatch(Msg.PlayRequested)

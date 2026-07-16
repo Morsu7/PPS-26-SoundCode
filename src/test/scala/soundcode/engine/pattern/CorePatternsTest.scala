@@ -14,6 +14,25 @@ class CorePatternsTest extends SchedulerTestBase {
     )
   }
 
+  test("""note("<e4 g4, g4 b4>")""") {
+    // L'AST corretto generato dal tuo parser:
+    // Un parallelo di due alternazioni!
+    val streams = List(par(alt(e4, g4), alt(g4, b4)))
+
+    assertCycleUnordered(streams, 0)(
+      ExpEvent("E", 0 \ 1, 1 \ 1),
+      ExpEvent("G", 0 \ 1, 1 \ 1)
+    )
+    assertCycleUnordered(streams, 1)(
+      ExpEvent("G", 1 \ 1, 2 \ 1),
+      ExpEvent("B", 1 \ 1, 2 \ 1)
+    )
+    assertCycleUnordered(streams, 2)(
+      ExpEvent("E", 2 \ 1, 3 \ 1),
+      ExpEvent("G", 2 \ 1, 3 \ 1)
+    )
+  }
+
   test("""sound("<bd bd hh bd rim bd hh bd>")""") {
     val pattern = alt(bd, bd, hh, bd, rim, bd, hh, bd)
     val streams = List(pattern)
