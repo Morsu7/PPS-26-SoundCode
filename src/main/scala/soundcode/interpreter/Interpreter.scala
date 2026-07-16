@@ -81,25 +81,22 @@ object Interpreter {
         }
     }
 
-    private def interpretSequence[A <: AST.Atom, B](sequence: AST.Sequence[A])(buildAtom: A => Pattern[B]): Pattern[B] = {
-        sequence.elems match {
-            case head :: Nil => interpretElement(head)(buildAtom)
-            case elems => Pattern.Sequence(elems.map(interpretElement(_)(buildAtom)))
+    private def smartSequence[B](elements: List[Pattern[B]]): Pattern[B] = {
+        elements match {
+            case head :: Nil   => head          // Evita Sequence(List(X)) -> X
+            case elems         => Pattern.Sequence(elems)
         }
     }
 
+    private def interpretSequence[A <: AST.Atom, B](sequence: AST.Sequence[A])(buildAtom: A => Pattern[B]): Pattern[B] = {
+        smartSequence(sequence.elems.map(interpretElement(_)(buildAtom)))
+    }
+
     private def interpretElement[A <: AST.Atom, B](element: AST.Element[A])(buildAtom: A => Pattern[B]): Pattern[B] = element match {
-        case AST.AlternationElement(pattern) => {
-            pattern.elems match {
-                case head :: Nil => interpretSequence(head)(buildAtom)
-                case seqs => Pattern.Alternation(seqs.map(interpretSequence(_)(buildAtom)))
-            }
-        }
+        case AST.AlternationElement(pattern) =>
+            Pattern.Alternation(pattern.elems.map(interpretSequence(_)(buildAtom)))
         case AST.SubPatternElement(pattern) => {
-            pattern.elems match {
-                case head :: Nil => interpretSequence(head)(buildAtom)
-                case seqs => Pattern.Sequence(seqs.map(interpretSequence(_)(buildAtom)))
-            }
+            smartSequence(pattern.elems.map(interpretSequence(_)(buildAtom)))
         }
         case AST.AtomElement(atom) => buildAtom(atom)
 

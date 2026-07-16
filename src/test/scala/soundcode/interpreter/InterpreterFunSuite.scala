@@ -70,7 +70,7 @@ class InterpreterFunSuite extends AnyFunSuite {
 
     test("interpret a stream with complex nested patterns") {
         val streams = interpret("note(\"c# [e3 g4]\")")
-        
+        println(streams.head)
         inside(streams.head) {
             case Pattern.Sequence(elements) =>
                 elements should have size 2
@@ -119,5 +119,11 @@ class InterpreterFunSuite extends AnyFunSuite {
                 
             case other => fail(s"Expected TimeWarp, but found $other")
         }
+    }
+
+    test("interpret a stream with alternation") {
+        val streams = interpret("note(\"<e3 g4, a5 b6>\")")
+        
+        println(streams.head)
     }
 }
