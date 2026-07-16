@@ -18,7 +18,7 @@ object SoundCodeFrame extends JFXApp3:
 
     val initialModel = AppModel()
 
-    lazy val mainView: MainView = MainView(runtime.dispatch, initialModel.tempo)
+    lazy val mainView: MainView = MainView(runtime.dispatch)
 
     runtime = SoundCodeRuntime(
       initialModel = initialModel,

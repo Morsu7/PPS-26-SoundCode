@@ -1,13 +1,18 @@
 package soundcode.ui.editor
 
 import org.fxmisc.richtext.GenericStyledArea
-import soundcode.ui.UITheme
 import soundcode.domain.TextPosition
-import scala.jdk.CollectionConverters.*
+import soundcode.ui.UITheme
 
 object SyntaxHighlighter:
-  private val StringPattern = "\"([^\"\\\\]|\\\\.)*\"".r
-  private val FunctionPattern = """\b[a-zA-Z_][a-zA-Z0-9_]*(?=\()""".r
+  private type EditorArea =
+    GenericStyledArea[?, ?, String]
+
+  private val StringPattern =
+    "\"([^\"\\\\]|\\\\.)*\"".r
+
+  private val FunctionPattern =
+    """\b[a-zA-Z_][a-zA-Z0-9_]*(?=\()""".r
 
   private val DefaultStyle =
     UITheme.textStyle(UITheme.Foreground)
@@ -28,22 +33,29 @@ object SyntaxHighlighter:
        |-rtfx-border-stroke-type: centered;
        |""".stripMargin
 
-  def applyTo(area: GenericStyledArea[?, ?, String]): Unit =
+  def applyTo(
+      area: GenericStyledArea[?, ?, String],
+      playbackPositions: Set[TextPosition] = Set.empty
+  ): Unit =
+    applySyntaxHighlighting(area)
+    applyPlaybackHighlighting(area, playbackPositions)
+
+  private def applySyntaxHighlighting(
+      area: EditorArea
+  ): Unit =
     (0 until area.getParagraphs.size()).foreach { paragraphIndex =>
       applyToParagraph(area, paragraphIndex)
     }
 
-  def applyTo(
-      area: GenericStyledArea[?, ?, String],
-      playbackPositions: Set[TextPosition]
+  private def applyPlaybackHighlighting(
+      area: EditorArea,
+      positions: Set[TextPosition]
   ): Unit =
-    applyTo(area)
-
     val textLength = area.getLength
 
-    playbackPositions.foreach { position =>
-      val start = Math.max(0, position.startIndex)
-      val end = Math.min(textLength, position.endIndex)
+    positions.foreach { position =>
+      val start = position.startIndex.max(0)
+      val end = position.endIndex.min(textLength)
 
       if start < end then
         area.setStyle(
@@ -53,38 +65,41 @@ object SyntaxHighlighter:
         )
     }
 
-  def applyToParagraph(
-      area: GenericStyledArea[?, ?, String],
+  private def isValidParagraph(
+      area: EditorArea,
+      index: Int
+  ): Boolean =
+    index >= 0 && index < area.getParagraphs.size()
+
+  private def applyToParagraph(
+      area: EditorArea,
       paragraphIndex: Int
   ): Unit =
-    if paragraphIndex < 0 || paragraphIndex >= area.getParagraphs.size() then
-      return
+    if isValidParagraph(area, paragraphIndex) then
+      val text =
+        area.getParagraph(paragraphIndex).getText
 
-    val paragraph = area.getParagraph(paragraphIndex)
-
-    val text = paragraph.getText
-
-    area.setStyle(
-      paragraphIndex,
-      0,
-      text.length,
-      DefaultStyle
-    )
-
-    FunctionPattern.findAllMatchIn(text).foreach { m =>
       area.setStyle(
         paragraphIndex,
-        m.start,
-        m.end,
-        FunctionStyle
+        0,
+        text.length,
+        DefaultStyle
       )
-    }
 
-    StringPattern.findAllMatchIn(text).foreach { m =>
-      area.setStyle(
-        paragraphIndex,
-        m.start,
-        m.end,
-        StringStyle
-      )
-    }
+      FunctionPattern.findAllMatchIn(text).foreach { matched =>
+        area.setStyle(
+          paragraphIndex,
+          matched.start,
+          matched.end,
+          FunctionStyle
+        )
+      }
+
+      StringPattern.findAllMatchIn(text).foreach { matched =>
+        area.setStyle(
+          paragraphIndex,
+          matched.start,
+          matched.end,
+          StringStyle
+        )
+      }

@@ -12,6 +12,12 @@ class SyntaxHighlighterSpec
   private val code =
     """note("c4").sound("piano")"""
 
+  test("handles an empty editor"):
+    onFxThread:
+      val editor = highlightedEditor("")
+
+      assert(editor.getText.isEmpty)
+
   test("highlights every character of function names"):
     onFxThread:
       val editor = highlightedEditor(code)
@@ -236,3 +242,23 @@ class SyntaxHighlighterSpec
         s"Unexpected style '$unexpectedStyle' at index $index"
       )
     }
+
+  test("string style takes precedence over function-like text inside strings"):
+    onFxThread:
+      val source = """note("sound(test)")"""
+      val editor = highlightedEditor(source)
+      val soundStart = source.indexOf("sound")
+  
+      assertRangeContains(
+        editor,
+        start = soundStart,
+        length = "sound".length,
+        expectedStyle = UITheme.String
+      )
+  
+      assertRangeDoesNotContain(
+        editor,
+        start = soundStart,
+        length = "sound".length,
+        unexpectedStyle = UITheme.Function
+      )

@@ -20,11 +20,9 @@ import soundcode.ui.editor.BlockEditorView
 
 class MainView(
     dispatch: Msg => Unit,
-    baseTempo: Tempo
 ):
 
-  private val editorView =
-    new BlockEditorView(baseTempo = baseTempo)
+  private val editorView = new BlockEditorView
 
   private val errorBanner = new ErrorBanner(
     onDismiss = () => dispatch(Msg.ErrorDismissed)

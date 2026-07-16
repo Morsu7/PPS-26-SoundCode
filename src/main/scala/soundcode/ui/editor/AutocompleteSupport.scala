@@ -11,38 +11,59 @@ import scala.jdk.CollectionConverters.*
 import soundcode.parser.SoundCodeLanguage
 
 object AutocompleteSupport:
+  private type CompletionItem = SoundCodeLanguage.Construct
+
+  private val afterDotCandidates =
+    SoundCodeLanguage.Generative.all ++
+      SoundCodeLanguage.Transformation.all ++
+      SoundCodeLanguage.Visualization.all
+
+  private val PopupListStyle =
+    """
+      |-fx-background-color: #25252b;
+      |-fx-control-inner-background: #25252b;
+      |-fx-text-background-color: #f4f4f5;
+      |-fx-background-radius: 6;
+      |-fx-border-color: #3a3a42;
+      |-fx-border-radius: 6;
+      |-fx-padding: 4;
+      |-fx-font-family: 'Cascadia Code', 'JetBrains Mono', 'Consolas';
+      |-fx-font-size: 13px;
+      |""".stripMargin
+
+  private val KeywordStyle =
+    """
+      |-fx-text-fill: #f4f4f5;
+      |-fx-font-size: 13px;
+      |-fx-font-weight: 700;
+      |""".stripMargin
+
+  private val DetailStyle =
+    """
+      |-fx-text-fill: #b8b8c2;
+      |-fx-font-size: 11px;
+      |""".stripMargin
+
+  private val SelectedCellStyle =
+    """
+      |-fx-background-color: #3a3a42;
+      |-fx-background-radius: 4;
+      |-fx-padding: 5 8;
+      |""".stripMargin
+
+  private val DefaultCellStyle =
+    """
+      |-fx-background-color: transparent;
+      |-fx-background-radius: 4;
+      |-fx-padding: 5 8;
+      |""".stripMargin
+
   private final case class Completion(
       from: Int,
       to: Int,
       text: String,
       caretPosition: Int
   )
-
-  private case class CompletionItem(
-      label: String,
-      insertText: String,
-      detail: String
-  ):
-    override def toString: String = s"$label ($detail)"
-
-  private object CompletionCatalog:
-    private def toCompletionItem(
-        construct: SoundCodeLanguage.Construct
-    ): CompletionItem =
-      CompletionItem(
-        construct.name,
-        construct.snippet,
-        construct.detail
-      )
-
-    val generativeBlocks: Vector[CompletionItem] =
-      SoundCodeLanguage.Generative.all.map(toCompletionItem)
-
-    val transformations: Vector[CompletionItem] =
-      SoundCodeLanguage.Transformation.all.map(toCompletionItem)
-
-    val visualizations: Vector[CompletionItem] =
-      SoundCodeLanguage.Visualization.all.map(toCompletionItem)
 
   private final case class CompletionContext(
       textBeforeCaret: String,
@@ -58,13 +79,63 @@ object AutocompleteSupport:
     def isAtLineStart: Boolean =
       lineBeforeCaret.trim == prefix
 
-  private object CompletionContext:
-    def from(area: GenericStyledArea[?, ?, ?]): CompletionContext =
-      val textBeforeCaret =
-        area.getText(
-          0,
-          area.getCaretPosition
+  private final class CompletionListCell(
+      list: ListView[CompletionItem]
+  ) extends ListCell[CompletionItem]:
+
+    private val keyword = new Label()
+    private val detail = new Label()
+    private val content = new VBox(2, keyword, detail)
+
+    content.setFillWidth(true)
+    content
+      .prefWidthProperty()
+      .bind(list.widthProperty().subtract(34))
+
+    keyword.setMaxWidth(Double.MaxValue)
+    keyword.setTextOverrun(OverrunStyle.ELLIPSIS)
+    keyword.setStyle(KeywordStyle)
+
+    detail.setMaxWidth(Double.MaxValue)
+    detail.setTextOverrun(OverrunStyle.ELLIPSIS)
+    detail.setStyle(DetailStyle)
+
+    override def updateItem(
+        item: CompletionItem,
+        empty: Boolean
+    ): Unit =
+      super.updateItem(item, empty)
+      refreshStyle()
+
+    override def updateSelected(
+        selected: Boolean
+    ): Unit =
+      super.updateSelected(selected)
+      refreshStyle()
+
+    private def refreshStyle(): Unit =
+      if isEmpty || getItem == null then
+        setText(null)
+        setGraphic(null)
+        setStyle("-fx-background-color: transparent;")
+      else
+        keyword.setText(getItem.name)
+        detail.setText(getItem.detail)
+
+        setText(null)
+        setGraphic(content)
+        setStyle(
+          if isSelected then SelectedCellStyle
+          else DefaultCellStyle
         )
+
+  private object CompletionContext:
+
+    def from(
+        text: String,
+        caretPosition: Int
+    ): CompletionContext =
+      val textBeforeCaret = text.take(caretPosition)
 
       val prefix =
         textBeforeCaret.reverse
@@ -76,42 +147,44 @@ object AutocompleteSupport:
 
       CompletionContext(textBeforeCaret, prefix, lineBeforeCaret)
 
-  private def suggestionsFor(
+  private def contextFor(
       area: GenericStyledArea[?, ?, ?]
-  ): Vector[CompletionItem] =
-    val context = CompletionContext.from(area)
+  ): CompletionContext =
+    CompletionContext.from(
+      text = area.getText,
+      caretPosition = area.getCaretPosition
+    )
 
+  private def suggestionsFor(
+      context: CompletionContext
+  ): Vector[CompletionItem] =
     if context.isInsideQuotes then Vector.empty
     else
       val candidates =
-        if context.isAfterDot then
-          CompletionCatalog.generativeBlocks ++
-            CompletionCatalog.transformations ++ 
-            CompletionCatalog.visualizations
-        else if context.isAtLineStart then CompletionCatalog.generativeBlocks
+        if context.isAfterDot then afterDotCandidates
+        else if context.isAtLineStart then SoundCodeLanguage.Generative.all
         else Vector.empty
 
       candidates.filter(
-        _.label.startsWith(context.prefix)
+        _.name.startsWith(context.prefix)
       )
 
   private def completionFor(
-      area: GenericStyledArea[?, ?, ?],
+      context: CompletionContext,
+      caretPosition: Int,
       item: CompletionItem
   ): Completion =
-    val context = CompletionContext.from(area)
-    val caret = area.getCaretPosition
-    val from = caret - context.prefix.length
-    val placeholderIndex = item.insertText.indexOf("$0")
+    val from = caretPosition - context.prefix.length
+    val placeholderIndex = item.snippet.indexOf("$0")
 
     val text =
       if placeholderIndex >= 0 then
-        item.insertText.patch(
+        item.snippet.patch(
           placeholderIndex,
           "",
           "$0".length
         )
-      else item.insertText
+      else item.snippet
 
     val finalCaret =
       if placeholderIndex >= 0 then from + placeholderIndex
@@ -119,7 +192,7 @@ object AutocompleteSupport:
 
     Completion(
       from = from,
-      to = caret,
+      to = caretPosition,
       text = text,
       caretPosition = finalCaret
     )
@@ -139,12 +212,15 @@ object AutocompleteSupport:
   private[ui] def completeFirst(
       area: GenericStyledArea[?, ?, ?]
   ): Boolean =
-    suggestionsFor(area).headOption match
+    val caretPosition = area.getCaretPosition
+    val context = contextFor(area)
+
+    suggestionsFor(context).headOption match
       case Some(item) =>
-        applyCompletion(
-          area,
-          completionFor(area, item)
-        )
+        val completion =
+          completionFor(context, caretPosition, item)
+
+        applyCompletion(area, completion)
         true
 
       case None =>
@@ -164,17 +240,7 @@ object AutocompleteSupport:
     list.setMinHeight(132)
     list.setMaxHeight(156)
     list.setFixedCellSize(48)
-    list.setStyle("""
-      |-fx-background-color: #25252b;
-      |-fx-control-inner-background: #25252b;
-      |-fx-text-background-color: #f4f4f5;
-      |-fx-background-radius: 6;
-      |-fx-border-color: #3a3a42;
-      |-fx-border-radius: 6;
-      |-fx-padding: 4;
-      |-fx-font-family: 'Cascadia Code', 'JetBrains Mono', 'Consolas';
-      |-fx-font-size: 13px;
-      |""".stripMargin)
+    list.setStyle(PopupListStyle)
 
     def styleScrollBar(): Unit =
       Platform.runLater(() =>
@@ -214,65 +280,11 @@ object AutocompleteSupport:
         }
       )
 
-    list.setCellFactory(_ =>
-      new ListCell[CompletionItem]:
-        private val keyword = new Label()
-        private val detail = new Label()
-        private val content = new VBox(2, keyword, detail)
-
-        content.setFillWidth(true)
-        content.prefWidthProperty().bind(list.widthProperty().subtract(34))
-
-        keyword.setMaxWidth(Double.MaxValue)
-        keyword.setTextOverrun(OverrunStyle.ELLIPSIS)
-        keyword.setStyle("""
-          |-fx-text-fill: #f4f4f5;
-          |-fx-font-size: 13px;
-          |-fx-font-weight: 700;
-          |""".stripMargin)
-
-        detail.setMaxWidth(Double.MaxValue)
-        detail.setTextOverrun(OverrunStyle.ELLIPSIS)
-        detail.setStyle("""
-          |-fx-text-fill: #b8b8c2;
-          |-fx-font-size: 11px;
-          |""".stripMargin)
-
-        private def refreshStyle(): Unit =
-          if isEmpty || getItem == null then
-            setText(null)
-            setGraphic(null)
-            setStyle("-fx-background-color: transparent;")
-          else
-            keyword.setText(getItem.label)
-            detail.setText(getItem.detail)
-
-            setText(null)
-            setGraphic(content)
-            setStyle(
-              if isSelected then """
-                |-fx-background-color: #3a3a42;
-                |-fx-background-radius: 4;
-                |-fx-padding: 5 8;
-                |""".stripMargin
-              else """
-                |-fx-background-color: transparent;
-                |-fx-background-radius: 4;
-                |-fx-padding: 5 8;
-                |""".stripMargin
-            )
-
-        override def updateItem(item: CompletionItem, empty: Boolean): Unit =
-          super.updateItem(item, empty)
-          refreshStyle()
-
-        override def updateSelected(selected: Boolean): Unit =
-          super.updateSelected(selected)
-          refreshStyle()
-    )
+    list.setCellFactory(_ => new CompletionListCell(list))
 
     def showPopup(): Unit =
-      val items = suggestionsFor(area)
+      val context = contextFor(area)
+      val items = suggestionsFor(context)
 
       if items.isEmpty then popup.hide()
       else
@@ -293,12 +305,19 @@ object AutocompleteSupport:
           styleScrollBar()
 
     def insertSelected(): Unit =
+      val caretPosition = area.getCaretPosition
+      val context = contextFor(area)
+
       Option(
         list.getSelectionModel.getSelectedItem
       ).foreach { selected =>
         applyCompletion(
           area,
-          completionFor(area, selected)
+          completionFor(
+            context,
+            caretPosition,
+            selected
+          )
         )
 
         popup.hide()
