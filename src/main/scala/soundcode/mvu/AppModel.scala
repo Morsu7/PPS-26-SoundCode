@@ -8,5 +8,6 @@ final case class AppModel(
     visualizers: List[VisualizerRequest] = List.empty,
     errors: Option[String] = None,
     tempo: Tempo = Tempo(0.5),
-    isPlaying: Boolean = false
+    isPlaying: Boolean = false,
+    timelineRevision: Long = 0L
 )

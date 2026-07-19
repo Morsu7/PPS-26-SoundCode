@@ -29,7 +29,8 @@ object BlockEditorView:
   private final case class RenderedVisualizersState(
       timelines: List[Seq[ScheduledEvent[AudioPayload]]],
       requests: List[VisualizerRequest],
-      tempo: Tempo
+      tempo: Tempo,
+      timelineRevision: Long
   )
 
   private final case class AnchoredVisualizer(
@@ -260,10 +261,16 @@ final class BlockEditorView(
     val nextVisualizersState = RenderedVisualizersState(
       timelines = state.timelines,
       requests = state.visualizers,
-      tempo = state.tempo
+      tempo = state.tempo,
+      timelineRevision = state.timelineRevision
     )
 
-    if !visualizersState.contains(nextVisualizersState) then
+    val isStaleVisualizerState =
+      visualizersState.exists(
+        _.timelineRevision > nextVisualizersState.timelineRevision
+      )
+
+    if !isStaleVisualizerState && !visualizersState.contains(nextVisualizersState) then
       renderVisualizers(nextVisualizersState)
       visualizersState = Some(nextVisualizersState)
 
