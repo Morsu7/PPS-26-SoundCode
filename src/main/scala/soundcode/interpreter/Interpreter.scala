@@ -17,7 +17,7 @@ object Interpreter {
         }
 
     def interpretVisualizerRequest(block: AST.Visualizers.VisualizerBlock, index: Int): VisualizerRequest = block match {
-        case AST.Visualizers.PianoRollBlock(_) => VisualizerRequest(index, VisualizerKind.PianoRoll)
+        case AST.Visualizers.PianoRollBlock(streamIndex) => VisualizerRequest(index, VisualizerKind.PianoRoll, streamIndex)
     }
 
     def interpret(tree: AST.ProgramAST): List[Pattern[AudioPayload]] = {

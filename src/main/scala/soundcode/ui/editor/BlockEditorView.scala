@@ -23,17 +23,17 @@ import soundcode.ui.visualizer.PianorollView
 
 object BlockEditorView:
   private final case class EditorParagraphStyle(
-    visualizerSpace: Double = 0
+      visualizerSpace: Double = 0
   )
 
   private final case class RenderedVisualizersState(
-    timelines: List[Seq[ScheduledEvent[AudioPayload]]],
-    requests: List[VisualizerRequest],
-    tempo: Tempo
+      timelines: List[Seq[ScheduledEvent[AudioPayload]]],
+      requests: List[VisualizerRequest],
+      tempo: Tempo
   )
 
   private final case class AnchoredVisualizer(
-      streamIndex: Int,
+      anchorOffset: Int,
       view: AnimatedView
   )
 
@@ -41,7 +41,7 @@ final class BlockEditorView(
     initialCode: String =
       """|note("<c4 e4 g4 e4> <a3 c4 e4 c4> <f3 a3 c4 a3> <g3 b3 d4 b3>").sound("piano")
      |sound("bd hh [cp, hh] hh")
-     |""".stripMargin.trim,
+     |""".stripMargin.trim
 ):
   import BlockEditorView.*
 
@@ -144,12 +144,33 @@ final class BlockEditorView(
       layoutVisualizers()
     }
 
+  private def updateVisualizerAnchors(
+      changePosition: Int,
+      removedLength: Int,
+      insertedLength: Int
+  ): Unit =
+    val removedEnd = changePosition + removedLength
+    val delta = insertedLength - removedLength
+
+    anchoredVisualizers = anchoredVisualizers.map { visualizer =>
+      val updatedOffset =
+        if removedLength > 0 &&
+          visualizer.anchorOffset >= changePosition &&
+          visualizer.anchorOffset < removedEnd
+        then math.max(0, changePosition - 1)
+        else if visualizer.anchorOffset >= removedEnd then
+          math.max(0, visualizer.anchorOffset + delta)
+        else visualizer.anchorOffset
+
+      visualizer.copy(anchorOffset = updatedOffset)
+    }
+
   private def layoutVisualizers(): Unit =
     if visualizerOverlay.getScene == null then return
 
     anchoredVisualizers.foreach { visualizer =>
       val node = visualizer.view.root.delegate
-      val anchorLine = lineForStream(visualizer.streamIndex)
+      val anchorLine = lineForOffset(visualizer.anchorOffset)
 
       if anchorLine < 0 || anchorLine >= area.getParagraphs.size()
       then node.setVisible(false)
@@ -218,7 +239,7 @@ final class BlockEditorView(
     }
 
     anchoredVisualizers.foreach { visualizer =>
-      val anchorLine = lineForStream(visualizer.streamIndex)
+      val anchorLine = lineForOffset(visualizer.anchorOffset)
 
       if anchorLine >= 0 &&
         anchorLine < area.getParagraphs.size()
@@ -272,17 +293,22 @@ final class BlockEditorView(
 
     area
       .plainTextChanges()
-      .subscribe { _ =>
-        if !replacingCode then playbackHighlightsEnabled = false
+      .subscribe { change =>
+        if !replacingCode then
+          playbackHighlightsEnabled = false
+
+          updateVisualizerAnchors(
+            changePosition = change.getPosition,
+            removedLength = change.getRemoved.length,
+            insertedLength = change.getInserted.length
+          )
+
+          Platform.runLater {
+            applyVisualizerSpacing()
+          }
 
         scheduleHighlight()
       }
-
-    area.textProperty().addListener { (_, _, _) =>
-      Platform.runLater {
-        applyVisualizerSpacing()
-      }
-    }
 
     visualizerOverlay.widthProperty().addListener { (_, _, _) =>
       Platform.runLater {
@@ -329,8 +355,7 @@ final class BlockEditorView(
       SyntaxHighlighter.applyTo(area)
     else if playbackHighlightsEnabled then
       SyntaxHighlighter.applyTo(area, state.positions)
-    else
-      SyntaxHighlighter.applyTo(area)
+    else SyntaxHighlighter.applyTo(area)
 
   private def renderVisualizers(
       nextState: RenderedVisualizersState
@@ -349,8 +374,8 @@ final class BlockEditorView(
               case VisualizerKind.Oscilloscope => ???
 
           AnchoredVisualizer(
-            request.streamIndex,
-            view
+            anchorOffset = request.sourceOffset,
+            view = view
           )
         }
     }.toVector
@@ -358,14 +383,13 @@ final class BlockEditorView(
     applyVisualizerSpacing()
     installVisualizerNodes()
 
-  private def lineForStream(streamIndex: Int): Int =
+  private def lineForOffset(offset: Int): Int =
+    val safeOffset =
+      offset.max(0).min(area.getLength)
+
     area.getText
-      .split("\n", -1)
-      .zipWithIndex
-      .filter { case (line, _) => line.trim.nonEmpty }
-      .lift(streamIndex)
-      .map(_._2)
-      .getOrElse(-1)
+      .take(safeOffset)
+      .count(_ == '\n')
 
   private def scheduleHighlight(): Unit =
     if !highlightScheduled && !replacingCode then

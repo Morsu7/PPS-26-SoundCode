@@ -6,5 +6,6 @@ enum VisualizerKind:
 
 final case class VisualizerRequest(
     streamIndex: Int,
-    kind: VisualizerKind
+    kind: VisualizerKind,
+    sourceOffset: Int
 )
