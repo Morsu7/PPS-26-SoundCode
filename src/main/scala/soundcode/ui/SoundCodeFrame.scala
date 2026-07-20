@@ -36,7 +36,7 @@ object SoundCodeFrame extends JFXApp3:
 
     stage = new JFXApp3.PrimaryStage:
       title = "SoundCode"
-      scene = new Scene(800, 500):
+      scene = new Scene(1280, 720):
         root = mainView.root
 
   override def stopApp(): Unit =

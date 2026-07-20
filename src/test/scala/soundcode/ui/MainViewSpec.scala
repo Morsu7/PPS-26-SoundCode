@@ -52,12 +52,12 @@ class MainViewSpec
     ("key", "modifier", "expectedMessage"),
     (
       KeyCode.ENTER,
-      KeyCombination.CONTROL_DOWN,
+      KeyCombination.SHORTCUT_DOWN,
       Msg.PlayRequested
     ),
     (
       KeyCode.PERIOD,
-      KeyCombination.CONTROL_DOWN,
+      KeyCombination.SHORTCUT_DOWN,
       Msg.StopRequested
     )
   )
@@ -89,7 +89,7 @@ class MainViewSpec
       val shortcut =
         new KeyCodeCombination(
           KeyCode.U,
-          KeyCombination.CONTROL_DOWN
+          KeyCombination.SHORTCUT_DOWN
         )
 
       val action = scene.getAccelerators.get(shortcut)

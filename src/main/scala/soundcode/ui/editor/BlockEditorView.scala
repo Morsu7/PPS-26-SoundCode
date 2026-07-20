@@ -271,8 +271,12 @@ final class BlockEditorView(
       )
 
     if !isStaleVisualizerState && !visualizersState.contains(nextVisualizersState) then
-      renderVisualizers(nextVisualizersState)
+      renderVisualizers(
+        nextState = nextVisualizersState,
+        isPlaying = state.isPlaying
+      )
       visualizersState = Some(nextVisualizersState)
+      playbackHighlightsEnabled = true
 
     renderHighlights(state)
 
@@ -357,15 +361,18 @@ final class BlockEditorView(
     finally replacingCode = false
 
   private def renderHighlights(state: AppModel): Unit =
-    if state.positions.isEmpty then
-      playbackHighlightsEnabled = true
-      SyntaxHighlighter.applyTo(area)
-    else if playbackHighlightsEnabled then
-      SyntaxHighlighter.applyTo(area, state.positions)
-    else SyntaxHighlighter.applyTo(area)
+    val playbackPositions =
+      Option.when(playbackHighlightsEnabled)(state.positions)
+        .getOrElse(Set.empty)
+  
+    SyntaxHighlighter.applyTo(
+      area,
+      playbackPositions
+    )
 
   private def renderVisualizers(
-      nextState: RenderedVisualizersState
+      nextState: RenderedVisualizersState,
+      isPlaying: Boolean
   ): Unit =
     anchoredVisualizers.foreach(_.view.stop())
 
@@ -389,6 +396,9 @@ final class BlockEditorView(
 
     applyVisualizerSpacing()
     installVisualizerNodes()
+
+    if isPlaying then
+      anchoredVisualizers.foreach(_.view.play())
 
   private def lineForOffset(offset: Int): Int =
     val safeOffset =
