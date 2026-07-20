@@ -56,7 +56,7 @@ class InterpreterFunSuite extends AnyFunSuite {
 
     test("interpret a stream with transformation effects") {
         val streams = interpret("note(\"c#\").gain(\"5\").room(\"10\")")
-        println(streams)
+        //println(streams)
         
         inside(streams.head) {
             case Pattern.WithExtensions(_, extensions) =>
@@ -70,7 +70,7 @@ class InterpreterFunSuite extends AnyFunSuite {
 
     test("interpret a stream with complex nested patterns") {
         val streams = interpret("note(\"c# [e3 g4]\")")
-        println(streams.head)
+        //println(streams.head)
         inside(streams.head) {
             case Pattern.Sequence(elements) =>
                 elements should have size 2
@@ -121,9 +121,16 @@ class InterpreterFunSuite extends AnyFunSuite {
         }
     }
 
-    test("interpret a stream with alternation") {
-        val streams = interpret("note(\"<e3 g4, a5 b6>\")")
+    test("interpret a stream with silence") {
+        val streams = interpret("note(\"c# ~ ~\").sound(\"piano ~\")")
         
-        println(streams.head)
+        inside(streams.head) {
+            case Pattern.WithExtensions(base, extensions) =>
+                println(s"Base: $base")
+                base should matchPattern { case Pattern.Sequence(List(_, Pattern.Atom(Rest(_)), _)) => }
+                extensions(0) should matchPattern { case Pattern.Sequence(List(_, Pattern.Atom(Rest(_)))) => }
+                
+            case other => fail(s"Expected WithExtensions, but found $other")
+        }
     }
 }

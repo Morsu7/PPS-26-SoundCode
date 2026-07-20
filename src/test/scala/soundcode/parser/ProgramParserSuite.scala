@@ -10,7 +10,7 @@ import soundcode.parser.AST.Transformations._
 
 class SoundCodeParserSuite extends AnyFunSuite with BeforeAndAfterAll {
 
-    private def DEBUG = true
+    private def DEBUG = false
     private val testReports = ListBuffer[String]()
 
     override def afterAll(): Unit = {
@@ -460,5 +460,31 @@ class SoundCodeParserSuite extends AnyFunSuite with BeforeAndAfterAll {
             
             assert(element.atom == expectedNote)
         }
+    }
+
+    test("parsing silence atoms in both sound and note blocks") {
+        val input = "sound(\"bd ~\")\nnote(\"c4 ~\")"
+        val result = parse(input)
+        
+        assert(result.isInstanceOf[Right[?, ?]])
+        val program = result.value
+        
+        // Check the sound block
+        val stream1 = program.blocks(0).asInstanceOf[StreamBlock]
+        val soundBlock = stream1.base.asInstanceOf[SoundBlock]
+        val soundPattern = soundBlock.pattern
+        val soundSequence = soundPattern.elems.head
+        val soundElement = soundSequence.elems.head.asInstanceOf[AtomElement[Sample | Silence]]
+        
+        assert(soundElement.atom.isInstanceOf[Sample | Silence])
+        
+        // Check the note block
+        val stream2 = program.blocks(1).asInstanceOf[StreamBlock]
+        val noteBlock = stream2.base.asInstanceOf[NoteBlock]
+        val notePattern = noteBlock.pattern
+        val noteSequence = notePattern.elems.head
+        val noteElement = noteSequence.elems.head.asInstanceOf[AtomElement[Note | Silence]]
+        
+        assert(noteElement.atom.isInstanceOf[Note | Silence])
     }
 }
