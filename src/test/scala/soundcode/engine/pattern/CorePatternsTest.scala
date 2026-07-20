@@ -33,6 +33,21 @@ class CorePatternsTest extends SchedulerTestBase {
     )
   }
 
+  test("""note("<e3 g4, a5 b6>") - Alternazione di Paralleli""") {
+    // Se il tuo parser "spalma" il parallelo dentro l'alternazione in questo modo:
+    val streams = List(alt(par(e3, a5), par(g4, b6)))
+
+    assertCycleUnordered(streams, 0)(
+      ExpEvent("E", 0 \ 1, 1 \ 1), // Suonano insieme
+      ExpEvent("A", 0 \ 1, 1 \ 1)
+    )
+
+    assertCycleUnordered(streams, 1)(
+      ExpEvent("G", 1 \ 1, 2 \ 1), // Suonano insieme
+      ExpEvent("B", 1 \ 1, 2 \ 1)
+    )
+  }
+
   test("""sound("<bd bd hh bd rim bd hh bd>")""") {
     val pattern = alt(bd, bd, hh, bd, rim, bd, hh, bd)
     val streams = List(pattern)
