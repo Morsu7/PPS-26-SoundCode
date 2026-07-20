@@ -7,9 +7,6 @@ import soundcode.domain.{ScheduledEvent, AudioPayload, Sound, Tempo}
 import scalafx.scene.text.TextAlignment
 import scalafx.scene.text.Font
 import scalafx.geometry.VPos
-import soundcode.domain.TextPosition
-import soundcode.domain.Interval
-import soundcode.domain.{Note, Fraction}
 
 final class PianorollView(
     timeline: Seq[ScheduledEvent[AudioPayload]],
@@ -22,6 +19,8 @@ final class PianorollView(
     .maxOption
     .map(_.toDouble)
     .getOrElse(0.0)
+
+  private val maxEventDuration = visualEvents.map(_.duration).maxOption.getOrElse(0.0)
 
   private def toVisualEvents(): Seq[VisualEvent] =
     val events = timeline.collect {
@@ -48,14 +47,14 @@ final class PianorollView(
 
   override protected def draw(
       gc: GraphicsContext,
-      currentBeat: Double,
+      currentCycle: Double,
       w: Double,
       h: Double
   ): Unit =
     val playheadX = w * 0.5
 
     drawPlayhead(gc, playheadX, h)
-    drawNotes(gc, currentBeat, playheadX)
+    drawNotes(gc, currentCycle, playheadX)
 
   private def drawPlayhead(gc: GraphicsContext, x: Double, h: Double): Unit =
     gc.stroke = Color.White
@@ -64,23 +63,24 @@ final class PianorollView(
 
   private def drawNotes(
       gc: GraphicsContext,
-      currentBeat: Double,
+      currentCycle: Double,
       playheadX: Double
   ): Unit =
+    if visualEvents.isEmpty || loopLength <= 0.0 then return
+
     val canvasWidth = gc.canvas.width.value
-    val maxDuration = visualEvents.map(_.duration).maxOption.getOrElse(0.0)
 
-    val firstVisibleBeat =
-      currentBeat - playheadX / pixelsPerCycle - maxDuration
+    val firstVisibleCycle =
+      currentCycle - playheadX / pixelsPerCycle - maxEventDuration
 
-    val lastVisibleBeat =
-      currentBeat + (canvasWidth - playheadX) / pixelsPerCycle
+    val lastVisibleCycle =
+      currentCycle + (canvasWidth - playheadX) / pixelsPerCycle
 
     val firstLoop =
-      Math.floor(firstVisibleBeat / loopLength).toInt.max(0)
+      Math.floor(firstVisibleCycle / loopLength).toInt.max(0)
 
     val lastLoop =
-      Math.ceil(lastVisibleBeat / loopLength).toInt
+      Math.ceil(lastVisibleCycle / loopLength).toInt
 
     val repeatedEvents =
       for
@@ -89,20 +89,20 @@ final class PianorollView(
       yield event.copy(start = event.start + loop * loopLength)
 
     repeatedEvents.foreach { event =>
-      val x = playheadX + (event.start - currentBeat) * pixelsPerCycle
+      val x = playheadX + (event.start - currentCycle) * pixelsPerCycle
       val y = event.lane * laneHeight + config.verticalPadding
       val width = event.duration * pixelsPerCycle
       val height = laneHeight
 
       val isActive =
-        currentBeat >= event.start && currentBeat < event.start + event.duration
+        currentCycle >= event.start && currentCycle < event.start + event.duration
 
       if isActive then
-        gc.stroke = Color.web(UITheme.Foreground)
+        gc.stroke = event.color
         gc.lineWidth = 2
         gc.strokeRect(x, y, width, height)
       else
-        gc.fill = Color.web(UITheme.Foreground)
+        gc.fill = event.color
         gc.fillRect(x, y, width, height)
 
       val horizontalTextPadding = 4.0

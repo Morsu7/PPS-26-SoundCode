@@ -18,8 +18,8 @@ import soundcode.domain.Tempo
 import soundcode.mvu.{AppModel, Msg}
 import soundcode.ui.editor.BlockEditorView
 
-class MainView(
-    dispatch: Msg => Unit,
+final class MainView(
+    dispatch: Msg => Unit
 ):
 
   private val editorView = new BlockEditorView
@@ -27,6 +27,8 @@ class MainView(
   private val errorBanner = new ErrorBanner(
     onDismiss = () => dispatch(Msg.ErrorDismissed)
   )
+
+  private var renderedPlayingState: Option[Boolean] = None
 
   private def requestPlay(): Unit =
     dispatch(Msg.PlayRequested)
@@ -45,7 +47,7 @@ class MainView(
     accelerators.put(
       new KeyCodeCombination(
         KeyCode.ENTER,
-        KeyCombination.CONTROL_DOWN
+        KeyCombination.SHORTCUT_DOWN
       ),
       () => requestPlay()
     )
@@ -53,7 +55,7 @@ class MainView(
     accelerators.put(
       new KeyCodeCombination(
         KeyCode.PERIOD,
-        KeyCombination.CONTROL_DOWN
+        KeyCombination.SHORTCUT_DOWN
       ),
       () => requestStop()
     )
@@ -61,7 +63,7 @@ class MainView(
     accelerators.put(
       new KeyCodeCombination(
         KeyCode.U,
-        KeyCombination.CONTROL_DOWN
+        KeyCombination.SHORTCUT_DOWN
       ),
       () => requestCodeUpdate()
     )
@@ -70,13 +72,16 @@ class MainView(
     editorView.render(state)
     errorBanner.render(state.errors)
 
-    if state.isPlaying then
-      editorView.play()
-    else
-      editorView.stop()
+    if !renderedPlayingState.contains(state.isPlaying) then
+      renderedPlayingState = Some(state.isPlaying)
+
+      if state.isPlaying then
+        editorView.play()
+      else
+        editorView.stop()
 
   @nowarn("msg=Implicit parameters should be provided with a `using` clause")
-  private def toolbar: ToolBar =
+  private val toolbar: ToolBar =
     new ToolBar:
       style =
         s"${UITheme.backgroundStyle} -fx-padding: 6;"

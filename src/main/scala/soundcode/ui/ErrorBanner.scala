@@ -81,7 +81,7 @@ final class ErrorBanner(
         root.visible = true
         root.managed = true
 
-        if displayedError != Some(message) then
+        if !displayedError.contains(message) then
           fadeIn.stop()
           fadeOut.stop()
 
