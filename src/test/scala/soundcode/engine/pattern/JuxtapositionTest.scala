@@ -25,9 +25,8 @@ class JuxtapositionTest extends SchedulerTestBase {
     )
   }
 
-  test("""sound("bd").jux(id)""") {
+  test("""sound("bd").jux()""") {
     val basePattern = bd
-    // id in Strudel/Tidal non applica modifiche, crea solo lo sdoppiamento stereo
     val juxPattern = Pattern.TimeWarp(Juxtaposition(Nil), basePattern)
     val streams = List(juxPattern)
 
