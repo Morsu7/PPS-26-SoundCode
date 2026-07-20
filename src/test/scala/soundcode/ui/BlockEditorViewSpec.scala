@@ -10,11 +10,9 @@ class BlockEditorViewSpec
     extends UITestSupport
     with TableDrivenPropertyChecks:
       
-  private val baseTempo = Tempo(0.5)
-
   test("creates an editor containing the default source code"):
     onFxThread:
-      val editor = new BlockEditorView(baseTempo = baseTempo)
+      val editor = new BlockEditorView
 
       assert(editor.root != null)
       assert(editor.currentCode.nonEmpty)
@@ -23,7 +21,7 @@ class BlockEditorViewSpec
     onFxThread:
       val code = "note(\"c4 a4\").sound(\"piano\")\nsound(\"hb hd hh\")"
 
-      val editor = new BlockEditorView(code, baseTempo)
+      val editor = new BlockEditorView(code)
 
       assert(editor.currentCode == code)
 
@@ -49,14 +47,14 @@ class BlockEditorViewSpec
   test("normalizes source-code newlines"):
     forAll(newlineCases): (_, source, expected) =>
       onFxThread:
-        val editor = new BlockEditorView(source, baseTempo)
+        val editor = new BlockEditorView(source)
 
         assert(editor.currentCode == expected)
 
   test("render applies playback highlighting to the requested range"):
     onFxThread:
       val code = """note("c4").sound("piano")"""
-      val editor = new BlockEditorView(code, baseTempo)
+      val editor = new BlockEditorView(code)
 
       editor.render(
         AppModel(positions = Set(TextPosition(0, 4)))
@@ -71,7 +69,7 @@ class BlockEditorViewSpec
   test("render preserves syntax highlighting outside playback range"):
     onFxThread:
       val code = """note("c4").sound("piano")"""
-      val editor = new BlockEditorView(code, baseTempo)
+      val editor = new BlockEditorView(code)
 
       editor.render(
         AppModel(positions = Set(TextPosition(0, 4)))
@@ -87,7 +85,7 @@ class BlockEditorViewSpec
   test("render ignores playback positions outside the source code"):
     onFxThread:
       val code = """note("c4")"""
-      val editor = new BlockEditorView(code, baseTempo)
+      val editor = new BlockEditorView(code)
 
       editor.render(
         AppModel(
@@ -104,7 +102,7 @@ class BlockEditorViewSpec
     onFxThread:
       val code = "note(\"c4 a4\").sound(\"piano\")\nsound(\"hb hd hh\")"
 
-      val editor = new BlockEditorView(code, baseTempo)
+      val editor = new BlockEditorView(code)
 
       editor.render(
         AppModel(positions = Set(TextPosition(0, 4)))

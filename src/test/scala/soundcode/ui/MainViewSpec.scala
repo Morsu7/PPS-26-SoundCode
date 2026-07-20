@@ -13,11 +13,9 @@ class MainViewSpec
     extends UITestSupport
     with TableDrivenPropertyChecks:
   
-  private val baseTempo = Tempo(0.5)
-
   test("creates the main layout with editor and toolbar"):
     onFxThread:
-      val view = MainView(_ => (), baseTempo)
+      val view = MainView(_ => ())
 
       assert(view.root.delegate.getCenter != null)
       assert(view.root.delegate.getTop.isInstanceOf[ToolBar])
@@ -32,7 +30,7 @@ class MainViewSpec
     forAll(buttonCases): (label, expectedMessage) =>
       onFxThread:
         val dispatched = ArrayBuffer.empty[Msg]
-        val view = MainView(dispatched += _, baseTempo)
+        val view = MainView(dispatched += _)
 
         toolbarButton(view, label).fire()
 
@@ -41,7 +39,7 @@ class MainViewSpec
   test("Update button dispatches the current source code"):
     onFxThread:
       val dispatched = ArrayBuffer.empty[Msg]
-      val view = MainView(dispatched += _, baseTempo)
+      val view = MainView(dispatched += _)
 
       toolbarButton(view, "Update").fire()
 
@@ -68,7 +66,7 @@ class MainViewSpec
     forAll(shortcutCases): (key, modifier, expectedMessage) =>
       onFxThread:
         val dispatched = ArrayBuffer.empty[Msg]
-        val view = MainView(dispatched += _, baseTempo)
+        val view = MainView(dispatched += _)
         val scene = new Scene(view.root.delegate)
 
         val shortcut =
@@ -85,7 +83,7 @@ class MainViewSpec
   test("Ctrl+U dispatches a code update with the current source"):
     onFxThread:
       val dispatched = ArrayBuffer.empty[Msg]
-      val view = MainView(dispatched += _, baseTempo)
+      val view = MainView(dispatched += _)
       val scene = new Scene(view.root.delegate)
 
       val shortcut =

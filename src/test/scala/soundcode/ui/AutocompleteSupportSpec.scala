@@ -126,6 +126,59 @@ class AutocompleteSupportSpec
         normalizedText(editor) == "sound(\"bd\")\nsound(\"\")"
       )
 
+  test("completes a visualization containing an underscore"):
+    onFxThread:
+      val initialText =
+        """sound("bd")._pia"""
+
+      val editor = editorWith(initialText)
+
+      val completed =
+        AutocompleteSupport.completeFirst(editor)
+
+      assert(completed)
+      assert(
+        editor.getText ==
+          """sound("bd")._pianoroll()"""
+      )
+      assert(
+        editor.getCaretPosition ==
+          """sound("bd")._pianoroll()""".length
+      )
+
+  test("places the caret at the end when the snippet has no placeholder"):
+    onFxThread:
+      val initialText =
+        """sound("bd").re"""
+
+      val editor = editorWith(initialText)
+
+      val completed =
+        AutocompleteSupport.completeFirst(editor)
+
+      assert(completed)
+      assert(editor.getText == """sound("bd").rev()""")
+      assert(
+        editor.getCaretPosition ==
+          """sound("bd").rev()""".length
+      )
+
+  test("completes a generative block on an indented line"):
+    onFxThread:
+      val initialText = "  sou"
+      val expectedText = """  sound("")"""
+      val editor = editorWith(initialText)
+
+      val completed =
+        AutocompleteSupport.completeFirst(editor)
+
+      assert(completed)
+      assert(editor.getText == expectedText)
+      assert(
+        editor.getCaretPosition ==
+          expectedText.indexOf('"') + 1
+      )
+
   private def editorWith(
       text: String,
       caretPosition: Int = -1

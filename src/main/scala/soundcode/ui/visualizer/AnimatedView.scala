@@ -28,12 +28,12 @@ trait AnimatedView:
 abstract class CanvasAnimatedView(
     protected val tempo: Tempo
 ) extends AnimatedView:
-  protected val pixelsPerCycle = 130.0
-  protected val canvasHeight = 100.0
+  protected val pixelsPerCycle: Double = 130.0
+  protected val canvasHeight: Double = 100.0
 
-  protected val config = VisualizerConfig.default
+  protected val config: VisualizerConfig = VisualizerConfig.default
 
-  protected val canvas = new Canvas(0, canvasHeight)
+  protected val canvas: Canvas = new Canvas(0, canvasHeight)
 
   private val canvasPane = new Pane:
     minWidth = 0
@@ -98,13 +98,12 @@ abstract class CanvasAnimatedView(
   }
 
   private val timer = AnimationTimer { now =>
-    if running then
-      if startNano == 0L then startNano = now
+    if startNano == 0L then startNano = now
 
-      val elapsedSeconds = (now - startNano) / 1e9
-      val currentCycle = elapsedSeconds * tempo.cps
+    val elapsedSeconds = (now - startNano) / 1e9
+    val currentCycle = elapsedSeconds * tempo.cps
 
-      redraw(currentCycle)
+    redraw(currentCycle)
   }
 
   override def play(): Unit =
@@ -114,5 +113,6 @@ abstract class CanvasAnimatedView(
       timer.start()
 
   override def stop(): Unit =
-    running = false
-    timer.stop()
+    if running then
+      running = false
+      timer.stop()

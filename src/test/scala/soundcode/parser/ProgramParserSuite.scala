@@ -7,6 +7,7 @@ import scala.collection.mutable.ListBuffer
 import fastparse._
 import soundcode.parser.AST._
 import soundcode.parser.AST.Transformations._
+import soundcode.parser.AST.Visualizers.PianoRollBlock
 
 class SoundCodeParserSuite extends AnyFunSuite with BeforeAndAfterAll {
 
@@ -460,6 +461,21 @@ class SoundCodeParserSuite extends AnyFunSuite with BeforeAndAfterAll {
             
             assert(element.atom == expectedNote)
         }
+    }
+
+    test("parsing visualizer block") {
+        val input = "sound(\"bd\")._pianoroll()"
+        val result = parse(input)
+        
+        assert(result.isInstanceOf[Right[?, ?]])
+        val program = result.value
+        val stream = program.blocks.head.asInstanceOf[StreamBlock]
+        
+        assert(stream.visualizer.isDefined)
+        val visualizerBlock = stream.visualizer.get.asInstanceOf[PianoRollBlock]
+        
+        // Check that the startIndex is correctly captured
+        assert(visualizerBlock.startIndex == 12)
     }
 
     test("parsing silence atoms in both sound and note blocks") {

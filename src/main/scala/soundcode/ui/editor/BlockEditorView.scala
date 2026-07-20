@@ -1,7 +1,6 @@
 package soundcode.ui.editor
 
 import javafx.scene.Node
-import javafx.scene.input.{KeyEvent, MouseEvent}
 import javafx.scene.text.{FontSmoothingType, TextFlow}
 import org.fxmisc.flowless.VirtualizedScrollPane
 import org.fxmisc.richtext.{GenericStyledArea, TextExt}
@@ -13,36 +12,45 @@ import soundcode.mvu.AppModel
 import soundcode.ui.UITheme
 import soundcode.ui.visualizer.AnimatedView
 
-import java.util.function.{BiConsumer, Function, IntFunction}
+import java.util.function.{BiConsumer, Function}
 import scala.jdk.CollectionConverters.*
 import soundcode.domain.ScheduledEvent
 import soundcode.domain.AudioPayload
 import soundcode.domain.Tempo
-import soundcode.domain.Timeline
+import soundcode.domain.VisualizerRequest
+import soundcode.domain.VisualizerKind
+import soundcode.ui.visualizer.PianorollView
 
-private final case class EditorParagraphStyle(
-    visualizerSpace: Double = 0
-)
+object BlockEditorView:
+  private final case class EditorParagraphStyle(
+      visualizerSpace: Double = 0
+  )
 
-final class BlockEditorView(
-    initialCode: String = """|note("c4 a4").sound("piano")
-                             |sound("hb hd hh")
-                             |""".stripMargin.trim,
-    baseTempo: Tempo
-):
-  private final case class VisualizerDecoration(
-      anchorLine: Int,
+  private final case class RenderedVisualizersState(
+      timelines: List[Seq[ScheduledEvent[AudioPayload]]],
+      requests: List[VisualizerRequest],
+      tempo: Tempo,
+      timelineRevision: Long
+  )
+
+  private final case class AnchoredVisualizer(
+      anchorOffset: Int,
       view: AnimatedView
   )
 
-  private var decorations =
-    Vector.empty[VisualizerDecoration]
+final class BlockEditorView(
+    initialCode: String =
+      """|note("<c4 e4 g4 e4> <a3 c4 e4 c4> <f3 a3 c4 a3> <g3 b3 d4 b3>").sound("piano")
+     |sound("bd hh [cp, hh] hh")
+     |""".stripMargin.trim
+):
+  import BlockEditorView.*
+
+  private var anchoredVisualizers = Vector.empty[AnchoredVisualizer]
 
   private val VisualizerHeight = 120.0
   private val VisualizerSpacing = 16.0
   private val ReservedVisualizerSpace = VisualizerHeight + VisualizerSpacing
-
-  private type Segment = String
 
   private val segmentOps: TextOps[String, String] =
     SegmentOps.styledTextOps[String]()
@@ -78,13 +86,13 @@ final class BlockEditorView(
     )
 
   // for testing purposes expose the underlying area
-  private[ui] def editorArea = area
+  private[ui] def editorArea: GenericStyledArea[?, String, String] = area
 
-  private var visualizers = Vector.empty[AnimatedView]
-  private var renderedTimelines = List.empty[Timeline[AudioPayload]]
-  private var renderedTempo = baseTempo
+  private var visualizersState: Option[RenderedVisualizersState] = None
+
   private var highlightScheduled = false
   private var replacingCode = false
+  private var playbackHighlightsEnabled = true
 
   private val scrollPane =
     new VirtualizedScrollPane(area)
@@ -123,7 +131,7 @@ final class BlockEditorView(
 
     visualizerOverlay.getChildren.clear()
 
-    decorations.foreach { decoration =>
+    anchoredVisualizers.foreach { decoration =>
       val node = decoration.view.root.delegate
 
       node.setManaged(false)
@@ -137,18 +145,39 @@ final class BlockEditorView(
       layoutVisualizers()
     }
 
+  private def updateVisualizerAnchors(
+      changePosition: Int,
+      removedLength: Int,
+      insertedLength: Int
+  ): Unit =
+    val removedEnd = changePosition + removedLength
+    val delta = insertedLength - removedLength
+
+    anchoredVisualizers = anchoredVisualizers.map { visualizer =>
+      val updatedOffset =
+        if removedLength > 0 &&
+          visualizer.anchorOffset >= changePosition &&
+          visualizer.anchorOffset < removedEnd
+        then math.max(0, changePosition - 1)
+        else if visualizer.anchorOffset >= removedEnd then
+          math.max(0, visualizer.anchorOffset + delta)
+        else visualizer.anchorOffset
+
+      visualizer.copy(anchorOffset = updatedOffset)
+    }
+
   private def layoutVisualizers(): Unit =
     if visualizerOverlay.getScene == null then return
 
-    decorations.foreach { decoration =>
-      val node = decoration.view.root.delegate
+    anchoredVisualizers.foreach { visualizer =>
+      val node = visualizer.view.root.delegate
+      val anchorLine = lineForOffset(visualizer.anchorOffset)
 
-      if decoration.anchorLine < 0 ||
-        decoration.anchorLine >= area.getParagraphs.size()
+      if anchorLine < 0 || anchorLine >= area.getParagraphs.size()
       then node.setVisible(false)
       else
         val bounds =
-          area.getParagraphBoundsOnScreen(decoration.anchorLine)
+          area.getParagraphBoundsOnScreen(anchorLine)
 
         if bounds.isEmpty then node.setVisible(false)
         else
@@ -202,7 +231,7 @@ final class BlockEditorView(
           node.setVisible(true)
     }
 
-  private def applyDecorationSpacing(): Unit =
+  private def applyVisualizerSpacing(): Unit =
     (0 until area.getParagraphs.size()).foreach { paragraphIndex =>
       area.setParagraphStyle(
         paragraphIndex,
@@ -210,12 +239,14 @@ final class BlockEditorView(
       )
     }
 
-    decorations.foreach { decoration =>
-      if decoration.anchorLine >= 0 &&
-        decoration.anchorLine < area.getParagraphs.size()
+    anchoredVisualizers.foreach { visualizer =>
+      val anchorLine = lineForOffset(visualizer.anchorOffset)
+
+      if anchorLine >= 0 &&
+        anchorLine < area.getParagraphs.size()
       then
         area.setParagraphStyle(
-          decoration.anchorLine,
+          anchorLine,
           EditorParagraphStyle(
             visualizerSpace = ReservedVisualizerSpace
           )
@@ -227,12 +258,23 @@ final class BlockEditorView(
     }
 
   def render(state: AppModel): Unit =
-    if state.timelines != renderedTimelines || state.tempo != renderedTempo then
-      refreshVisualizers(state.timelines, state.tempo)
-      renderedTimelines = state.timelines
-      renderedTempo = state.tempo
+    val nextVisualizersState = RenderedVisualizersState(
+      timelines = state.timelines,
+      requests = state.visualizers,
+      tempo = state.tempo,
+      timelineRevision = state.timelineRevision
+    )
 
-    SyntaxHighlighter.applyTo(area, state.positions)
+    val isStaleVisualizerState =
+      visualizersState.exists(
+        _.timelineRevision > nextVisualizersState.timelineRevision
+      )
+
+    if !isStaleVisualizerState && !visualizersState.contains(nextVisualizersState) then
+      renderVisualizers(nextVisualizersState)
+      visualizersState = Some(nextVisualizersState)
+
+    renderHighlights(state)
 
   def currentCode: String =
     normalizeNewlines(
@@ -240,10 +282,10 @@ final class BlockEditorView(
     )
 
   def play(): Unit =
-    visualizers.foreach(_.play())
+    anchoredVisualizers.foreach(_.view.play())
 
   def stop(): Unit =
-    visualizers.foreach(_.stop())
+    anchoredVisualizers.foreach(_.view.stop())
 
   private def configureArea(): Unit =
     area.setWrapText(true)
@@ -258,13 +300,22 @@ final class BlockEditorView(
 
     area
       .plainTextChanges()
-      .subscribe(_ => scheduleHighlight())
+      .subscribe { change =>
+        if !replacingCode then
+          playbackHighlightsEnabled = false
 
-    area.textProperty().addListener { (_, _, _) =>
-      Platform.runLater {
-        applyDecorationSpacing()
+          updateVisualizerAnchors(
+            changePosition = change.getPosition,
+            removedLength = change.getRemoved.length,
+            insertedLength = change.getInserted.length
+          )
+
+          Platform.runLater {
+            applyVisualizerSpacing()
+          }
+
+        scheduleHighlight()
       }
-    }
 
     visualizerOverlay.widthProperty().addListener { (_, _, _) =>
       Platform.runLater {
@@ -305,31 +356,47 @@ final class BlockEditorView(
       SyntaxHighlighter.applyTo(area)
     finally replacingCode = false
 
-  private def refreshVisualizers(
-      timelines: List[Timeline[AudioPayload]],
-      tempo: Tempo
+  private def renderHighlights(state: AppModel): Unit =
+    if state.positions.isEmpty then
+      playbackHighlightsEnabled = true
+      SyntaxHighlighter.applyTo(area)
+    else if playbackHighlightsEnabled then
+      SyntaxHighlighter.applyTo(area, state.positions)
+    else SyntaxHighlighter.applyTo(area)
+
+  private def renderVisualizers(
+      nextState: RenderedVisualizersState
   ): Unit =
-    visualizers.foreach(_.stop())
+    anchoredVisualizers.foreach(_.view.stop())
 
-    decorations = area.getText
-      .split("\n", -1)
-      .indices
-      .flatMap { lineIndex =>
-        BlockEditorVisualizers
-          .forLine(lineIndex, timelines, tempo)
-          .map(view =>
-            VisualizerDecoration(
-              anchorLine = lineIndex,
-              view = view
-            )
+    anchoredVisualizers = nextState.requests.flatMap { request =>
+      nextState.timelines
+        .lift(request.streamIndex)
+        .map { timeline =>
+          val view =
+            request.kind match
+              case VisualizerKind.PianoRoll =>
+                new PianorollView(timeline, nextState.tempo)
+
+              case VisualizerKind.Oscilloscope => ???
+
+          AnchoredVisualizer(
+            anchorOffset = request.sourceOffset,
+            view = view
           )
-      }
-      .toVector
+        }
+    }.toVector
 
-    visualizers = decorations.map(_.view)
-
-    applyDecorationSpacing()
+    applyVisualizerSpacing()
     installVisualizerNodes()
+
+  private def lineForOffset(offset: Int): Int =
+    val safeOffset =
+      offset.max(0).min(area.getLength)
+
+    area.getText
+      .take(safeOffset)
+      .count(_ == '\n')
 
   private def scheduleHighlight(): Unit =
     if !highlightScheduled && !replacingCode then

@@ -154,11 +154,6 @@ case class Tempo(cps: Double) {
     (phase.toDouble * cycleDurationMs).toLong
 }
 
-final case class Timeline[+T](
-    events: Seq[ScheduledEvent[T]],
-    loopLength: Fraction
-)
-
 opaque type AbsoluteTime = Long
 object AbsoluteTime:
   def apply(value: Long): AbsoluteTime = value
