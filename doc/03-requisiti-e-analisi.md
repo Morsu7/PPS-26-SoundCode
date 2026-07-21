@@ -321,7 +321,35 @@ L'eventuale pan non è udibile nel backend MIDI corrente, ma resta associato agl
 
 ### RF-22 — Editor
 
-Il sistema deve fornire un editor multiriga con numeri di riga, ritorno a capo visivo, undo/redo fornito dal componente, zoom, evidenziazione sintattica, completamento dei costrutti conosciuti e inserimento automatico delle coppie di parentesi e virgolette.
+Il sistema deve fornire un editor multiriga con:
+
+- numeri di riga;
+- ritorno a capo automatico delle righe troppo lunghe, applicato soltanto alla visualizzazione e senza modificare il testo sorgente;
+- funzionalità di undo e redo;
+- zoom del testo;
+- evidenziazione sintattica;
+- completamento automatico;
+- inserimento automatico delle coppie di delimitatori.
+
+L’evidenziazione sintattica deve distinguere visivamente almeno:
+
+- i nomi delle funzioni;
+- le stringhe;
+- gli eventi attualmente evidenziati durante la riproduzione.
+
+Durante la digitazione, l’editor deve proporre i costrutti compatibili con il contesto:
+
+- i costrutti generativi all’inizio di una riga;
+- le estensioni generative, le trasformazioni e le visualizzazioni dopo il punto;
+- nessun suggerimento all’interno delle stringhe.
+
+La selezione di un suggerimento deve inserire il relativo costrutto e collocare il cursore nella posizione prevista per la compilazione. I suggerimenti devono poter essere selezionati tramite tastiera o doppio clic.
+
+La digitazione di `(`, `[`, `<` e `"` deve inserire automaticamente il delimitatore di chiusura corrispondente.
+
+Se è presente una selezione, la digitazione di un delimitatore di apertura deve racchiudere il testo selezionato nella coppia corrispondente, mantenendo selezionato il contenuto originale.
+
+Quando il delimitatore di chiusura è già presente nella posizione del cursore, la sua digitazione deve spostare il cursore oltre il carattere esistente senza duplicarlo. Le virgolette devono essere accoppiate soltanto quando il cursore non si trova già all’interno di una stringa.
 
 ### RF-23 — Comandi
 
