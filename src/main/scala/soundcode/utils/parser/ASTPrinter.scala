@@ -118,6 +118,7 @@ object ASTPrinter {
           case n: Note => s"Note(name=${n.name}, acc=${n.accidental.getOrElse("none")}, oct=${n.octave}) [${n.startIndex}:${n.endIndex}]"
           case s: Sample => s"Sample(${s.value}) [${s.startIndex}:${s.endIndex}]"
           case c: Config => s"Config(${c.value}) [${c.startIndex}:${c.endIndex}]" 
+          case s: Silence => s"Silence [${s.startIndex}:${s.endIndex}]"
         }
         s"$indent${marker}Atom: $atomStr"
         
