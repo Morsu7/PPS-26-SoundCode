@@ -65,25 +65,51 @@ object Interpreter {
         else Pattern.WithExtensions(finalBase, finalEffects)
     }
 
-    private def applyTransformation(basePattern: Pattern[AudioPayload], transBlock: AST.Transformations.TransformationBlock): Pattern[AudioPayload] = transBlock match {
-        case AST.Transformations.Gain(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value)))
-        case AST.Transformations.Pan(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value)))
-        case AST.Transformations.Room(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value)))
-        case AST.Transformations.Delay(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Delay(c.value, c.value, c.value)))
-        case AST.Transformations.LowPassFilter(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value)))
-        case AST.Transformations.HighPassFilter(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value)))
+    private def interpretAudioEffect(transBlock: AST.Transformations.TransformationBlock): Option[Pattern[AudioPayload]] = transBlock match{
+        case AST.Transformations.Gain(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value))))
+        case AST.Transformations.Pan(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value))))
+        case AST.Transformations.Room(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value))))
+        case AST.Transformations.Delay(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Delay(c.value, c.value, c.value))))
+        case AST.Transformations.LowPassFilter(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value))))
+        case AST.Transformations.HighPassFilter(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value))))
 
-        case AST.Transformations.Reverse() => Pattern.TimeWarp(PatternModifier.Reverse, basePattern)
-        case AST.Transformations.Repetition(pattern) => Pattern.TimeWarp(PatternModifier.Repetition(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
-        case AST.Transformations.FastForward(pattern) => Pattern.TimeWarp(PatternModifier.FastForward(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
-        case AST.Transformations.SlowMotion(pattern) => Pattern.TimeWarp(PatternModifier.SlowMotion(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
-        case AST.Transformations.Early(pattern) => Pattern.TimeWarp(PatternModifier.Early(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
-        case AST.Transformations.Late(pattern) => Pattern.TimeWarp(PatternModifier.Late(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
+        case _ => None
+    }
 
-        case AST.Transformations.Juxtaposition(transformations) => Pattern.TimeWarp(PatternModifier.Juxtaposition(transformations.map(tb => applyTransformation(basePattern, tb).asInstanceOf[Pattern[AudioEffect]])), basePattern)
-        case AST.Transformations.Offset(offsetPattern, transformations) => Pattern.TimeWarp(PatternModifier.Offset(interpretPattern(offsetPattern)(interpretConfigAtom), transformations.map(tb => applyTransformation(basePattern, tb).asInstanceOf[Pattern[AudioEffect]])), basePattern)
+    private def interpretTimeWarp(transBlock: AST.Transformations.TransformationBlock): Option[PatternModifier[AudioPayload]] = transBlock match {
+        case AST.Transformations.Reverse() => Some(PatternModifier.Reverse)
+        case AST.Transformations.Repetition(pattern) => Some(PatternModifier.Repetition(interpretPattern(pattern)(interpretConfigAtom)))
+        case AST.Transformations.FastForward(pattern) => Some(PatternModifier.FastForward(interpretPattern(pattern)(interpretConfigAtom)))
+        case AST.Transformations.SlowMotion(pattern) => Some(PatternModifier.SlowMotion(interpretPattern(pattern)(interpretConfigAtom)))
+        case AST.Transformations.Early(pattern) => Some(PatternModifier.Early(interpretPattern(pattern)(interpretConfigAtom)))
+        case AST.Transformations.Late(pattern) => Some(PatternModifier.Late(interpretPattern(pattern)(interpretConfigAtom)))
 
-        case _ => ???
+        case _ => None
+    }
+
+    private def interpretInnerTransformation(basePattern: Pattern[AudioPayload])(transBlock: AST.Transformations.TransformationBlock): Pattern[AudioEffect] | PatternModifier[AudioPayload] = {
+        interpretAudioEffect(transBlock)
+        .map(_.asInstanceOf[Pattern[AudioEffect]])
+        .orElse(
+            interpretTimeWarp(transBlock)
+        )
+        .getOrElse(throw new IllegalArgumentException("Unknown transformation block"))
+    }
+
+    private def applyTransformation(basePattern: Pattern[AudioPayload], transBlock: AST.Transformations.TransformationBlock): Pattern[AudioPayload] = {
+        interpretAudioEffect(transBlock) match {
+            case Some(effectPattern) => effectPattern
+            case None => interpretTimeWarp(transBlock) match {
+                    case Some(modifier) => Pattern.TimeWarp(modifier, basePattern)
+                    case None => transBlock match {
+                        case AST.Transformations.Juxtaposition(transformations) =>
+                            Pattern.TimeWarp(PatternModifier.Juxtaposition(transformations.map(tb => interpretInnerTransformation(basePattern)(tb))), basePattern)
+                        case AST.Transformations.Offset(offsetPattern, transformations) =>
+                            Pattern.TimeWarp(PatternModifier.Offset(interpretPattern(offsetPattern)(interpretConfigAtom), transformations.map(tb => interpretInnerTransformation(basePattern)(tb))), basePattern)
+                        case _ => throw new IllegalArgumentException("Unknown transformation block")
+                }
+            }
+        }
     }
 
     private def interpretPattern[A <: AST.Atom, B](pattern: AST.Pattern[A])(buildAtom: A => Pattern[B]): Pattern[B] = {
