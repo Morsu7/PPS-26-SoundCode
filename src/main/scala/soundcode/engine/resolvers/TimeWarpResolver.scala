@@ -57,16 +57,23 @@ object TimeWarpResolver:
         events
 
       case PatternModifier.Juxtaposition(modifiers) =>
-        val rightPattern = modifiers.foldLeft(innerPattern)((p, m) => Pattern.TimeWarp(m, p))
-
-        List(innerPattern -> 0.0, rightPattern -> 1.0).flatMap { case (pattern, pan) =>
-          pattern.resolve(timeWindow).map(e => e.copy(appliedExtensions = e.appliedExtensions :+ AudioEffect.Pan(pan)))
+        val rightPattern = modifiers.foldLeft[Pattern[Any]](innerPattern) {
+          case (pat, mod: PatternModifier[_]) =>
+            Pattern.TimeWarp(mod.asInstanceOf[PatternModifier[Any]], pat)
+          case (pat, effectPat: Pattern[_]) =>
+            Pattern.WithExtensions(pat.asInstanceOf[Pattern[AudioPayload]], List(effectPat.asInstanceOf[Pattern[AudioPayload]]))  
         }
 
-      case PatternModifier.Offset(offset, modifiers) =>
-        val delayedPattern = Pattern.TimeWarp(PatternModifier.Late(Pattern.Atom(offset)), innerPattern)
+        List(innerPattern -> 0.0, rightPattern -> 1.0).flatMap { case (pattern, pan) =>
+          pattern.asInstanceOf[Pattern[T]].resolve(timeWindow).map { e =>
+            e.copy(appliedExtensions = e.appliedExtensions :+ AudioEffect.Pan(pan))
+          }
+        }
+
+      case PatternModifier.Offset(offset, modifiers) => ???
+        /*val delayedPattern = Pattern.TimeWarp(PatternModifier.Late(Pattern.Atom(offset)), innerPattern)
         val finalTransformed = modifiers.foldLeft(delayedPattern)((pat, mod) => Pattern.TimeWarp(mod, pat))
-        Pattern.Parallel(List(innerPattern, finalTransformed)).resolve(timeWindow)
+        Pattern.Parallel(List(innerPattern, finalTransformed)).resolve(timeWindow)*/
 
   private def applyDynamicModifier[T](parameter: Pattern[Double], innerPattern: Pattern[T], timeWindow: Interval, zoomIn: (Interval, Fraction) => Interval, zoomOut: (ScheduledEvent[T], Fraction) => ScheduledEvent[T]): List[ScheduledEvent[T]] =
     for
