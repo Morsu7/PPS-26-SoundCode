@@ -57,6 +57,8 @@ def repeat[T](times: Pattern[Double], p: Pattern[T]): Pattern[T] = Pattern.TimeW
 
 val rev: PatternModifier[Nothing] = PatternModifier.Reverse
 
+def rev[T](p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Reverse, p)
+
 def fast(factor: Double): PatternModifier[Nothing] = PatternModifier.FastForward(Pattern.Atom(factor))
 def slow(factor: Double): PatternModifier[Nothing] = PatternModifier.SlowMotion(Pattern.Atom(factor))
 

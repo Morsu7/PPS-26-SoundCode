@@ -58,9 +58,9 @@ class ExtensionsPatternTest extends SchedulerTestBase {
       ("cp", "C"), ("bd", "F"), ("cp", "G")
     )
 
-    for (i <- 0 until 6) {
+    for (((sound, note), i) <- expectedElements.zipWithIndex) {
       assertCycle(streams, i)(
-        ExpEvent(expectedElements(i)._1, i \ 1, (i + 1) \ 1, List(expectedElements(i)._2))
+        ExpEvent(sound, i \ 1, (i + 1) \ 1, List(note))
       )
     }
   }
