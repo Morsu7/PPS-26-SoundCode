@@ -69,7 +69,7 @@ object Interpreter {
         case AST.Transformations.Gain(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value)))
         case AST.Transformations.Pan(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value)))
         case AST.Transformations.Room(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value)))
-        case AST.Transformations.Delay(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Delay(c.value, c.value, c.value))) // TODO fix parsing for delay
+        case AST.Transformations.Delay(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.Delay(c.value, c.value, c.value)))
         case AST.Transformations.LowPassFilter(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value)))
         case AST.Transformations.HighPassFilter(pattern) => interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value)))
 
@@ -79,6 +79,9 @@ object Interpreter {
         case AST.Transformations.SlowMotion(pattern) => Pattern.TimeWarp(PatternModifier.SlowMotion(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
         case AST.Transformations.Early(pattern) => Pattern.TimeWarp(PatternModifier.Early(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
         case AST.Transformations.Late(pattern) => Pattern.TimeWarp(PatternModifier.Late(interpretPattern(pattern)(interpretConfigAtom)), basePattern)
+
+        case AST.Transformations.Juxtaposition(transformations) => Pattern.TimeWarp(PatternModifier.Juxtaposition(transformations.map(tb => applyTransformation(basePattern, tb).asInstanceOf[Pattern[AudioEffect]])), basePattern)
+        case AST.Transformations.Offset(offsetPattern, transformations) => Pattern.TimeWarp(PatternModifier.Offset(interpretPattern(offsetPattern)(interpretConfigAtom), transformations.map(tb => applyTransformation(basePattern, tb).asInstanceOf[Pattern[AudioEffect]])), basePattern)
 
         case _ => ???
     }
@@ -119,7 +122,10 @@ object Interpreter {
 
         case AST.AtomElement(atom) => buildAtom(atom)
 
-        case AST.SpeedModifiedElement(_, _, _) => ???
+        case AST.SpeedModifiedElement(element, isFastForward, factor) => isFastForward match {
+            case true  => Pattern.TimeWarp(PatternModifier.FastForward(interpretConfigAtom(factor)), interpretElement(element)(buildAtom))
+            case false => Pattern.TimeWarp(PatternModifier.SlowMotion(interpretConfigAtom(factor)), interpretElement(element)(buildAtom))
+        }
     }
 
     private def interpretSoundAtom(atom: AST.Atom): Pattern[AudioPayload] = atom match {
