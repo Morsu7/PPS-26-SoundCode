@@ -49,6 +49,8 @@ object AutocompleteSupport:
       |-fx-background-color: #3a3a42;
       |-fx-background-radius: 4;
       |-fx-padding: 5 8;
+      |-fx-text-background-color: #f4f4f5;
+      |-fx-text-fill: #f4f4f5;
       |""".stripMargin
 
   private val DefaultCellStyle =
@@ -56,6 +58,8 @@ object AutocompleteSupport:
       |-fx-background-color: transparent;
       |-fx-background-radius: 4;
       |-fx-padding: 5 8;
+      |-fx-text-background-color: #f4f4f5;
+      |-fx-text-fill: #f4f4f5;
       |""".stripMargin
 
   private final case class Completion(
@@ -117,7 +121,13 @@ object AutocompleteSupport:
       if isEmpty || getItem == null then
         setText(null)
         setGraphic(null)
-        setStyle("-fx-background-color: transparent;")
+        setStyle(
+          """
+            |-fx-background-color: transparent;
+            |-fx-text-background-color: #f4f4f5;
+            |-fx-text-fill: #f4f4f5;
+            |""".stripMargin
+        )
       else
         keyword.setText(getItem.name)
         detail.setText(getItem.detail)
