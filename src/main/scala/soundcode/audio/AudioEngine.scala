@@ -1,9 +1,32 @@
 package soundcode.audio
 
+/** Parametri di una nota intonata da suonare.
+  *
+  * Oltre a nota/strumento/durata porta gli effetti *per-canale* come `Option`:
+  * `None` significa "manopola non toccata" (il canale resta al suo default), così
+  * senza effetti il comportamento è identico a prima.
+  *
+  *   - `pan`        -> posizione stereo (CC10), 0 = sinistra, 64 = centro, 127 = destra
+  *   - `reverb`     -> quantità di riverbero (CC91)
+  *   - `brightness` -> apertura del filtro / brillantezza (CC74)
+  *
+  * `velocity` (0..127) veicola il `gain`: è per-nota, quindi due note con gain diverso
+  * possono convivere sullo stesso canale.
+  */
+case class NoteSpec(
+    midiNote: Int,
+    velocity: Int,
+    durationMs: Long,
+    program: Int,
+    pan: Option[Int] = None,
+    reverb: Option[Int] = None,
+    brightness: Option[Int] = None
+)
+
 /** Backend audio astratto: il player delega qui la produzione effettiva del suono. */
 trait AudioEngine:
-  /** Suona una nota intonata. midiNote/velocity in 0..127, program = strumento GM 0..127. */
-  def playNote(midiNote: Int, velocity: Int, durationMs: Long, program: Int): Unit
+  /** Suona una nota intonata secondo lo [[NoteSpec]] (nota, strumento GM, effetti). */
+  def playNote(spec: NoteSpec): Unit
 
   /** Suona una percussione General MIDI (canale 10). */
   def playDrum(gmNote: Int, velocity: Int, durationMs: Long): Unit
@@ -15,7 +38,7 @@ trait AudioEngine:
   * (es. ambiente headless / CI). Non produce suono e non lancia mai eccezioni.
   */
 object NoopAudioEngine extends AudioEngine:
-  def playNote(midiNote: Int, velocity: Int, durationMs: Long, program: Int): Unit = ()
+  def playNote(spec: NoteSpec): Unit = ()
   def playDrum(gmNote: Int, velocity: Int, durationMs: Long): Unit = ()
   def close(): Unit = ()
 

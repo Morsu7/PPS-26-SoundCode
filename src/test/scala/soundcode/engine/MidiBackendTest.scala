@@ -3,7 +3,7 @@ package soundcode.engine
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 import soundcode.domain.*
-import soundcode.audio.AudioEngine
+import soundcode.audio.{AudioEngine, NoteSpec}
 
 /** Verifica il dispatch di [[MidiBackend]] (nota -> numero MIDI, sample -> percussione GM)
   * senza toccare hardware audio: inietta un `AudioEngine` fittizio che registra le chiamate.
@@ -12,9 +12,9 @@ import soundcode.audio.AudioEngine
 class MidiBackendTest extends AnyFunSuite with Matchers:
 
   private class RecordingEngine extends AudioEngine:
-    var notes: List[(Int, Int, Long)] = Nil // (midiNote, program, durationMs)
+    var notes: List[NoteSpec] = Nil
     var drums: List[(Int, Long)] = Nil
-    def playNote(midiNote: Int, velocity: Int, durationMs: Long, program: Int): Unit = notes = notes :+ (midiNote, program, durationMs)
+    def playNote(spec: NoteSpec): Unit = notes = notes :+ spec
     def playDrum(gmNote: Int, velocity: Int, durationMs: Long): Unit = drums = drums :+ (gmNote, durationMs)
     def close(): Unit = ()
 
@@ -25,7 +25,7 @@ class MidiBackendTest extends AnyFunSuite with Matchers:
     val backend = new MidiBackend(engine)
     backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, Nil)
     backend.triggerSound(Sound.NoteInText(Note("a", 4), pos), 500, Nil)
-    engine.notes.map(_._1) shouldBe List(60, 69)
+    engine.notes.map(_.midiNote) shouldBe List(60, 69)
     engine.drums shouldBe empty
   }
 
@@ -59,12 +59,43 @@ class MidiBackendTest extends AnyFunSuite with Matchers:
     val backend = new MidiBackend(engine)
     // note("c").sound("bass") -> la nota porta un SampleInText("bass") come estensione
     backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(Sound.SampleInText(Sample("bass"), pos)))
-    engine.notes shouldBe List((60, 33, 500)) // bass -> program GM 33
+    engine.notes.map(s => (s.midiNote, s.program, s.durationMs)) shouldBe List((60, 33, 500)) // bass -> program GM 33
   }
 
   test("senza estensione lo strumento e' il piano (program 0)") {
     val engine = new RecordingEngine
     val backend = new MidiBackend(engine)
     backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, Nil)
-    engine.notes.map(_._2) shouldBe List(0)
+    engine.notes.map(_.program) shouldBe List(0)
+  }
+
+  test("il gain scala la velocity: moltiplicatore sulla base 96, clampato 1..127 (story #3)") {
+    val engine = new RecordingEngine
+    val backend = new MidiBackend(engine)
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Gain(0.5)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Gain(2.0)))
+    engine.notes.map(_.velocity) shouldBe List(48, 127) // 96*0.5=48 ; 96*2=192 -> clamp 127
+  }
+
+  test("senza gain la velocity e' quella di default (96)") {
+    val engine = new RecordingEngine
+    val backend = new MidiBackend(engine)
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, Nil)
+    engine.notes.map(_.velocity) shouldBe List(96)
+  }
+
+  test("il pan 0..1 diventa CC10 0..127 (0=sinistra, 0.5=centro, 1=destra) (story #3)") {
+    val engine = new RecordingEngine
+    val backend = new MidiBackend(engine)
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(0.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(0.5)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(1.0)))
+    engine.notes.map(_.pan) shouldBe List(Some(0), Some(64), Some(127))
+  }
+
+  test("senza pan il campo resta None (centro)") {
+    val engine = new RecordingEngine
+    val backend = new MidiBackend(engine)
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, Nil)
+    engine.notes.map(_.pan) shouldBe List(None)
   }
