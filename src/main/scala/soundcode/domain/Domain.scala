@@ -121,8 +121,8 @@ enum PatternModifier[+T]:
   case Late(offset: Pattern[Double])
   case Early(offset: Pattern[Double])
   case Repetition(times: Pattern[Double])
-  case Juxtaposition(modifiers: List[PatternModifier[T]])
-  case Offset(offset: Double, modifiers: List[PatternModifier[T]])
+  case Juxtaposition(modifiers: List[PatternModifier[T] | Pattern[AudioEffect]])
+  case Offset(offset: Pattern[Double], modifiers: List[PatternModifier[T] | Pattern[AudioEffect]])
 
 
 sealed trait Pattern[+T]

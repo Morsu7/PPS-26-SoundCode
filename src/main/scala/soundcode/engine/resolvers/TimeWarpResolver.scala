@@ -57,16 +57,19 @@ object TimeWarpResolver:
         events
 
       case PatternModifier.Juxtaposition(modifiers) =>
-        val rightPattern = modifiers.foldLeft(innerPattern)((p, m) => Pattern.TimeWarp(m, p))
+        val rightPattern = applyModifiers(innerPattern, modifiers)
 
         List(innerPattern -> 0.0, rightPattern -> 1.0).flatMap { case (pattern, pan) =>
-          pattern.resolve(timeWindow).map(e => e.copy(appliedExtensions = e.appliedExtensions :+ AudioEffect.Pan(pan)))
+          pattern.resolve(timeWindow).map { e =>
+            e.copy(appliedExtensions = e.appliedExtensions :+ AudioEffect.Pan(pan))
+          }
         }
 
       case PatternModifier.Offset(offset, modifiers) =>
-        val delayedPattern = Pattern.TimeWarp(PatternModifier.Late(Pattern.Atom(offset)), innerPattern)
-        val finalTransformed = modifiers.foldLeft(delayedPattern)((pat, mod) => Pattern.TimeWarp(mod, pat))
-        Pattern.Parallel(List(innerPattern, finalTransformed)).resolve(timeWindow)
+        val modifiedPattern = applyModifiers(innerPattern, modifiers)
+        val delayedPattern = Pattern.TimeWarp(PatternModifier.Late(offset), modifiedPattern)
+
+        Pattern.Parallel(List(innerPattern, delayedPattern)).resolve(timeWindow)
 
   private def applyDynamicModifier[T](parameter: Pattern[Double], innerPattern: Pattern[T], timeWindow: Interval, zoomIn: (Interval, Fraction) => Interval, zoomOut: (ScheduledEvent[T], Fraction) => ScheduledEvent[T]): List[ScheduledEvent[T]] =
     for
@@ -82,3 +85,11 @@ object TimeWarpResolver:
       cycleWindow <- Interval(cycleStart, cycleStart + 1).intersect(warpedWindow).toList
       innerEvent <- innerPattern.resolve(cycleWindow)
     yield zoomOut(innerEvent, paramValue)
+
+  private def applyModifiers[T](basePattern: Pattern[T], modifiers: List[PatternModifier[T] | Pattern[AudioEffect]]): Pattern[T] =
+    modifiers.foldLeft[Pattern[Any]](basePattern) {
+      case (pat, mod: PatternModifier[_]) =>
+        Pattern.TimeWarp(mod.asInstanceOf[PatternModifier[Any]], pat)
+      case (pat, effectPat: Pattern[_]) =>
+        Pattern.WithExtensions(pat.asInstanceOf[Pattern[AudioPayload]], List(effectPat.asInstanceOf[Pattern[AudioPayload]]))
+    }.asInstanceOf[Pattern[T]]

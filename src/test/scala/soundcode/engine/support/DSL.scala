@@ -54,3 +54,22 @@ def early[T](offset: Double, pattern: Pattern[T]): Pattern[T] = Pattern.TimeWarp
 
 def repeat[T](times: Double, p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Repetition(Pattern.Atom(times)), p)
 def repeat[T](times: Pattern[Double], p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Repetition(times), p)
+
+val rev: PatternModifier[Nothing] = PatternModifier.Reverse
+
+def rev[T](p: Pattern[T]): Pattern[T] = Pattern.TimeWarp(PatternModifier.Reverse, p)
+
+def fast(factor: Double): PatternModifier[Nothing] = PatternModifier.FastForward(Pattern.Atom(factor))
+def slow(factor: Double): PatternModifier[Nothing] = PatternModifier.SlowMotion(Pattern.Atom(factor))
+
+def late(offset: Double): PatternModifier[Nothing] = PatternModifier.Late(Pattern.Atom(offset))
+def late(offset: Fraction): PatternModifier[Nothing] = PatternModifier.Late(Pattern.Atom(offset.toDouble))
+
+def early(offset: Double): PatternModifier[Nothing] = PatternModifier.Early(Pattern.Atom(offset))
+def early(offset: Fraction): PatternModifier[Nothing] = PatternModifier.Early(Pattern.Atom(offset.toDouble))
+
+extension [T](pattern: Pattern[T])
+  def jux(modifiers: (PatternModifier[T] | Pattern[AudioEffect])*): Pattern[T] = Pattern.TimeWarp(PatternModifier.Juxtaposition(modifiers.toList), pattern)
+  def off(offset: Pattern[Double], modifiers: (PatternModifier[T] | Pattern[AudioEffect])*): Pattern[T] = Pattern.TimeWarp(PatternModifier.Offset(offset, modifiers.toList), pattern)
+  def off(offset: Double, modifiers: (PatternModifier[T] | Pattern[AudioEffect])*): Pattern[T] = pattern.off(Pattern.Atom(offset), modifiers*)
+  def off(offset: Fraction, modifiers: (PatternModifier[T] | Pattern[AudioEffect])*): Pattern[T] = pattern.off(Pattern.Atom(offset.toDouble), modifiers*)

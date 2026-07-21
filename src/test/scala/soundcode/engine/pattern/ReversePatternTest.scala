@@ -5,7 +5,7 @@ import soundcode.engine.support.*
 
 class ReversePatternTest extends SchedulerTestBase {
   test("""sound("bd sn hh").reverse""") {
-    val streams = List(Pattern.TimeWarp(PatternModifier.Reverse, seq(bd, sn, hh)))
+    val streams = List(rev(seq(bd, sn, hh)))
 
     // L'inversione specchia il tempo all'interno del ciclo:
     // Il rullante (sn) passa all'inizio [0.0 -> 0.5] e la cassa (bd) alla fine [0.5 -> 1.0]
@@ -22,7 +22,7 @@ class ReversePatternTest extends SchedulerTestBase {
     val fxGain = alt(gain(1.0), gain(0.8))
 
     val patternWithEffects = ext(baseSound, fxNote, fxGain)
-    val streams = List(Pattern.TimeWarp(PatternModifier.Reverse, patternWithEffects))
+    val streams = List(rev(patternWithEffects))
 
     assertCycleUnordered(streams, 0)(
       ExpEvent("clap", 0 \ 1, 1 \ 6, List("G", "1.0")),
