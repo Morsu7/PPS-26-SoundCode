@@ -66,3 +66,9 @@ class MidiBackendPipelineTest extends AnyFunSuite with Matchers:
     r.notes.map(_.pan).count(_.contains(0)) shouldBe 2
     r.notes.map(_.pan).count(_.contains(127)) shouldBe 2
   }
+
+  test("note(...).room(...).lpf(...) rende reverb e brightness (pipeline completa, story #3)") {
+    val r = play("note(\"c4\").room(\"0.5\").lpf(\"1000\")")
+    r.notes.head.reverb shouldBe defined
+    r.notes.head.brightness shouldBe defined
+  }

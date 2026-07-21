@@ -99,3 +99,36 @@ class MidiBackendTest extends AnyFunSuite with Matchers:
     backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, Nil)
     engine.notes.map(_.pan) shouldBe List(None)
   }
+
+  test("il room diventa CC91 (reverb) 0..127 (story #3)") {
+    val engine = new RecordingEngine
+    val backend = new MidiBackend(engine)
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(0.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(0.8)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(2.0)))
+    engine.notes.map(_.reverb) shouldBe List(Some(0), Some(102), Some(127)) // 0.8*127=101.6->102 ; 2.0->clamp
+  }
+
+  test("il lpf (Hz) diventa CC74 (brightness): estremi del range su scala log (story #3)") {
+    val engine = new RecordingEngine
+    val backend = new MidiBackend(engine)
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(20.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(20000.0)))
+    engine.notes.map(_.brightness) shouldBe List(Some(0), Some(127))
+  }
+
+  test("un cutoff piu' alto produce una brightness maggiore (monotonia)") {
+    val engine = new RecordingEngine
+    val backend = new MidiBackend(engine)
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(200.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(2000.0)))
+    val bs = engine.notes.flatMap(_.brightness)
+    bs(0) should be < bs(1)
+  }
+
+  test("senza room/lpf i campi reverb e brightness restano None") {
+    val engine = new RecordingEngine
+    val backend = new MidiBackend(engine)
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, Nil)
+    engine.notes.map(s => (s.reverb, s.brightness)) shouldBe List((None, None))
+  }
