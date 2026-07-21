@@ -133,4 +133,25 @@ class InterpreterFunSuite extends AnyFunSuite {
             case other => fail(s"Expected WithExtensions, but found $other")
         }
     }
+
+    test("interpret a juxtaposition transformation") {
+        val streams = interpret("note(\"c#\").jux(gain(\"5\"), room(\"10\"), rev())")
+        
+        inside(streams.head) {
+            case Pattern.TimeWarp(modifier, pattern) =>
+                modifier should matchPattern { case PatternModifier.Juxtaposition(_) => }
+                
+                inside(modifier) {
+                    case PatternModifier.Juxtaposition(modifiers) =>
+                        modifiers should have size 3
+                        modifiers(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0)) => }
+                        modifiers(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(10.0)) => }
+                        modifiers(2) should matchPattern { case PatternModifier.Reverse => }
+
+                    case other => fail(s"Expected Juxtaposition, but found $other")
+                }
+                
+            case other => fail(s"Expected TimeWarp, but found $other")
+        }
+    }
 }
