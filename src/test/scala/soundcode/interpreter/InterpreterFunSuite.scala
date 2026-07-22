@@ -48,7 +48,7 @@ class InterpreterFunSuite extends AnyFunSuite {
                 
                 extensions should have size 1
                 extensions.head match {
-                    case Pattern.Atom(note: NoteInText) => note.note.toString() shouldBe "G4"
+                    case Pattern.Atom(note: NoteInText) => note.note.toString shouldBe "G4"
                     case _ => fail("Expected NoteInText")
                 }
         }
@@ -63,8 +63,8 @@ class InterpreterFunSuite extends AnyFunSuite {
                 extensions should have size 2
                 
                 // Verifica effetti in modo leggibile e senza cast
-                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0)) => }
-                extensions(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(10.0)) => }
+                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0, _)) => }
+                extensions(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(10.0, _)) => }
         }
     }
 
@@ -79,7 +79,7 @@ class InterpreterFunSuite extends AnyFunSuite {
                 inside(elements(1)) {
                     case Pattern.Sequence(inner) =>
                         inner.head match {
-                            case Pattern.Atom(n: NoteInText) => n.note.toString() shouldBe "E3"
+                            case Pattern.Atom(n: NoteInText) => n.note.toString shouldBe "E3"
                             case other => fail(s"Expected NoteInText, found $other")
                         }
                     case other => fail(s"Expected nested sequence, found $other")
@@ -109,7 +109,7 @@ class InterpreterFunSuite extends AnyFunSuite {
                         extensions should have size 2
                         
                         // Verifica il Gain
-                        extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0)) => }
+                        extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0, _)) => }
                         
                         // Verifica il Sound (Sample)
                         extensions(1) should matchPattern { case Pattern.Atom(s: SampleInText) if s.sample.value == "bd" => }
@@ -144,8 +144,8 @@ class InterpreterFunSuite extends AnyFunSuite {
                 inside(modifier) {
                     case PatternModifier.Juxtaposition(modifiers) =>
                         modifiers should have size 3
-                        modifiers(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0)) => }
-                        modifiers(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(10.0)) => }
+                        modifiers(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0, _)) => }
+                        modifiers(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(10.0, _)) => }
                         modifiers(2) should matchPattern { case PatternModifier.Reverse => }
 
                     case other => fail(s"Expected Juxtaposition, but found $other")

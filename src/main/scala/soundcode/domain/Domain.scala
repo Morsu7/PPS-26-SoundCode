@@ -48,6 +48,7 @@ object Fraction:
   def apply(n: Double): Fraction =
     val precision = 10000L
     Fraction(math.round(n * precision), precision)
+  given Conversion[Fraction, Double] = _.toDouble
 
 case class Interval(start: Fraction, end: Fraction):
   def duration: Fraction = end - start
@@ -98,21 +99,25 @@ object Sample:
 // ==========================================
 
 case class TextPosition(startIndex: Int, endIndex: Int)
+object TextPosition:
+    def some(startIndex: Int, endIndex: Int): Option[TextPosition] =
+      Some(TextPosition(startIndex, endIndex))
 
-sealed trait AudioPayload
+sealed trait AudioPayload:
+  def position: Option[TextPosition]
 
 enum Sound extends AudioPayload:
-  case NoteInText(note: Note, position: TextPosition)
-  case SampleInText(sample: Sample, position: TextPosition)
-  case Rest(position: TextPosition)
+  case NoteInText(note: Note, position: Option[TextPosition] = None)
+  case SampleInText(sample: Sample, position: Option[TextPosition] = None)
+  case Rest(position: Option[TextPosition] = None)
 
 enum AudioEffect extends AudioPayload:
-  case Gain(value: Double)
-  case Pan(value: Double)
-  case Room(value: Double)
-  case LowPass(value: Double)
-  case HighPass(value: Double)
-  case Delay(volume: Double, time: Double, feedback: Double)
+  case Gain(value: Double, position: Option[TextPosition] = None)
+  case Pan(value: Double, position: Option[TextPosition] = None)
+  case Room(value: Double, position: Option[TextPosition] = None)
+  case LowPass(value: Double, position: Option[TextPosition] = None)
+  case HighPass(value: Double, position: Option[TextPosition] = None)
+  case Delay(volume: Double, time: Double, feedback: Double, position: Option[TextPosition] = None)
 
 enum PatternModifier[+T]:
   case Reverse
@@ -148,18 +153,21 @@ case class Tempo(cps: Double) {
   val cycleDurationMs: Double = 1000.0 / cps
 
   def durationMs(start: Fraction, end: Fraction): Long =
-    Math.round((end.toDouble - start.toDouble) * cycleDurationMs)
+    Math.round((end - start) * cycleDurationMs)
 
   def offsetMs(phase: Fraction): Long =
-    (phase.toDouble * cycleDurationMs).toLong
+    (phase * cycleDurationMs).toLong
 }
 
 opaque type AbsoluteTime = Long
 object AbsoluteTime:
   def apply(value: Long): AbsoluteTime = value
+  //given Conversion[AbsoluteTime, Long] = a => a
   extension (t: AbsoluteTime)
     def toLong: Long = t
     def +(other: Long): AbsoluteTime = AbsoluteTime(t + other)
     def -(other: Long): AbsoluteTime = AbsoluteTime(t - other)
     def <(other: AbsoluteTime): Boolean = t < other
     def <=(other: AbsoluteTime): Boolean = t <= other
+    def >(other: AbsoluteTime): Boolean = t > other
+    def >=(other: AbsoluteTime): Boolean = t >= other

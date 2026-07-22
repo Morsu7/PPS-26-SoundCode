@@ -9,7 +9,7 @@ extension (n: Int)
 extension (n: Long)
   def \(d: Long): Fraction = Fraction(n, d)
 
-val dummyPos = TextPosition(0, 0)
+val dummyPos = Some(TextPosition(0, 0))
 // Suoni Base
 def bd = Pattern.Atom(Sound.SampleInText(Sample("bd"), dummyPos))
 def hh = Pattern.Atom(Sound.SampleInText(Sample("hh"), dummyPos))

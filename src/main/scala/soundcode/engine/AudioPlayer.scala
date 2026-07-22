@@ -4,6 +4,19 @@ import soundcode.domain.*
 
 import scala.concurrent.duration.Duration
 
+
+/** Riproduttore audio multithread che consuma una sequenza temporale di eventi musicali.
+ *
+ * Il player gestisce il ciclo di vita della riproduzione svolgendo tre compiti principali:
+ * 1. Sincronizzare il tempo logico/musicale con il tempo reale di sistema.
+ * 2. Instradare i payload da riprodurre verso il generico [[AudioBackend]] per l'emissione del suono.
+ * 3. Tracciare la posizione nel testo degli eventi in esecuzione ([[TextPosition]]), notificando
+ *    l'interfaccia utente per l'evidenziazione dinamica del codice (highlighting).
+ *
+ * @param tempo Definisce i cicli per secondo (CPS) e traduce le frazioni temporali in millisecondi.
+ * @param backend Il motore fisico (es. MIDI o synth) che esegue i comandi sonori.
+ * @param onHighlightChange Callback invocata per informare la UI di quali porzioni di testo evidenziare.
+ */
 class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Set[TextPosition] => Unit = _ => ()) {
 
   private val loopResolutionMs = 1L
@@ -12,9 +25,9 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
   private var thread: Option[Thread] = None
 
   @volatile private var eventStream: LazyList[ScheduledEvent[AudioPayload]] = LazyList.empty
-  @volatile private var firstTickTimeMs: Option[Long] = None
+  @volatile private var firstTickTimeMs: Option[AbsoluteTime] = None
 
-  private var activeHighlights: Map[TextPosition, Long] = Map.empty
+  private var activeHighlights: Map[TextPosition, AbsoluteTime] = Map.empty
   private var currentHighlightSet: Set[TextPosition] = Set.empty
 
   def updateTimeline(stream: LazyList[ScheduledEvent[AudioPayload]]): Unit =
@@ -23,6 +36,7 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
     this.activeHighlights = Map.empty
     notifyHighlightsChanged()
 
+  /** Avvia il thread di riproduzione in background. */
   def start(): Unit = if (!isRunning) {
     isRunning = true
     thread = Some(new Thread(() => while (isRunning) {
@@ -35,56 +49,43 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
     thread.get.start()
   }
 
+  /** Ferma la riproduzione, chiude il thread e pulisce gli highlight attivi sulla UI. */
   def stop(): Unit =
     isRunning = false
     thread.foreach(_.join())
     activeHighlights = Map.empty
     notifyHighlightsChanged()
 
+  /** Avanza lo stato del player in base all'istante di tempo corrente.
+   *
+   * Estrae dallo stream gli eventi la cui finestra temporale è maturata, li invia al backend
+   * audio e aggiorna la mappa delle posizioni testuali da evidenziare a schermo.
+   *
+   * @param now Il tempo assoluto di sistema al momento dell'invocazione.
+   */
   def tick(now: AbsoluteTime): Unit = {
-    if (firstTickTimeMs.isEmpty) firstTickTimeMs = Some(now.toLong)
-    //controllo per highLight
-    var highlightsChanged = false
 
-    val initialSize = activeHighlights.size
-    activeHighlights = activeHighlights.filter { case (_, expireAtMs) => expireAtMs > now.toLong }
-    if activeHighlights.size != initialSize then highlightsChanged = true
-    //-----------------------
+    val firstPerformance = firstTickTimeMs.getOrElse(now)
+    if firstTickTimeMs.isEmpty then firstTickTimeMs = Some(firstPerformance)
 
-    var processing = true
-    while (eventStream.nonEmpty && processing) {
-      val nextEvent = eventStream.head
-      val expectedTriggerMs = firstTickTimeMs.get + tempo.offsetMs(nextEvent.part.start)
+    val initialHighlights = activeHighlights
+    activeHighlights = activeHighlights.filter { case (_, expireAtMs) => expireAtMs > now }
+    val (toProcess, futureEvents) = eventStream.span { nextEvent =>
+      val expectedTriggerMs = firstPerformance + tempo.offsetMs(nextEvent.part.start)
+      now >= expectedTriggerMs
+    }
+    eventStream = futureEvents
+    toProcess.filter(e => e.part.start == e.whole.start).foreach { nextEvent =>
+      val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
+      backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
 
-      if (now.toLong >= expectedTriggerMs) {
-        eventStream = eventStream.tail
-        if (nextEvent.part.start == nextEvent.whole.start) {
-          val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
-          backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
-          //aggiunta highLight
-          val allPayloads = nextEvent.value :: nextEvent.appliedExtensions
+      val allPayloads = nextEvent.value :: nextEvent.appliedExtensions
 
-          // Cicliamo su tutti i payload (principale + estensioni)
-          allPayloads.foreach { payload =>
-            val positionOpt = payload match
-              case Sound.NoteInText(_, pos) => Some(pos)
-              case Sound.SampleInText(_, pos) => Some(pos)
-              case Sound.Rest(pos) => Some(pos)
-              case _ => None // Ignora gli AudioEffect senza posizione
-
-            positionOpt.foreach { pos =>
-              activeHighlights = activeHighlights + (pos -> (now.toLong + durationMs))
-              highlightsChanged = true
-            }
-          }
-          //-----------------------
-        }
-      }else {
-        processing = false
-      }
+      val newHighlights = allPayloads.flatMap(_.position).map { pos =>pos -> (now + durationMs)}
+      activeHighlights = activeHighlights ++ newHighlights
     }
 
-    if highlightsChanged then notifyHighlightsChanged()
+    if (activeHighlights != initialHighlights) notifyHighlightsChanged()
   }
 
   private def notifyHighlightsChanged(): Unit =

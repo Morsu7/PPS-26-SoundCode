@@ -4,21 +4,21 @@ import soundcode.engine.*
 
 object TimeWarpResolver:
 
-  def resolve[T](pattern: Pattern.TimeWarp[T], timeWindow: Interval): List[ScheduledEvent[T]] =
+  def resolve[T](pattern: Pattern.TimeWarp[T])(using timeWindow: Interval): List[ScheduledEvent[T]] =
     val innerPattern = pattern.pattern
 
     pattern.modifier match
       case PatternModifier.FastForward(factor) =>
-        applyDynamicModifier(factor, innerPattern, timeWindow, zoomIn = _ * _, zoomOut = (e, f) => e.mapTime(_ / f))
+        applyDynamicModifier(factor, innerPattern, zoomIn = _ * _, zoomOut = (e, f) => e.mapTime(_ / f))
 
       case PatternModifier.SlowMotion(factor) =>
-        applyDynamicModifier(factor, innerPattern, timeWindow, zoomIn = _ / _, zoomOut = (e, f) => e.mapTime(_ * f))
+        applyDynamicModifier(factor, innerPattern, zoomIn = _ / _, zoomOut = (e, f) => e.mapTime(_ * f))
 
       case PatternModifier.Late(offset) =>
-        applyDynamicModifier(offset, innerPattern, timeWindow, zoomIn = _ - _, zoomOut = (e, o) => e.mapTime(_ + o))
+        applyDynamicModifier(offset, innerPattern, zoomIn = _ - _, zoomOut = (e, o) => e.mapTime(_ + o))
 
       case PatternModifier.Early(offset) =>
-        applyDynamicModifier(offset, innerPattern, timeWindow, zoomIn = _ + _, zoomOut = (e, o) => e.mapTime(_ - o))
+        applyDynamicModifier(offset, innerPattern, zoomIn = _ + _, zoomOut = (e, o) => e.mapTime(_ - o))
 
       case PatternModifier.Reverse =>
         val events = for cycle <- timeWindow.spanningCycles yield
@@ -29,7 +29,7 @@ object TimeWarpResolver:
             val reverseF = (t: Fraction) => cycleStart + cycleEnd - t
             val queryWindow = Interval(reverseF(activeWindow.end), reverseF(activeWindow.start))
 
-            innerPattern.resolve(queryWindow).map { e =>
+            innerPattern.resolve(using queryWindow).map { e =>
               e.copy(
                 whole = Interval(reverseF(e.whole.end), reverseF(e.whole.start)),
                 part = Interval(reverseF(e.part.end), reverseF(e.part.start))
@@ -40,10 +40,10 @@ object TimeWarpResolver:
 
       case PatternModifier.Repetition(times) =>
         val events = for
-          paramEvent <- times.resolve(timeWindow)
+          paramEvent <- times.resolve
           n = math.max(1, math.round(paramEvent.value).toInt)
           activeWindow <- paramEvent.part.intersect(timeWindow).toList
-          innerEvent <- innerPattern.resolve(activeWindow)
+          innerEvent <- innerPattern.resolve(using activeWindow)
 
           wholeDur = innerEvent.whole.duration
           stepDur = wholeDur / n
@@ -60,7 +60,7 @@ object TimeWarpResolver:
         val rightPattern = applyModifiers(innerPattern, modifiers)
 
         List(innerPattern -> 0.0, rightPattern -> 1.0).flatMap { case (pattern, pan) =>
-          pattern.resolve(timeWindow).map { e =>
+          pattern.resolve.map { e =>
             e.copy(appliedExtensions = e.appliedExtensions :+ AudioEffect.Pan(pan))
           }
         }
@@ -69,11 +69,14 @@ object TimeWarpResolver:
         val modifiedPattern = applyModifiers(innerPattern, modifiers)
         val delayedPattern = Pattern.TimeWarp(PatternModifier.Late(offset), modifiedPattern)
 
-        Pattern.Parallel(List(innerPattern, delayedPattern)).resolve(timeWindow)
+        Pattern.Parallel(List(innerPattern, delayedPattern)).resolve
 
-  private def applyDynamicModifier[T](parameter: Pattern[Double], innerPattern: Pattern[T], timeWindow: Interval, zoomIn: (Interval, Fraction) => Interval, zoomOut: (ScheduledEvent[T], Fraction) => ScheduledEvent[T]): List[ScheduledEvent[T]] =
+  private def applyDynamicModifier[T](parameter: Pattern[Double], innerPattern: Pattern[T],
+                                       zoomIn: (Interval, Fraction) => Interval,
+                                       zoomOut: (ScheduledEvent[T], Fraction) => ScheduledEvent[T]
+                                     )(using timeWindow: Interval): List[ScheduledEvent[T]] =
     for
-      paramEvent <- parameter.resolve(timeWindow)
+      paramEvent <- parameter.resolve
       paramValue = Fraction(paramEvent.value)
 
       activeWindow <- paramEvent.part.intersect(timeWindow).toList
@@ -83,7 +86,8 @@ object TimeWarpResolver:
       cycleStart = Fraction(cycle)
 
       cycleWindow <- Interval(cycleStart, cycleStart + 1).intersect(warpedWindow).toList
-      innerEvent <- innerPattern.resolve(cycleWindow)
+      
+      innerEvent <- innerPattern.resolve(using cycleWindow)
     yield zoomOut(innerEvent, paramValue)
 
   private def applyModifiers[T](basePattern: Pattern[T], modifiers: List[PatternModifier[T] | Pattern[AudioEffect]]): Pattern[T] =

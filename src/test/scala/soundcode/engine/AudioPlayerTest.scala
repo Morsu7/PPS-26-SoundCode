@@ -112,8 +112,8 @@ class AudioPlayerTest extends AnyFunSuite with Matchers {
       def extractName(p: AudioPayload): String = p match {
         case Sound.SampleInText(s, _) => s.value
         case Sound.NoteInText(n, _) => n.name
-        case AudioEffect.Gain(v) => s"gain($v)"
-        case AudioEffect.Room(v) => s"room($v)"
+        case AudioEffect.Gain(v,_) => s"gain($v)"
+        case AudioEffect.Room(v,_) => s"room($v)"
         case _ => "unknown"
       }
 

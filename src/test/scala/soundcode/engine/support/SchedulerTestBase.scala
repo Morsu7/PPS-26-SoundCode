@@ -41,9 +41,9 @@ extension (e: ScheduledEvent[AudioPayload])
       case Sound.SampleInText(s, _) => s.value
       case Sound.NoteInText(n, _) => n.name
       case Sound.Rest(_) => ""
-      case AudioEffect.Gain(v) => v.toString
-      case AudioEffect.Room(v) => v.toString
-      case AudioEffect.Pan(v) => v.toString
+      case AudioEffect.Gain(v,_) => v.toString
+      case AudioEffect.Room(v,_) => v.toString
+      case AudioEffect.Pan(v,_) => v.toString
       case _ => "unknown"
 
     val name = extractName(e.value)
