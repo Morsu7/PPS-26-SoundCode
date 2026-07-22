@@ -17,7 +17,12 @@ import scala.concurrent.duration.Duration
  * @param backend Il motore fisico (es. MIDI o synth) che esegue i comandi sonori.
  * @param onHighlightChange Callback invocata per informare la UI di quali porzioni di testo evidenziare.
  */
-class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Set[TextPosition] => Unit = _ => ()) {
+class AudioPlayer(
+    val tempo: Tempo,
+    backend: AudioBackend,
+    onHighlightChange: Set[TextPosition] => Unit = _ => (),
+    onActiveNotes: Seq[ActiveNote] => Unit = _ => ()
+) {
 
   private val loopResolutionMs = 1L
 
@@ -30,11 +35,17 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
   private var activeHighlights: Map[TextPosition, AbsoluteTime] = Map.empty
   private var currentHighlightSet: Set[TextPosition] = Set.empty
 
+  // Buffer delle note attualmente in suono, per i visualizzatori (es. oscilloscopio).
+  private var activeNotes: List[(ActiveNote, AbsoluteTime)] = Nil
+  private var currentNoteBuffer: Seq[ActiveNote] = Nil
+
   def updateTimeline(stream: LazyList[ScheduledEvent[AudioPayload]]): Unit =
     this.eventStream = stream
     this.firstTickTimeMs = None
     this.activeHighlights = Map.empty
+    this.activeNotes = Nil
     notifyHighlightsChanged()
+    notifyActiveNotesChanged()
 
   /** Avvia il thread di riproduzione in background. */
   def start(): Unit = if (!isRunning) {
@@ -54,7 +65,9 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
     isRunning = false
     thread.foreach(_.join())
     activeHighlights = Map.empty
+    activeNotes = Nil
     notifyHighlightsChanged()
+    notifyActiveNotesChanged()
 
   /** Avanza lo stato del player in base all'istante di tempo corrente.
    *
@@ -69,7 +82,9 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
     if firstTickTimeMs.isEmpty then firstTickTimeMs = Some(firstPerformance)
 
     val initialHighlights = activeHighlights
+    val initialNotes = activeNotes
     activeHighlights = activeHighlights.filter { case (_, expireAtMs) => expireAtMs > now }
+    activeNotes = activeNotes.filter { case (_, expireAtMs) => expireAtMs > now }
     val (toProcess, futureEvents) = eventStream.span { nextEvent =>
       val expectedTriggerMs = firstPerformance + tempo.offsetMs(nextEvent.part.start)
       now >= expectedTriggerMs
@@ -83,9 +98,14 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
 
       val newHighlights = allPayloads.flatMap(_.position).map { pos =>pos -> (now + durationMs)}
       activeHighlights = activeHighlights ++ newHighlights
+
+      ActiveNote.fromPayload(nextEvent.value, nextEvent.appliedExtensions).foreach { note =>
+        activeNotes = activeNotes :+ (note -> (now + durationMs))
+      }
     }
 
     if (activeHighlights != initialHighlights) notifyHighlightsChanged()
+    if (activeNotes != initialNotes) notifyActiveNotesChanged()
   }
 
   private def notifyHighlightsChanged(): Unit =
@@ -93,5 +113,11 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
     if newSet != currentHighlightSet then
       currentHighlightSet = newSet
       onHighlightChange(currentHighlightSet)
+
+  private def notifyActiveNotesChanged(): Unit =
+    val newBuffer = activeNotes.map(_._1)
+    if newBuffer != currentNoteBuffer then
+      currentNoteBuffer = newBuffer
+      onActiveNotes(newBuffer)
 
 }
