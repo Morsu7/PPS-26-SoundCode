@@ -18,7 +18,7 @@ class MidiBackendTest extends AnyFunSuite with Matchers:
     def playDrum(gmNote: Int, velocity: Int, durationMs: Long): Unit = drums = drums :+ (gmNote, durationMs)
     def close(): Unit = ()
 
-  private val pos = TextPosition(0, 0)
+  private val pos = Some(TextPosition(0, 0))
 
   test("una nota viene tradotta nel numero MIDI e suonata come playNote") {
     val engine = new RecordingEngine

@@ -155,15 +155,15 @@ object Interpreter {
     }
 
     private def interpretSoundAtom(atom: AST.Atom): Pattern[AudioPayload] = atom match {
-        case AST.Sample(value, startPos, endPos) => Pattern.Atom(Sound.SampleInText(Sample(value), TextPosition(startPos, endPos)))
+        case AST.Sample(value, startPos, endPos) => Pattern.Atom(Sound.SampleInText(Sample(value), Some(TextPosition(startPos, endPos))))
         case AST.Note(name, accidental, octave, startPos, endPos) =>
             val acc: Accidental = accidental match {
                 case Some("#") | Some("s") => Accidental.Sharp
                 case Some("b") => Accidental.Flat
                 case _ => Accidental.Natural
             }
-            Pattern.Atom(Sound.NoteInText(Note(name, acc, octave), TextPosition(startPos, endPos)))
-        case AST.Silence(startPos, endPos) => Pattern.Atom(Sound.Rest(TextPosition(startPos, endPos)))
+            Pattern.Atom(Sound.NoteInText(Note(name, acc, octave), Some(TextPosition(startPos, endPos))))
+        case AST.Silence(startPos, endPos) => Pattern.Atom(Sound.Rest(Some(TextPosition(startPos, endPos))))
         case _ => throw new IllegalArgumentException("Expected Sample or Note")
     }
 
