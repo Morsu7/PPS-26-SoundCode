@@ -43,48 +43,28 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
 
   def tick(now: AbsoluteTime): Unit = {
     if (firstTickTimeMs.isEmpty) firstTickTimeMs = Some(now.toLong)
-    //controllo per highLight
-    var highlightsChanged = false
-
-    val initialSize = activeHighlights.size
+    val initialHighlights = activeHighlights
     activeHighlights = activeHighlights.filter { case (_, expireAtMs) => expireAtMs > now.toLong }
-    if activeHighlights.size != initialSize then highlightsChanged = true
-    //-----------------------
-
-    var processing = true
-    while (eventStream.nonEmpty && processing) {
-      val nextEvent = eventStream.head
+    val (toProcess, futureEvents) = eventStream.span { nextEvent =>
       val expectedTriggerMs = firstTickTimeMs.get + tempo.offsetMs(nextEvent.part.start)
+      now.toLong >= expectedTriggerMs
+    }
+    eventStream = futureEvents
+    toProcess.filter(e => e.part.start == e.whole.start).foreach { nextEvent =>
+      val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
+      backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
 
-      if (now.toLong >= expectedTriggerMs) {
-        eventStream = eventStream.tail
-        if (nextEvent.part.start == nextEvent.whole.start) {
-          val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
-          backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
-          //aggiunta highLight
-          val allPayloads = nextEvent.value :: nextEvent.appliedExtensions
+      val allPayloads = nextEvent.value :: nextEvent.appliedExtensions
 
-          // Cicliamo su tutti i payload (principale + estensioni)
-          allPayloads.foreach { payload =>
-            val positionOpt = payload match
-              case Sound.NoteInText(_, pos) => Some(pos)
-              case Sound.SampleInText(_, pos) => Some(pos)
-              case Sound.Rest(pos) => Some(pos)
-              case _ => None // Ignora gli AudioEffect senza posizione
-
-            positionOpt.foreach { pos =>
-              activeHighlights = activeHighlights + (pos -> (now.toLong + durationMs))
-              highlightsChanged = true
-            }
-          }
-          //-----------------------
-        }
-      }else {
-        processing = false
+      val newHighlights = allPayloads.collect {
+        case Sound.NoteInText(_, pos) => pos -> (now.toLong + durationMs)
+        case Sound.SampleInText(_, pos) => pos -> (now.toLong + durationMs)
+        case Sound.Rest(pos) => pos -> (now.toLong + durationMs)
       }
+      activeHighlights = activeHighlights ++ newHighlights
     }
 
-    if highlightsChanged then notifyHighlightsChanged()
+    if (activeHighlights != initialHighlights) notifyHighlightsChanged()
   }
 
   private def notifyHighlightsChanged(): Unit =
