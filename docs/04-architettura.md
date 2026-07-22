@@ -43,23 +43,11 @@ Il flusso principale procede dal testo scritto dall'utente verso il backend audi
 | Motore MIDI | Produce concretamente note e percussioni tramite Java MIDI. |
 | Visualizzazioni | Rappresentano graficamente gli eventi mediante piano roll e oscilloscopio. |
 
-### Flusso principale di esecuzione
-
-1. L'utente modifica il programma nell'editor e richiede un aggiornamento.
-2. Il parser produce un AST oppure un errore con posizione nel testo.
-3. L'interprete converte l'AST in pattern appartenenti al dominio.
-4. I resolver e lo scheduler generano gli eventi temporali e le timeline necessarie alle viste.
-5. Il runtime aggiorna il modello e, di conseguenza, l'interfaccia.
-6. Durante la riproduzione, l'audio player invia gli eventi al backend MIDI rispettando il tempo configurato.
-7. Le notifiche del player ritornano al runtime per aggiornare le evidenziazioni nell'editor.
-
-Se il parsing del nuovo codice fallisce, le fasi successive non vengono eseguite. L'errore viene mostrato nella GUI, mentre la precedente timeline valida può continuare a essere riprodotta.
-
 ## Pattern architetturali
 
 ### Model-View-Update
 
-La gestione dell'interfaccia segue il pattern architetturale **Model--View--Update (MVU)**. I suoi elementi principali sono:
+La gestione dell'interfaccia segue il pattern architetturale **Model-View-Update (MVU)**. I suoi elementi principali sono:
 
 - **Model:** `AppModel` contiene lo stato osservabile dell'applicazione, come riproduzione, errori, timeline, visualizzatori e posizioni da evidenziare;
 - **View:** la GUI ScalaFX viene aggiornata a partire dal modello;
@@ -108,25 +96,6 @@ La separazione permette di modificare e verificare ciascuna fase con un impatto 
 
 Il tipo `Cmd` rappresenta esplicitamente gli effetti collaterali prodotti da una transizione MVU, come il parsing, l'aggiornamento della timeline e l'avvio o l'arresto della riproduzione. In questo modo la decisione di eseguire un'operazione rimane separata dalla sua esecuzione concreta.
 
-#### Composite
-
-I pattern musicali formano strutture ricorsive nelle quali elementi atomici possono essere combinati mediante sequenze, parallelismi, alternanze e trasformazioni temporali. Elementi semplici e composizioni complesse possono quindi essere trattati attraverso lo stesso modello astratto.
-
-#### Ports and Adapters
-
-Le astrazioni `AudioBackend` e `AudioEngine` costituiscono il confine tra il nucleo applicativo e l'infrastruttura audio. Il dominio non dipende direttamente da Java MIDI: il backend concreto può essere sostituito oppure simulato durante i test di scheduler e player.
-
-#### Strategy
-
-La risoluzione è suddivisa tra componenti specializzati, tra cui `AtomResolver`, `SequenceResolver`, `ParallelResolver`, `AlternationResolver`, `TimeWarpResolver` e `WithExtensionsResolver`. Ogni componente incapsula l'algoritmo relativo a una forma di pattern, mentre `PatternResolver` seleziona la strategia appropriata.
-
-## Distribuzione e concorrenza
-
-SoundCode non presenta componenti distribuiti: GUI, parser, interprete, scheduler e backend audio sono eseguiti localmente nello stesso processo JVM. Non sono presenti servizi remoti, protocolli di rete o comunicazioni tra nodi diversi.
-
-L'assenza di distribuzione non elimina tuttavia i vincoli di concorrenza. JavaFX richiede che gli aggiornamenti grafici siano eseguiti sul proprio application thread, mentre il ciclo di riproduzione deve procedere senza dipendere dal rendering della GUI. Le notifiche prodotte dall'audio player vengono quindi ricondotte al runtime MVU e inoltrate alla vista rispettando il modello di threading di JavaFX.
-
-Il backend può inoltre degradare a un comportamento privo di riproduzione quando il sintetizzatore MIDI non è disponibile. Gli errori dell'input vengono rappresentati nello stato applicativo, mentre i guasti infrastrutturali devono essere contenuti al confine del backend.
 
 ## Scelte tecnologiche rilevanti
 
@@ -141,22 +110,3 @@ Il backend può inoltre degradare a un comportamento privo di riproduzione quand
 | Strutture immutabili | Stato e dominio | Rendono prevedibili le trasformazioni e semplificano la verifica delle funzioni pure. |
 
 ScalaFX, RichTextFX e Java MIDI sono confinati ai livelli di presentazione e infrastruttura e non contaminano il modello del dominio.
-
-## Conseguenze delle scelte architetturali
-
-### Vantaggi
-
-- separazione chiara delle responsabilità;
-- dominio indipendente dalla GUI e dal backend MIDI;
-- transizioni di stato esplicite e verificabili;
-- possibilità di testare il motore senza un dispositivo audio reale;
-- rappresentazione naturale di pattern ricorsivi e potenzialmente infiniti;
-- sostituibilità delle implementazioni audio attraverso interfacce dedicate.
-
-### Limiti
-
-- applicazione legata all'ecosistema desktop JVM;
-- aggiornamenti grafici vincolati al thread JavaFX;
-- capacità sonore del backend MIDI inferiori rispetto a motori audio specializzati;
-- assenza di collaborazione remota o distribuzione della riproduzione;
-- necessità di coordinare il tempo della riproduzione con gli aggiornamenti della GUI.
