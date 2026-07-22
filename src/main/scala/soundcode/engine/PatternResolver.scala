@@ -21,4 +21,4 @@ object PatternResolver:
       case p @ Pattern.Parallel(_)            => ParallelResolver.resolve(p)
       case alt @ Pattern.Alternation(_)       => AlternationResolver.resolve(alt)
       case tw @ Pattern.TimeWarp(_, _)        => TimeWarpResolver.resolve(tw)
-      case p: Pattern.WithExtensions => WithExtensionsResolver.resolve(p)
+      case p: Pattern.WithExtensions          => WithExtensionsResolver.resolve(p)
