@@ -52,8 +52,15 @@ object Interpreter {
                     // Applichiamo il TimeWarp sopra il blocco precedente
                     (Pattern.TimeWarp(tw.modifier, baseWithEffects), List.empty, foundGen)
                     
-                case atom => 
-                    (currentBase, accEffects :+ atom, foundGen)
+                case effects: List[Pattern[AudioPayload]] => 
+                    (currentBase, accEffects ++ effects, foundGen)
+
+                case atom: Pattern[AudioPayload] =>
+                    (
+                        currentBase,
+                        accEffects :+ atom,
+                        foundGen
+                    )
                 }
 
             case _ => (currentBase, accEffects, foundGen)
@@ -65,15 +72,25 @@ object Interpreter {
         else Pattern.WithExtensions(finalBase, finalEffects)
     }
 
-    private def interpretAudioEffect(transBlock: AST.Transformations.TransformationBlock): Option[Pattern[AudioPayload]] = transBlock match{
-        case AST.Transformations.Gain(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
-        case AST.Transformations.Pan(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
-        case AST.Transformations.Room(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
-        case AST.Transformations.Delay(value, time, feedback) => Some(interpretPattern(value)(c => Atom(AudioEffect.Delay(c.value, ???, ???, TextPosition.some(c.startIndex, c.endIndex)))))
-        case AST.Transformations.LowPassFilter(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
-        case AST.Transformations.HighPassFilter(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+    private def interpretDelay(valueP: AST.Pattern[AST.Config], timeP: Option[AST.Pattern[AST.Config]], feedbackP: Option[AST.Pattern[AST.Config]]): List[Pattern[AudioEffect]] =
+        (
+            List(valueP -> AudioEffect.DelayVolume.apply) ++
+            timeP.map(_ -> AudioEffect.DelayTime.apply).toList ++
+            feedbackP.map(_ -> AudioEffect.DelayFeedback.apply).toList
+        ).map{ case (pattern, constructor) =>
+            interpretPattern(pattern)(c => Atom(constructor(c.value, TextPosition.some(c.startIndex, c.endIndex)))
+            )
+        }
 
-        case _ => None
+    private def interpretAudioEffect(transBlock: AST.Transformations.TransformationBlock): List[Pattern[AudioPayload]] = transBlock match{
+        case AST.Transformations.Gain(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.Pan(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.Room(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.Delay(value, time, feedback) => interpretDelay(value, time, feedback)
+        case AST.Transformations.LowPassFilter(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.HighPassFilter(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+
+        case _ => List.empty
     }
 
     private def interpretTimeWarp(transBlock: AST.Transformations.TransformationBlock): Option[PatternModifier[AudioPayload]] = transBlock match {
@@ -87,25 +104,32 @@ object Interpreter {
         case _ => None
     }
 
-    private def interpretInnerTransformation(basePattern: Pattern[AudioPayload])(transBlock: AST.Transformations.TransformationBlock): Pattern[AudioEffect] | PatternModifier[AudioPayload] = {
-        interpretAudioEffect(transBlock)
-        .map(_.asInstanceOf[Pattern[AudioEffect]])
-        .orElse(
-            interpretTimeWarp(transBlock)
-        )
-        .getOrElse(throw new IllegalArgumentException("Unknown transformation block"))
-    }
-
-    private def applyTransformation(basePattern: Pattern[AudioPayload], transBlock: AST.Transformations.TransformationBlock): Pattern[AudioPayload] = {
+    private def interpretInnerTransformation(basePattern: Pattern[AudioPayload])(transBlock: AST.Transformations.TransformationBlock): List[Pattern[AudioEffect]] | PatternModifier[AudioPayload] =
         interpretAudioEffect(transBlock) match {
-            case Some(effectPattern) => effectPattern
-            case None => interpretTimeWarp(transBlock) match {
+            case effects @ (_ :: _) => effects.asInstanceOf[List[Pattern[AudioEffect]]]
+            case List() => interpretTimeWarp(transBlock).getOrElse(throw new IllegalArgumentException("Unknown transformation block"))
+        }
+
+    private def applyTransformation(basePattern: Pattern[AudioPayload], transBlock: AST.Transformations.TransformationBlock): Pattern[AudioPayload] | List[Pattern[AudioPayload]] = {
+        interpretAudioEffect(transBlock) match {
+            case effects @ (_ :: _) => effects
+            case List() => interpretTimeWarp(transBlock) match {
                     case Some(modifier) => Pattern.TimeWarp(modifier, basePattern)
                     case None => transBlock match {
                         case AST.Transformations.Juxtaposition(transformations) =>
-                            Pattern.TimeWarp(PatternModifier.Juxtaposition(transformations.map(tb => interpretInnerTransformation(basePattern)(tb))), basePattern)
+                            Pattern.TimeWarp(PatternModifier.Juxtaposition(transformations.flatMap(tb => 
+                                interpretInnerTransformation(basePattern)(tb) match {
+                                    case effects: List[Pattern[AudioEffect]] => effects
+                                    case modifier: PatternModifier[AudioPayload] => List(modifier)
+                                }
+                            )), basePattern)
                         case AST.Transformations.Offset(offsetPattern, transformations) =>
-                            Pattern.TimeWarp(PatternModifier.Offset(interpretPattern(offsetPattern)(interpretConfigAtom), transformations.map(tb => interpretInnerTransformation(basePattern)(tb))), basePattern)
+                            Pattern.TimeWarp(PatternModifier.Offset(interpretPattern(offsetPattern)(interpretConfigAtom), transformations.flatMap(tb => 
+                                interpretInnerTransformation(basePattern)(tb) match {
+                                    case effects: List[Pattern[AudioEffect]] => effects
+                                    case modifier: PatternModifier[AudioPayload] => List(modifier)
+                                }
+                            )), basePattern)
                         case _ => throw new IllegalArgumentException("Unknown transformation block")
                 }
             }

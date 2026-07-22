@@ -117,7 +117,9 @@ enum AudioEffect extends AudioPayload:
   case Room(value: Double, position: Option[TextPosition] = None)
   case LowPass(value: Double, position: Option[TextPosition] = None)
   case HighPass(value: Double, position: Option[TextPosition] = None)
-  case Delay(volume: Double, time: Double, feedback: Double, position: Option[TextPosition] = None)
+  case DelayVolume(value: Double, position: Option[TextPosition] = None)
+  case DelayTime(value: Double, position: Option[TextPosition] = None)
+  case DelayFeedback(value: Double, position: Option[TextPosition] = None)
 
 enum PatternModifier[+T]:
   case Reverse
