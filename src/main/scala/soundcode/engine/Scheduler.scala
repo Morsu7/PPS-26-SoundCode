@@ -10,7 +10,7 @@ object SchedulerImpl extends Scheduler:
 
   def generateBoundedTimelines(patterns: List[Pattern[AudioPayload]]): List[Seq[ScheduledEvent[AudioPayload]]] =
     patterns.map { pat =>
-      val totalCycles = CycleCalculator.lengthOf(pat)
+      val totalCycles = pat.cycleLength
       (0 until totalCycles).flatMap{n =>
         given Interval = Interval(Fraction(n), Fraction(n + 1))
         pat.resolve

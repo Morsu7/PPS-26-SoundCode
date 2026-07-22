@@ -13,7 +13,3 @@ object PatternResolver:
       case alt @ Pattern.Alternation(_)       => AlternationResolver.resolve(alt)
       case tw @ Pattern.TimeWarp(_, _)        => TimeWarpResolver.resolve(tw)
       case p: Pattern.WithExtensions => WithExtensionsResolver.resolve(p)
-
-extension [T](pattern: Pattern[T])
-  def resolve(using timeWindow: Interval): List[ScheduledEvent[T]] =
-    PatternResolver.resolve(pattern)
