@@ -135,12 +135,19 @@ object SoundCodeLanguage:
 
   object Visualization:
     val Pianoroll = "_pianoroll"
+    val Oscilloscope = "_scope"
 
     val all: Vector[Construct] = Vector(
       Construct(
         Pianoroll,
         """_pianoroll()""",
         "Visualizes the pattern as a pianoroll",
+        ConstructKind.Visualization
+      ),
+      Construct(
+        Oscilloscope,
+        """_scope()""",
+        "Visualizes the pattern as an oscilloscope",
         ConstructKind.Visualization
       )
     )

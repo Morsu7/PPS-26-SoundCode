@@ -13,5 +13,6 @@ object Update:
       case Msg.PlaybackTick(currentBeat) => (model, NoOp)
       case Msg.UpdateHighlightText(positions) => (model.copy(positions = positions), NoOp)
       case Msg.UpdateTimelines(timelines, visualizers) => (model.copy(visualizers = visualizers, timelines = timelines, timelineRevision = model.timelineRevision + 1), NoOp)
+      case Msg.ActiveNotesChanged(notes) => (model.copy(activeNotes = notes), Cmd.NoOp)
       case Msg.ErrorDismissed => (model.copy(errors = None), NoOp)
       case _ => (model, NoOp)

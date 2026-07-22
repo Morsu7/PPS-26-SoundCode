@@ -2,6 +2,7 @@ package soundcode.mvu
 
 import soundcode.domain.Tempo
 import soundcode.engine.*
+import scalafx.application.Platform
 
 class SoundCodeRuntime(
     initialModel: AppModel,
@@ -14,7 +15,14 @@ class SoundCodeRuntime(
     initialModel.tempo,
     backend,
     positions => {
-      dispatch(Msg.UpdateHighlightText(positions))
+      Platform.runLater {
+        dispatch(Msg.UpdateHighlightText(positions))
+      }
+    },
+    notes => {
+      Platform.runLater {
+        dispatch(Msg.ActiveNotesChanged(notes))
+      }
     }
   )
 

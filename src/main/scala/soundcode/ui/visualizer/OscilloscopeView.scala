@@ -4,21 +4,31 @@ import scalafx.scene.canvas.GraphicsContext
 import scalafx.scene.paint.Color
 import soundcode.ui.UITheme
 import soundcode.domain.Tempo
+import soundcode.engine.ActiveNote
 
 final class OscilloscopeView(
     tempo: Tempo
 ) extends CanvasAnimatedView(tempo):
 
+  private var activeNotes: Seq[ActiveNote] = Seq.empty
+
+  def updateNotes(notes: Seq[ActiveNote]): Unit =
+    activeNotes = notes
+
   override protected def draw(
       gc: GraphicsContext,
-      currentBeat: Double,
+      currentCycle: Double,
       w: Double,
       h: Double
   ): Unit =
     drawBaseline(gc, w, h)
-    drawWaveform(gc, currentBeat, w, h)
+    drawWaveform(gc, currentCycle, w, h)
 
-  private def drawBaseline(gc: GraphicsContext, w: Double, h: Double): Unit =
+  private def drawBaseline(
+      gc: GraphicsContext,
+      w: Double,
+      h: Double
+  ): Unit =
     val centerY = h * 0.5
 
     gc.stroke = Color.web(UITheme.VisualizerLine)
@@ -27,29 +37,50 @@ final class OscilloscopeView(
 
   private def drawWaveform(
       gc: GraphicsContext,
-      currentBeat: Double,
+      currentCycle: Double,
       w: Double,
       h: Double
   ): Unit =
-    val samples = 256
-    val visibleCycles = w / pixelsPerCycle
+    val samples = 512
+    val windowSeconds = 0.080
+    val elapsedSeconds = currentCycle / tempo.cps
     val centerY = h * 0.5
-    var amplitude = (h - config.verticalPadding * 2) * 0.38
+    val heightScale =
+      (h - config.verticalPadding * 2) * 0.30
 
     gc.stroke = Color.web(UITheme.Foreground)
     gc.lineWidth = 2
     gc.beginPath()
 
     for sample <- 0 until samples do
-      val progress = sample.toDouble / (samples - 1)
-      val beat = currentBeat + progress * visibleCycles
+      val progress =
+        sample.toDouble / (samples - 1)
+
+      val timeSeconds =
+        elapsedSeconds + progress * windowSeconds
+
+      val rawSignal = signalAt(timeSeconds)
+
+      // Solo adattamento grafico per mantenere il segnale nel canvas.
+      val displayedSignal = Math.tanh(rawSignal)
+
       val x = progress * w
-      val y = centerY + signalAt(beat) * amplitude
+      val y = centerY - displayedSignal * heightScale
 
       if sample == 0 then gc.moveTo(x, y)
       else gc.lineTo(x, y)
 
     gc.stroke()
 
-  private def signalAt(beat: Double): Double =
-    Math.sin(beat * 2 * Math.PI) * 0.5 + Math.sin(beat * 4 * Math.PI) * 0.25
+  private def signalAt(timeSeconds: Double): Double =
+    activeNotes.iterator
+      .map { note =>
+        note.amplitude *
+          Math.sin(
+            2.0 *
+              Math.PI *
+              note.frequencyHz *
+              timeSeconds
+          )
+      }
+      .sum

@@ -20,6 +20,7 @@ import soundcode.domain.Tempo
 import soundcode.domain.VisualizerRequest
 import soundcode.domain.VisualizerKind
 import soundcode.ui.visualizer.PianorollView
+import soundcode.ui.visualizer.OscilloscopeView
 
 object BlockEditorView:
   private final case class EditorParagraphStyle(
@@ -278,6 +279,13 @@ final class BlockEditorView(
       visualizersState = Some(nextVisualizersState)
       playbackHighlightsEnabled = true
 
+    anchoredVisualizers.foreach {
+      case AnchoredVisualizer(_, oscilloscope: OscilloscopeView) =>
+        oscilloscope.updateNotes(state.activeNotes)
+
+      case _ => ()
+    }
+
     renderHighlights(state)
 
   def currentCode: String =
@@ -385,7 +393,8 @@ final class BlockEditorView(
               case VisualizerKind.PianoRoll =>
                 new PianorollView(timeline, nextState.tempo)
 
-              case VisualizerKind.Oscilloscope => ???
+              case VisualizerKind.Oscilloscope =>
+                new OscilloscopeView(nextState.tempo)
 
           AnchoredVisualizer(
             anchorOffset = request.sourceOffset,
