@@ -154,4 +154,32 @@ class InterpreterFunSuite extends AnyFunSuite {
             case other => fail(s"Expected TimeWarp, but found $other")
         }
     }
+
+    test("interpret delay transformation with parameters") {
+        val streams = interpret("note(\"c#\").delay(\"5\", \"2\", \"0.5\")")
+        
+        inside(streams.head) {
+            case Pattern.WithExtensions(base, extensions) =>
+                extensions should have size 3
+
+                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.DelayVolume(5.0, _)) => }
+                extensions(1) should matchPattern { case Pattern.Atom(AudioEffect.DelayTime(2.0, _)) => }
+                extensions(2) should matchPattern { case Pattern.Atom(AudioEffect.DelayFeedback(0.5, _)) => }
+                
+            case other => fail(s"Expected WithExtensions, but found $other")
+        }
+    }
+
+    test("interpret delay transformation with only volume parameter") {
+        val streams = interpret("note(\"c#\").delay(\"5\")")
+        
+        inside(streams.head) {
+            case Pattern.WithExtensions(base, extensions) =>
+                extensions should have size 1
+
+                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.DelayVolume(5.0, _)) => }
+                
+            case other => fail(s"Expected WithExtensions, but found $other")
+        }
+    }
 }
