@@ -4,58 +4,16 @@ import soundcode.domain.*
 import soundcode.engine.resolvers.*
 
 object PatternResolver:
-  def resolve[T](pattern: Pattern[T], timeWindow: Interval): List[ScheduledEvent[T]] =
+  def resolve[T](pattern: Pattern[T])(using timeWindow: Interval): List[ScheduledEvent[T]] =
     if timeWindow.start >= timeWindow.end then Nil
     else pattern match
-      case a @ Pattern.Atom(_)                => AtomResolver.resolve(a, timeWindow)
-      case s @ Pattern.Sequence(_)            => SequenceResolver.resolve(s, timeWindow)
-      case p @ Pattern.Parallel(_)            => ParallelResolver.resolve(p, timeWindow)
-      case alt @ Pattern.Alternation(_)       => AlternationResolver.resolve(alt, timeWindow)
-      case tw @ Pattern.TimeWarp(_, _)        => TimeWarpResolver.resolve(tw, timeWindow)
-      case p: Pattern.WithExtensions => WithExtensionsResolver.resolve(p, timeWindow)
+      case a @ Pattern.Atom(_)                => AtomResolver.resolve(a)
+      case s @ Pattern.Sequence(_)            => SequenceResolver.resolve(s)
+      case p @ Pattern.Parallel(_)            => ParallelResolver.resolve(p)
+      case alt @ Pattern.Alternation(_)       => AlternationResolver.resolve(alt)
+      case tw @ Pattern.TimeWarp(_, _)        => TimeWarpResolver.resolve(tw)
+      case p: Pattern.WithExtensions => WithExtensionsResolver.resolve(p)
 
 extension [T](pattern: Pattern[T])
-  def resolve(timeWindow: Interval): List[ScheduledEvent[T]] =
-    PatternResolver.resolve(pattern, timeWindow)
-
-
-/*package soundcode.engine
-
-import soundcode.domain.*
-import soundcode.engine.resolvers.given
-import scala.deriving.Mirror
-import scala.compiletime.{erasedValue, summonInline}
-import scala.reflect.ClassTag
-
-trait PatternResolver[P]:
-  def resolve[T](pattern: P, timeWindow: Interval): List[ScheduledEvent[T]]
-
-object PatternResolver:
-
-  private inline def summonAll[Elems <: Tuple]: List[(Class[?], PatternResolver[Any])] =
-    inline erasedValue[Elems] match
-      case _: EmptyTuple => Nil
-      case _: (h *: t) =>
-        val resolver  = summonInline[PatternResolver[h]].asInstanceOf[PatternResolver[Any]]
-        val classTag  = summonInline[ClassTag[h]]
-        (classTag.runtimeClass, resolver) :: summonAll[t]
-
-  private inline def buildRegistry(using m: Mirror.SumOf[Pattern[Any]]): Map[Class[?], PatternResolver[Any]] =
-    summonAll[m.MirroredElemTypes].toMap
-
-  private val registry: Map[Class[?], PatternResolver[Any]] = buildRegistry
-
-  private def lookup(pattern: Any): PatternResolver[Any] =
-    registry.getOrElse(
-      pattern.getClass,
-      throw new NoSuchElementException(s"Nessun PatternResolver registrato per ${pattern.getClass.getSimpleName}")
-    )
-
-  given dispatcher: PatternResolver[Pattern[?]] with
-    def resolve[T](pattern: Pattern[?], timeWindow: Interval): List[ScheduledEvent[T]] =
-      lookup(pattern).resolve(pattern, timeWindow)
-
-extension [T](pattern: Pattern[T])
-  def resolve(timeWindow: Interval)(using res: PatternResolver[Pattern[?]]): List[ScheduledEvent[T]] =
-    if timeWindow.start >= timeWindow.end then Nil
-    else res.resolve(pattern, timeWindow)*/
+  def resolve(using timeWindow: Interval): List[ScheduledEvent[T]] =
+    PatternResolver.resolve(pattern)

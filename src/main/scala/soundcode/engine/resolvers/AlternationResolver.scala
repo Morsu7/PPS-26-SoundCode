@@ -3,7 +3,7 @@ import soundcode.domain.*
 import soundcode.engine.*
 
 object AlternationResolver:
-  def resolve[T](pattern: Pattern.Alternation[T], timeWindow: Interval): List[ScheduledEvent[T]] =
+  def resolve[T](pattern: Pattern.Alternation[T])(using timeWindow: Interval): List[ScheduledEvent[T]] =
     val elements = pattern.elements
     if elements.isEmpty then return Nil
 
@@ -12,9 +12,10 @@ object AlternationResolver:
       Interval(cycleStart, cycleStart + 1).intersect(timeWindow).toList.flatMap { activeWindow =>
         val activeIndex = (cycle.abs % elements.size).toInt
         val timeOffset = Fraction(cycle - (cycle / elements.size))
-
+        val shiftedWindow = activeWindow.map(_ - timeOffset)
+        
         elements(activeIndex)
-          .resolve(activeWindow.map(_ - timeOffset))
+          .resolve(using shiftedWindow)
           .map(_.mapTime(_ + timeOffset))
       }
 
