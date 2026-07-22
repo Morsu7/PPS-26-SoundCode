@@ -7,11 +7,11 @@ object PatternResolver:
   def resolve[T](pattern: Pattern[T], timeWindow: Interval): List[ScheduledEvent[T]] =
     if timeWindow.start >= timeWindow.end then Nil
     else pattern match
-      case p: Pattern.Atom[_]        => AtomResolver.resolve(p.asInstanceOf[Pattern.Atom[T]], timeWindow)
-      case p: Pattern.Sequence[_]    => SequenceResolver.resolve(p.asInstanceOf[Pattern.Sequence[T]], timeWindow)
-      case p: Pattern.Parallel[_]    => ParallelResolver.resolve(p.asInstanceOf[Pattern.Parallel[T]], timeWindow)
-      case p: Pattern.Alternation[_] => AlternationResolver.resolve(p.asInstanceOf[Pattern.Alternation[T]], timeWindow)
-      case p: Pattern.TimeWarp[_]    => TimeWarpResolver.resolve(p.asInstanceOf[Pattern.TimeWarp[T]], timeWindow)
+      case a @ Pattern.Atom(_)                => AtomResolver.resolve(a, timeWindow)
+      case s @ Pattern.Sequence(_)            => SequenceResolver.resolve(s, timeWindow)
+      case p @ Pattern.Parallel(_)            => ParallelResolver.resolve(p, timeWindow)
+      case alt @ Pattern.Alternation(_)       => AlternationResolver.resolve(alt, timeWindow)
+      case tw @ Pattern.TimeWarp(_, _)        => TimeWarpResolver.resolve(tw, timeWindow)
       case p: Pattern.WithExtensions => WithExtensionsResolver.resolve(p, timeWindow)
 
 extension [T](pattern: Pattern[T])
