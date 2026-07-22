@@ -8,7 +8,7 @@ object Transformations {
     case class Gain(pattern: Pattern[Config]) extends TransformationBlock
     case class Pan(pattern: Pattern[Config]) extends TransformationBlock
     case class Room(pattern: Pattern[Config]) extends TransformationBlock
-    case class Delay(pattern: Pattern[Config]) extends TransformationBlock
+    case class Delay(pattern: Pattern[Config], timePattern: Option[Pattern[Config]], feedbackPattern: Option[Pattern[Config]]) extends TransformationBlock
     case class LowPassFilter(pattern: Pattern[Config]) extends TransformationBlock
     case class HighPassFilter(pattern: Pattern[Config]) extends TransformationBlock
 

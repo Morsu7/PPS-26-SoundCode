@@ -99,6 +99,9 @@ object Sample:
 // ==========================================
 
 case class TextPosition(startIndex: Int, endIndex: Int)
+object TextPosition:
+    def some(startIndex: Int, endIndex: Int): Option[TextPosition] =
+      Some(TextPosition(startIndex, endIndex))
 
 sealed trait AudioPayload:
   def position: Option[TextPosition]

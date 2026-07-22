@@ -503,4 +503,29 @@ class SoundCodeParserSuite extends AnyFunSuite with BeforeAndAfterAll {
         
         assert(noteElement.atom.isInstanceOf[Note | Silence])
     }
+
+    test("parsing delay with one and three parameters"){
+        val input = "sound(\"bd\").delay(\"0.5\")\nsound(\"hh\").delay(\"0.3\", \"0.2\", \"1.0\").delay(\"3.0\",\"2.0\",\"1.0\")"
+        val result = parse(input)
+        
+        assert(result.isInstanceOf[Right[?, ?]])
+        val program = result.value
+
+        val stream1 = program.blocks(0).asInstanceOf[StreamBlock]
+        val delayBlock1 = stream1.extensions.head.asInstanceOf[TransformationExtensionBlock].block.asInstanceOf[Delay]
+        assert(delayBlock1.timePattern.isEmpty)
+        assert(delayBlock1.feedbackPattern.isEmpty)
+
+        val stream2 = program.blocks(1).asInstanceOf[StreamBlock]
+        val delayBlock2 = stream2.extensions.head.asInstanceOf[TransformationExtensionBlock].block.asInstanceOf[Delay]
+        assert(delayBlock2.timePattern.isDefined)
+        assert(delayBlock2.feedbackPattern.isDefined)
+    }
+
+    test("parsing failure for delay with two parameters") {
+        val input = "sound(\"bd\").delay(\"0.5\", \"0.2\")"
+        val result = parse(input)
+        
+        assert(result.isInstanceOf[Left[?, ?]])
+    }
 }

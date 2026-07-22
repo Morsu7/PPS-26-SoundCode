@@ -58,7 +58,7 @@ object ASTPrinter {
           case Gain(p)            => formatTransWithParam("gain", p, nextIndent, indent, marker)
           case Pan(p)             => formatTransWithParam("pan", p, nextIndent, indent, marker)
           case Room(p)            => formatTransWithParam("room", p, nextIndent, indent, marker)
-          case Delay(p)           => formatTransWithParam("delay", p, nextIndent, indent, marker)
+          case Delay(p, t, f)     => formatTransWithParam("delay", List(p) ++ t.toList ++ f.toList, nextIndent, indent, marker)
           case LowPassFilter(p)   => formatTransWithParam("lpf", p, nextIndent, indent, marker)
           case HighPassFilter(p)  => formatTransWithParam("hpf", p, nextIndent, indent, marker)
           case FastForward(p)     => formatTransWithParam("fast", p, nextIndent, indent, marker)
@@ -90,7 +90,15 @@ object ASTPrinter {
   }
 
   private def formatTransWithParam(name: String, pat: Pattern[Config], nextIndent: String, indent: String, marker: String): String = {
-    s"$indent${marker}TransformationBlock: .$name(...)\n${formatPattern(pat, nextIndent, isLast = true)}"
+    formatTransWithParam(name, List(pat), nextIndent, indent, marker)
+  }
+
+  private def formatTransWithParam(name: String, pats: List[Pattern[Config]], nextIndent: String, indent: String, marker: String): String = {
+    val formatted = pats.zipWithIndex.map { case (pat, idx) =>
+      formatPattern(pat, nextIndent, isLast = idx == pats.size - 1)
+    }.mkString("\n")
+
+    s"$indent${marker}TransformationBlock: .$name(...)\n$formatted"
   }
 
   private def formatPattern[A <: Atom](pat: Pattern[A], indent: String, isLast: Boolean): String = {

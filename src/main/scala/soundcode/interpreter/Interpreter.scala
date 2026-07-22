@@ -66,12 +66,12 @@ object Interpreter {
     }
 
     private def interpretAudioEffect(transBlock: AST.Transformations.TransformationBlock): Option[Pattern[AudioPayload]] = transBlock match{
-        case AST.Transformations.Gain(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value))))
-        case AST.Transformations.Pan(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value))))
-        case AST.Transformations.Room(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value))))
-        case AST.Transformations.Delay(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Delay(c.value, c.value, c.value))))
-        case AST.Transformations.LowPassFilter(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value))))
-        case AST.Transformations.HighPassFilter(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value))))
+        case AST.Transformations.Gain(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.Pan(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.Room(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.Delay(value, time, feedback) => Some(interpretPattern(value)(c => Atom(AudioEffect.Delay(c.value, ???, ???, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.LowPassFilter(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.HighPassFilter(pattern) => Some(interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
 
         case _ => None
     }

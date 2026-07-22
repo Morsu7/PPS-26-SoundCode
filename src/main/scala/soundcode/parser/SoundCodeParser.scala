@@ -38,8 +38,8 @@ class SoundCodeParser {
 
   private def extensionBlock(using P[?]): P[ExtensionBlock] =
     P(
-      generativeBlock.map(GenerativeExtensionBlock.apply) | transformationBlock
-        .map(TransformationExtensionBlock.apply)
+      generativeBlock.map(GenerativeExtensionBlock.apply) 
+      | transformationBlock.map(TransformationExtensionBlock.apply)
     )
 
   private def visualizerBlock(using P[?]): P[VisualizerBlock] =
@@ -116,13 +116,14 @@ class SoundCodeParser {
   private def inlineTransformation(using P[?]): P[TransformationBlock] = P(
     gain | pan | room | delay | lowPassFilter | highPassFilter |
       fastForward | slowMotion | early | late | reverse | repetition
-  ).opaque("an inline transformation")
+  )
 
   private def transformationBlock(using P[?]): P[TransformationBlock] =
     P(
       inlineTransformation
         | offset
         | juxtaposition
+        | unknownTransformationFallback
     )
 
   private def unknownExtension(using P[?]): P[Unknown] = P(
@@ -150,12 +151,46 @@ class SoundCodeParser {
       ) ~ ws ~ ")"
     ).map(Room.apply)
 
+  /*private def delay(using P[?]): P[Delay] =
+    P(
+      SoundCodeLanguage.Transformation.Delay ~/
+      "(" ~ ws ~
+      wrappedPattern(configAtom) ~/
+      (
+        ws ~ "," ~/ ws ~ wrappedPattern(configAtom) ~
+        ws ~ "," ~/ ws ~ wrappedPattern(configAtom)
+      ).? ~
+      ws ~ ")"
+    ).map {
+      case (value, Some((time, feedback))) =>
+        Delay(value, Some(time), Some(feedback))
+      case (value, None) =>
+        Delay(value, None, None)
+    }*/
+
   private def delay(using P[?]): P[Delay] =
     P(
-      SoundCodeLanguage.Transformation.Delay ~/ "(" ~ ws ~ wrappedPattern(
-        configAtom
-      ) ~ ws ~ ")"
-    ).map(Delay.apply)
+      SoundCodeLanguage.Transformation.Delay ~/
+      "(" ~/ ws ~
+      wrappedPattern(configAtom) ~/
+      (
+        // Ramo 1: Nessun altro parametro, chiude subito la tonda
+        (ws ~ ")").map(_ => None)
+        |
+        // Ramo 2: Trova una virgola, quindi ESIGE che ci siano tempo e feedback
+        (
+          ws ~ "," ~/ ws ~ wrappedPattern(configAtom) ~/
+          (ws ~ ",").opaque("\",\" (il metodo delay richiede esattamente 1 o 3 parametri)") ~/
+          ws ~ wrappedPattern(configAtom) ~ 
+          ws ~ ")"
+        ).map(Some(_))
+      )
+    ).map {
+      case (value, Some((time, feedback))) =>
+        Delay(value, Some(time), Some(feedback))
+      case (value, None) =>
+        Delay(value, None, None)
+    }
 
   private def lowPassFilter(using P[?]): P[LowPassFilter] =
     P(
@@ -229,6 +264,13 @@ class SoundCodeParser {
     ).map { case (offsetPattern, transSeq) =>
       Offset(offsetPattern, transSeq.toList)
     }
+
+  // Fallback per catturare qualsiasi trasformazione che non esiste
+  private def unknownTransformationFallback(using P[?]): P[TransformationBlock] =
+    P(identifier.! ~/ Pass).flatMap { name =>
+      Pass.filter(_ => false).opaque(s"a valid transformation. '$name' is not recognized.")
+    }.map(_ => null.asInstanceOf[TransformationBlock]) // Non arriverà mai qui perché fallisce prima
+
   /*
     ---------- ATOMS PARSER ----------
    */
