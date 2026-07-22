@@ -42,11 +42,14 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
     notifyHighlightsChanged()
 
   def tick(now: AbsoluteTime): Unit = {
-    if (firstTickTimeMs.isEmpty) firstTickTimeMs = Some(now.toLong)
+
+    val firstPerformance = firstTickTimeMs.getOrElse(now.toLong)
+    if firstTickTimeMs.isEmpty then firstTickTimeMs = Some(firstPerformance)
+
     val initialHighlights = activeHighlights
     activeHighlights = activeHighlights.filter { case (_, expireAtMs) => expireAtMs > now.toLong }
     val (toProcess, futureEvents) = eventStream.span { nextEvent =>
-      val expectedTriggerMs = firstTickTimeMs.get + tempo.offsetMs(nextEvent.part.start)
+      val expectedTriggerMs = firstPerformance + tempo.offsetMs(nextEvent.part.start)
       now.toLong >= expectedTriggerMs
     }
     eventStream = futureEvents
