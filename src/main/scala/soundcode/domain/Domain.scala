@@ -1,6 +1,8 @@
 package soundcode.domain
 
 import scala.annotation.tailrec
+import scala.collection.immutable.ListMap
+import scala.collection.mutable
 
 // ==========================================
 // TIPI BASE E TEMPORALI
@@ -105,6 +107,17 @@ object TextPosition:
 
 sealed trait AudioPayload:
   def position: Option[TextPosition]
+
+object AudioPayload:
+  private def kind(p: AudioPayload): (Int, Int) = p match
+    case s: Sound       => (0, s.ordinal)
+    case e: AudioEffect => (1, e.ordinal)
+
+  extension (base: List[AudioPayload])
+    def overriddenBy(incoming: List[AudioPayload]): List[AudioPayload] =
+      (base ++ incoming)
+        .foldLeft(ListMap.empty[(Int, Int), AudioPayload])((m, p) => m + (kind(p) -> p))
+        .values.toList
 
 enum Sound extends AudioPayload:
   case NoteInText(note: Note, position: Option[TextPosition] = None)

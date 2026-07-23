@@ -1,67 +1,64 @@
 package soundcode.engine.pattern
 
-import soundcode.engine.support.SchedulerTestBase
-import soundcode.domain.*
 import soundcode.engine.support.*
+import soundcode.engine.support.given_Conversion_Fraction_Pattern
 
 class OffsetModifierTest extends SchedulerTestBase {
 
-
   test("""sound("bd hh").off(1/4)""") {
-    val streams = List(seq(bd, hh).off(1 \ 4))
+    val pattern = seq(bd, hh).off(1 \ 4)
 
-    assertCycleUnordered(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 2),
-      ExpEvent("hh", 1 \ 2, 1 \ 1),
-      ExpEvent("hh", 0 \ 1, 1 \ 4),
-      ExpEvent("bd", 1 \ 4, 3 \ 4),
-      ExpEvent("hh", 3 \ 4, 1 \ 1)
+    check(pattern).inCycleUnordered(0)(
+      ExpectedEvent("bd", 0 -> (1\2)),
+      ExpectedEvent("hh", (1\2) -> 1),
+      ExpectedEvent("hh", 0 -> (1\4), whole = (-1\4) -> (1\4)), // Se c'è un whole tagliato a cavallo, lo specifichiamo; altrimenti se è interno o standard usiamo le frazioni corrette
+      ExpectedEvent("bd", (1\4) -> (3\4)),
+      ExpectedEvent("hh", (3\4) -> 1, whole = (3\4) -> (5\4))
     )
   }
 
   test("""sound("bd hh").off(1/4, rev)""") {
-    val streams = List(seq(bd, hh).off(1 \ 4, rev))
+    val pattern = seq(bd, hh).off(1 \ 4, rev)
 
-    assertCycleUnordered(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 2),
-      ExpEvent("hh", 1 \ 2, 1 \ 1),
-      ExpEvent("bd", 0 \ 1, 1 \ 4),
-      ExpEvent("hh", 1 \ 4, 3 \ 4),
-      ExpEvent("bd", 3 \ 4, 1 \ 1)
+    check(pattern).inCycleUnordered(0)(
+      ExpectedEvent("bd", 0 -> (1\2)),
+      ExpectedEvent("hh", (1\2) -> 1),
+      ExpectedEvent("bd", 0 -> (1\4), whole = (-1\4) -> (1\4)),
+      ExpectedEvent("hh", (1\4) -> (3\4)),
+      ExpectedEvent("bd", (3\4) -> 1, whole = (3\4) -> (5\4))
     )
   }
 
   test("""sound("bd hh").off(1/4, gain(0.5))""") {
-    val streams = List(seq(bd, hh).off(1 \ 4, gain(0.5)))
+    val pattern = seq(bd, hh).off(1 \ 4, gain(0.5))
 
-    assertCycleUnordered(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 2),
-      ExpEvent("hh", 1 \ 2, 1 \ 1),
-      ExpEvent("hh", 0 \ 1, 1 \ 4, List("0.5")),
-      ExpEvent("bd", 1 \ 4, 3 \ 4, List("0.5")),
-      ExpEvent("hh", 3 \ 4, 1 \ 1, List("0.5"))
+    check(pattern).inCycleUnordered(0)(
+      ExpectedEvent("bd", 0 -> (1\2)),
+      ExpectedEvent("hh", (1\2) -> 1),
+      ExpectedEvent("hh", 0 -> (1\4), whole = (-1\4) -> (1\4), effects = List("0.5")),
+      ExpectedEvent("bd", (1\4) -> (3\4), effects = List("0.5")),
+      ExpectedEvent("hh", (3\4) -> 1, whole = (3\4) -> (5\4), effects = List("0.5"))
     )
   }
 
   test("""sound("bd hh").off("<1/4 1/2>")""") {
-    val offsetPattern = alt(num(0.25), num(0.5))
-    val streams = List(seq(bd, hh).off(offsetPattern))
+    // Usiamo il nostro alt o pattern per l'offset dinamico
+    val offsetPattern = alt(1 \ 4, 1 \ 2)
+    val pattern = seq(bd, hh).off(offsetPattern)
 
-
-    assertCycleUnordered(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 2),
-      ExpEvent("hh", 1 \ 2, 1 \ 1),
-      ExpEvent("hh", 0 \ 1, 1 \ 4),
-      ExpEvent("bd", 1 \ 4, 3 \ 4),
-      ExpEvent("hh", 3 \ 4, 1 \ 1)
+    check(pattern).inCycleUnordered(0)(
+      ExpectedEvent("bd", 0 -> (1\2)),
+      ExpectedEvent("hh", (1\2) -> 1),
+      ExpectedEvent("hh", 0 -> (1\4), whole = (-1\4) -> (1\4)),
+      ExpectedEvent("bd", (1\4) -> (3\4)),
+      ExpectedEvent("hh", (3\4) -> 1, whole = (3\4) -> (5\4))
     )
 
-
-    assertCycleUnordered(streams, 1)(
-      ExpEvent("bd", 1 \ 1, 3 \ 2),
-      ExpEvent("hh", 3 \ 2, 2 \ 1),
-      ExpEvent("hh", 1 \ 1, 3 \ 2),
-      ExpEvent("bd", 3 \ 2, 2 \ 1)
+    check(pattern).inCycleUnordered(1)(
+      ExpectedEvent("bd", 1 -> (3\2)),
+      ExpectedEvent("hh", (3\2) -> 2),
+      ExpectedEvent("hh", 1 -> (3\2)),
+      ExpectedEvent("bd", (3\2) -> 2)
     )
   }
 }

@@ -17,11 +17,18 @@ object SequenceResolver:
       slotStart = cycleStart + (step * index)
       slot = Interval(slotStart, slotStart + step)
 
-      overlap <- slot.intersect(timeWindow).toList
+      /*overlap <- slot.intersect(timeWindow).toList
       zoomedInWindow = overlap.map(t => (t - slotStart) * n + cycleStart)
 
       childEvent <- element.resolve(using zoomedInWindow)
 
+      finalEvent <- childEvent
+        .mapTime(t => ((t - cycleStart) / n) + slotStart)
+        .clipTo(overlap)
+        .toList*/
+      overlap <- slot.intersect(timeWindow).toList
+      zoomedFullWindow = slot.map(t => (t - slotStart) * n + cycleStart)   // slot, NON overlap
+      childEvent <- element.resolve(using zoomedFullWindow)
       finalEvent <- childEvent
         .mapTime(t => ((t - cycleStart) / n) + slotStart)
         .clipTo(overlap)

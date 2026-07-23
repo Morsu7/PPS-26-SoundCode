@@ -9,5 +9,6 @@ object WithExtensionsResolver:
         .flatMap(ext => ext.resolve(using baseEvent.part))
         .filter(e => e.part.start <= baseEvent.part.start && e.part.end > baseEvent.part.start)
         .map(_.value)
-      baseEvent.copy(appliedExtensions = baseEvent.appliedExtensions ++ activeExts)
+
+      baseEvent.copy(appliedExtensions = baseEvent.appliedExtensions.overriddenBy(activeExts))
     }
