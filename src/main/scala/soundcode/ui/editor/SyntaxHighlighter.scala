@@ -19,6 +19,12 @@ object SyntaxHighlighter:
   def applyTo(area: GenericStyledArea[?, ?, String]): Unit =
     applySyntaxHighlighting(area)
 
+  def applyTo(
+      area: GenericStyledArea[?, ?, String],
+      paragraphIndex: Int
+  ): Unit =
+    applyToParagraph(area, paragraphIndex)
+
   private def applySyntaxHighlighting(
       area: EditorArea
   ): Unit =
