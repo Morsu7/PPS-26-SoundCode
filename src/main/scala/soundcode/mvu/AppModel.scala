@@ -7,7 +7,7 @@ final case class AppModel(
     timelines: List[Seq[ScheduledEvent[AudioPayload]]] = List.empty,
     visualizers: List[VisualizerRequest] = List.empty,
     errors: Option[String] = None,
-    tempo: Tempo = Tempo(0.5),
+    tempo: Tempo = Tempo.default,
     isPlaying: Boolean = false,
     timelineRevision: Long = 0L
 )
