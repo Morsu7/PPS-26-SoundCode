@@ -4,6 +4,7 @@ import org.fxmisc.richtext.InlineCssTextArea
 import org.scalatest.prop.TableDrivenPropertyChecks
 import soundcode.domain.TextPosition
 import soundcode.ui.editor.SyntaxHighlighter
+import soundcode.ui.theme.UITheme
 
 class SyntaxHighlighterSpec
     extends UITestSupport

@@ -9,8 +9,7 @@ import scalafx.Includes.jfxNode2sfx
 import scalafx.application.Platform
 import scalafx.scene.layout.StackPane
 import soundcode.mvu.AppModel
-import soundcode.ui.UITheme
-import soundcode.ui.visualizer.AnimatedView
+import soundcode.ui.theme.UITheme
 
 import java.util.function.{BiConsumer, Function}
 import scala.jdk.CollectionConverters.*
@@ -18,8 +17,6 @@ import soundcode.domain.ScheduledEvent
 import soundcode.domain.AudioPayload
 import soundcode.domain.Tempo
 import soundcode.domain.VisualizerRequest
-import soundcode.domain.VisualizerKind
-import soundcode.ui.visualizer.PianorollView
 
 object BlockEditorView:
   private final case class EditorParagraphStyle(
@@ -33,11 +30,6 @@ object BlockEditorView:
       timelineRevision: Long
   )
 
-  private final case class AnchoredVisualizer(
-      anchorOffset: Int,
-      view: AnimatedView
-  )
-
 final class BlockEditorView(
     initialCode: String =
       """|note("<c4 e4 g4 e4> <a3 c4 e4 c4> <f3 a3 c4 a3> <g3 b3 d4 b3>").sound("piano")
@@ -45,12 +37,6 @@ final class BlockEditorView(
      |""".stripMargin.trim
 ):
   import BlockEditorView.*
-
-  private var anchoredVisualizers = Vector.empty[AnchoredVisualizer]
-
-  private val VisualizerHeight = 120.0
-  private val VisualizerSpacing = 16.0
-  private val ReservedVisualizerSpace = VisualizerHeight + VisualizerSpacing
 
   private val segmentOps: TextOps[String, String] =
     SegmentOps.styledTextOps[String]()
@@ -116,6 +102,16 @@ final class BlockEditorView(
 
   visualizerOverlay.setClip(overlayClip)
 
+  private val visualizerManager =
+    new VisualizerOverlayManager(
+      area = area,
+      overlay = visualizerOverlay,
+      emptyParagraphStyle = EditorParagraphStyle(),
+      visualizerParagraphStyle = space =>
+        EditorParagraphStyle(visualizerSpace = space),
+      gutterWidth = UITheme.LineNumberWidth
+    )
+
   val root: StackPane = new StackPane:
     children = Seq(
       jfxNode2sfx(scrollPane),
@@ -125,137 +121,6 @@ final class BlockEditorView(
   configureArea()
   setCode(initialCode)
   area.getUndoManager.forgetHistory()
-
-  private def installVisualizerNodes(): Unit =
-    import scala.jdk.CollectionConverters.*
-
-    visualizerOverlay.getChildren.clear()
-
-    anchoredVisualizers.foreach { decoration =>
-      val node = decoration.view.root.delegate
-
-      node.setManaged(false)
-      node.setMouseTransparent(true)
-      node.setVisible(false)
-
-      visualizerOverlay.getChildren.add(node)
-    }
-
-    Platform.runLater {
-      layoutVisualizers()
-    }
-
-  private def updateVisualizerAnchors(
-      changePosition: Int,
-      removedLength: Int,
-      insertedLength: Int
-  ): Unit =
-    val removedEnd = changePosition + removedLength
-    val delta = insertedLength - removedLength
-
-    anchoredVisualizers = anchoredVisualizers.map { visualizer =>
-      val updatedOffset =
-        if removedLength > 0 &&
-          visualizer.anchorOffset >= changePosition &&
-          visualizer.anchorOffset < removedEnd
-        then math.max(0, changePosition - 1)
-        else if visualizer.anchorOffset >= removedEnd then
-          math.max(0, visualizer.anchorOffset + delta)
-        else visualizer.anchorOffset
-
-      visualizer.copy(anchorOffset = updatedOffset)
-    }
-
-  private def layoutVisualizers(): Unit =
-    if visualizerOverlay.getScene == null then return
-
-    anchoredVisualizers.foreach { visualizer =>
-      val node = visualizer.view.root.delegate
-      val anchorLine = lineForOffset(visualizer.anchorOffset)
-
-      if anchorLine < 0 || anchorLine >= area.getParagraphs.size()
-      then node.setVisible(false)
-      else
-        val bounds =
-          area.getParagraphBoundsOnScreen(anchorLine)
-
-        if bounds.isEmpty then node.setVisible(false)
-        else
-          val paragraphBounds = bounds.get()
-
-          val paragraphTop =
-            visualizerOverlay.screenToLocal(
-              paragraphBounds.getMinX,
-              paragraphBounds.getMinY
-            )
-
-          // Il paragrafo comprende anche il padding inferiore.
-          val visualizerY =
-            paragraphTop.getY +
-              paragraphBounds.getHeight -
-              ReservedVisualizerSpace +
-              4
-
-          val gutterWidth = 40.0
-          val horizontalMargin = 8.0
-
-          val visualizerX =
-            gutterWidth + horizontalMargin
-
-          val visualizerWidth =
-            math.max(
-              0,
-              visualizerOverlay.getWidth -
-                visualizerX -
-                horizontalMargin
-            )
-
-          node match
-            case region: javafx.scene.layout.Region =>
-              region.setMinWidth(0)
-              region.setMaxWidth(Double.MaxValue)
-
-              region.resizeRelocate(
-                visualizerX,
-                visualizerY,
-                visualizerWidth,
-                VisualizerHeight
-              )
-
-            case _ =>
-              node.relocate(
-                visualizerX,
-                visualizerY
-              )
-
-          node.setVisible(true)
-    }
-
-  private def applyVisualizerSpacing(): Unit =
-    (0 until area.getParagraphs.size()).foreach { paragraphIndex =>
-      area.setParagraphStyle(
-        paragraphIndex,
-        EditorParagraphStyle()
-      )
-    }
-
-    anchoredVisualizers.foreach { visualizer =>
-      val anchorLine = lineForOffset(visualizer.anchorOffset)
-
-      if anchorLine >= 0 &&
-        anchorLine < area.getParagraphs.size()
-      then
-        area.setParagraphStyle(
-          anchorLine,
-          EditorParagraphStyle(
-            visualizerSpace = ReservedVisualizerSpace
-          )
-        )
-    }
-
-    Platform.runLater {
-      layoutVisualizers()
-    }
 
   def render(state: AppModel): Unit =
     val nextVisualizersState = RenderedVisualizersState(
@@ -286,17 +151,17 @@ final class BlockEditorView(
     )
 
   def play(): Unit =
-    anchoredVisualizers.foreach(_.view.play())
+    visualizerManager.play()
 
   def stop(): Unit =
-    anchoredVisualizers.foreach(_.view.stop())
+    visualizerManager.stop()
 
   private def configureArea(): Unit =
     area.setWrapText(true)
     area.setParagraphGraphicFactory(
-      LineNumberFactory(lineNumberStyle)
+      LineNumberFactory(UITheme.lineNumberStyle)
     )
-    area.setStyle(editorStyle)
+    area.setStyle(UITheme.editorStyle)
 
     applyEditorChrome()
     AutoPairingSupport.install(area)
@@ -308,14 +173,14 @@ final class BlockEditorView(
         if !replacingCode then
           playbackHighlightsEnabled = false
 
-          updateVisualizerAnchors(
+          visualizerManager.updateAnchors(
             changePosition = change.getPosition,
             removedLength = change.getRemoved.length,
             insertedLength = change.getInserted.length
           )
 
           Platform.runLater {
-            applyVisualizerSpacing()
+            visualizerManager.applySpacing()
           }
 
         scheduleHighlight()
@@ -323,26 +188,26 @@ final class BlockEditorView(
 
     visualizerOverlay.widthProperty().addListener { (_, _, _) =>
       Platform.runLater {
-        layoutVisualizers()
+        visualizerManager.layout()
       }
     }
 
     visualizerOverlay.heightProperty().addListener { (_, _, _) =>
       Platform.runLater {
-        layoutVisualizers()
+        visualizerManager.layout()
       }
     }
 
     area.viewportDirtyEvents().subscribe { _ =>
       Platform.runLater {
-        layoutVisualizers()
+        visualizerManager.layout()
       }
     }
 
   private def applyEditorChrome(): Unit =
     Platform.runLater {
       area.lookupAll(".caret").asScala.foreach {
-        _.setStyle(s"-fx-stroke: ${UITheme.Foreground};")
+        _.setStyle(UITheme.caretStyle)
       }
 
       area.lookupAll(".paragraph-box").asScala.foreach {
@@ -374,39 +239,12 @@ final class BlockEditorView(
       nextState: RenderedVisualizersState,
       isPlaying: Boolean
   ): Unit =
-    anchoredVisualizers.foreach(_.view.stop())
-
-    anchoredVisualizers = nextState.requests.flatMap { request =>
-      nextState.timelines
-        .lift(request.streamIndex)
-        .map { timeline =>
-          val view =
-            request.kind match
-              case VisualizerKind.PianoRoll =>
-                new PianorollView(timeline, nextState.tempo)
-
-              case VisualizerKind.Oscilloscope => ???
-
-          AnchoredVisualizer(
-            anchorOffset = request.sourceOffset,
-            view = view
-          )
-        }
-    }.toVector
-
-    applyVisualizerSpacing()
-    installVisualizerNodes()
-
-    if isPlaying then
-      anchoredVisualizers.foreach(_.view.play())
-
-  private def lineForOffset(offset: Int): Int =
-    val safeOffset =
-      offset.max(0).min(area.getLength)
-
-    area.getText
-      .take(safeOffset)
-      .count(_ == '\n')
+    visualizerManager.render(
+      timelines = nextState.timelines,
+      requests = nextState.requests,
+      tempo = nextState.tempo,
+      isPlaying = isPlaying
+    )
 
   private def scheduleHighlight(): Unit =
     if !highlightScheduled && !replacingCode then
@@ -421,22 +259,3 @@ final class BlockEditorView(
     text
       .replace("\r\n", "\n")
       .replace("\r", "\n")
-
-  private def editorStyle: String =
-    s"""
-       |-fx-font-family: ${UITheme.FontFamily};
-       |-fx-font-size: 15px;
-       |-fx-background-color: ${UITheme.Background};
-       |-fx-control-inner-background: ${UITheme.Background};
-       |-fx-text-fill: ${UITheme.Foreground};
-       |""".stripMargin
-
-  private def lineNumberStyle: String =
-    s"""
-       |-fx-background-color: ${UITheme.Background};
-       |-fx-text-fill: ${UITheme.Muted};
-       |-fx-font-family: ${UITheme.FontFamily};
-       |-fx-font-size: 13px;
-       |-fx-padding: 2 8 0 4;
-       |-fx-alignment: top-right;
-       |""".stripMargin

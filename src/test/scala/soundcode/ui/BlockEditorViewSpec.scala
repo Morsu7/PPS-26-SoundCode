@@ -5,6 +5,7 @@ import soundcode.mvu.AppModel
 import soundcode.domain.TextPosition
 import soundcode.domain.Tempo
 import org.scalatest.prop.TableDrivenPropertyChecks
+import soundcode.ui.theme.UITheme
 
 class BlockEditorViewSpec 
     extends UITestSupport

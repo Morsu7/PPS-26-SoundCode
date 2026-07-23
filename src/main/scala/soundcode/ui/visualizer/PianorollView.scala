@@ -2,7 +2,7 @@ package soundcode.ui.visualizer
 
 import scalafx.scene.paint.Color
 import scalafx.scene.canvas.GraphicsContext
-import soundcode.ui.UITheme
+import soundcode.ui.theme.UITheme
 import soundcode.domain.{ScheduledEvent, AudioPayload, Sound, Tempo}
 import scalafx.scene.text.TextAlignment
 import scalafx.scene.text.Font

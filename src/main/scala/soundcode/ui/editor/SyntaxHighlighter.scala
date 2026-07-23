@@ -2,7 +2,7 @@ package soundcode.ui.editor
 
 import org.fxmisc.richtext.GenericStyledArea
 import soundcode.domain.TextPosition
-import soundcode.ui.UITheme
+import soundcode.ui.theme.UITheme
 
 object SyntaxHighlighter:
   private type EditorArea =
@@ -13,25 +13,6 @@ object SyntaxHighlighter:
 
   private val FunctionPattern =
     """\b[a-zA-Z_][a-zA-Z0-9_]*(?=\()""".r
-
-  private val DefaultStyle =
-    UITheme.textStyle(UITheme.Foreground)
-
-  private val StringStyle =
-    UITheme.textStyle(UITheme.String)
-
-  private val FunctionStyle =
-    s"${UITheme.textStyle(UITheme.Function)} -fx-font-weight: bold;"
-
-  private val PlaybackHighlightStyle =
-    s"""
-       |-fx-fill: ${UITheme.String};
-       |-fx-font-weight: bold;
-       |-rtfx-background-color: transparent;
-       |-rtfx-border-stroke-color: ${UITheme.String};
-       |-rtfx-border-stroke-width: 1px;
-       |-rtfx-border-stroke-type: centered;
-       |""".stripMargin
 
   def applyTo(
       area: GenericStyledArea[?, ?, String],
@@ -61,7 +42,7 @@ object SyntaxHighlighter:
         area.setStyle(
           start,
           end,
-          PlaybackHighlightStyle
+          UITheme.playbackHighlightStyle
         )
     }
 
@@ -83,7 +64,7 @@ object SyntaxHighlighter:
         paragraphIndex,
         0,
         text.length,
-        DefaultStyle
+        UITheme.syntaxDefaultStyle
       )
 
       FunctionPattern.findAllMatchIn(text).foreach { matched =>
@@ -91,7 +72,7 @@ object SyntaxHighlighter:
           paragraphIndex,
           matched.start,
           matched.end,
-          FunctionStyle
+          UITheme.syntaxFunctionStyle
         )
       }
 
@@ -100,6 +81,6 @@ object SyntaxHighlighter:
           paragraphIndex,
           matched.start,
           matched.end,
-          StringStyle
+          UITheme.syntaxStringStyle
         )
       }

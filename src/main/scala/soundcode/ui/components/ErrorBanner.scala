@@ -1,4 +1,4 @@
-package soundcode.ui
+package soundcode.ui.components
 
 import scalafx.animation.{FadeTransition, Interpolator}
 import scalafx.geometry.Pos
@@ -7,6 +7,7 @@ import scalafx.scene.layout.{HBox, Priority}
 import scalafx.util.Duration
 
 import scala.annotation.nowarn
+import soundcode.ui.theme.UITheme
 
 final class ErrorBanner(
   onDismiss: () => Unit
@@ -18,25 +19,13 @@ final class ErrorBanner(
     wrapText = true
     maxWidth = Double.MaxValue
 
-    style =
-      """
-        |-fx-text-fill: #ffb4ab;
-        |-fx-font-family: 'Cascadia Code', 'JetBrains Mono', 'Consolas';
-        |-fx-font-size: 13px;
-        |""".stripMargin
+    style = UITheme.errorTextStyle
 
   @nowarn("msg=Implicit parameters should be provided with a `using` clause")
   private val closeButton = new Button("\u00D7"):
     focusTraversable = false
 
-    style =
-      """
-        |-fx-background-color: transparent;
-        |-fx-text-fill: #ffb4ab;
-        |-fx-font-size: 18px;
-        |-fx-font-weight: bold;
-        |-fx-cursor: hand;
-        |""".stripMargin
+    style = UITheme.errorCloseButtonStyle
 
     onAction = _ => dismiss()
 
@@ -47,11 +36,7 @@ final class ErrorBanner(
     alignment = Pos.CenterLeft
     spacing = 8
 
-    style =
-      """
-        |-fx-background-color: #3f1d24;
-        |-fx-padding: 10;
-        |""".stripMargin
+    style = UITheme.errorBannerStyle
 
     children = Seq(errorLabel, closeButton)
 

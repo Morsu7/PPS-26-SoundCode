@@ -9,58 +9,10 @@ import javafx.geometry.Orientation
 import javafx.scene.layout.VBox
 import scala.jdk.CollectionConverters.*
 import soundcode.parser.SoundCodeLanguage
+import soundcode.ui.theme.UITheme
 
 object AutocompleteSupport:
   private type CompletionItem = SoundCodeLanguage.Construct
-
-  private val afterDotCandidates =
-    SoundCodeLanguage.Generative.all ++
-      SoundCodeLanguage.Transformation.all ++
-      SoundCodeLanguage.Visualization.all
-
-  private val PopupListStyle =
-    """
-      |-fx-background-color: #25252b;
-      |-fx-control-inner-background: #25252b;
-      |-fx-text-background-color: #f4f4f5;
-      |-fx-background-radius: 6;
-      |-fx-border-color: #3a3a42;
-      |-fx-border-radius: 6;
-      |-fx-padding: 4;
-      |-fx-font-family: 'Cascadia Code', 'JetBrains Mono', 'Consolas';
-      |-fx-font-size: 13px;
-      |""".stripMargin
-
-  private val KeywordStyle =
-    """
-      |-fx-text-fill: #f4f4f5;
-      |-fx-font-size: 13px;
-      |-fx-font-weight: 700;
-      |""".stripMargin
-
-  private val DetailStyle =
-    """
-      |-fx-text-fill: #b8b8c2;
-      |-fx-font-size: 11px;
-      |""".stripMargin
-
-  private val SelectedCellStyle =
-    """
-      |-fx-background-color: #3a3a42;
-      |-fx-background-radius: 4;
-      |-fx-padding: 5 8;
-      |-fx-text-background-color: #f4f4f5;
-      |-fx-text-fill: #f4f4f5;
-      |""".stripMargin
-
-  private val DefaultCellStyle =
-    """
-      |-fx-background-color: transparent;
-      |-fx-background-radius: 4;
-      |-fx-padding: 5 8;
-      |-fx-text-background-color: #f4f4f5;
-      |-fx-text-fill: #f4f4f5;
-      |""".stripMargin
 
   private final case class Completion(
       from: Int,
@@ -68,20 +20,6 @@ object AutocompleteSupport:
       text: String,
       caretPosition: Int
   )
-
-  private final case class CompletionContext(
-      textBeforeCaret: String,
-      prefix: String,
-      lineBeforeCaret: String
-  ):
-    def isInsideQuotes: Boolean =
-      textBeforeCaret.count(_ == '"') % 2 == 1
-
-    def isAfterDot: Boolean =
-      lineBeforeCaret.take(lineBeforeCaret.length - prefix.length).endsWith(".")
-
-    def isAtLineStart: Boolean =
-      lineBeforeCaret.trim == prefix
 
   private final class CompletionListCell(
       list: ListView[CompletionItem]
@@ -98,11 +36,11 @@ object AutocompleteSupport:
 
     keyword.setMaxWidth(Double.MaxValue)
     keyword.setTextOverrun(OverrunStyle.ELLIPSIS)
-    keyword.setStyle(KeywordStyle)
+    keyword.setStyle(UITheme.autocompleteKeywordStyle)
 
     detail.setMaxWidth(Double.MaxValue)
     detail.setTextOverrun(OverrunStyle.ELLIPSIS)
-    detail.setStyle(DetailStyle)
+    detail.setStyle(UITheme.autocompleteDetailStyle)
 
     override def updateItem(
         item: CompletionItem,
@@ -121,13 +59,7 @@ object AutocompleteSupport:
       if isEmpty || getItem == null then
         setText(null)
         setGraphic(null)
-        setStyle(
-          """
-            |-fx-background-color: transparent;
-            |-fx-text-background-color: #f4f4f5;
-            |-fx-text-fill: #f4f4f5;
-            |""".stripMargin
-        )
+        setStyle(UITheme.autocompleteEmptyCellStyle)
       else
         keyword.setText(getItem.name)
         detail.setText(getItem.detail)
@@ -135,52 +67,20 @@ object AutocompleteSupport:
         setText(null)
         setGraphic(content)
         setStyle(
-          if isSelected then SelectedCellStyle
-          else DefaultCellStyle
+          if isSelected then UITheme.autocompleteSelectedCellStyle
+          else UITheme.autocompleteDefaultCellStyle
         )
-
-  private object CompletionContext:
-
-    def from(
-        text: String,
-        caretPosition: Int
-    ): CompletionContext =
-      val textBeforeCaret = text.take(caretPosition)
-
-      val prefix =
-        textBeforeCaret.reverse
-          .takeWhile(ch => ch.isLetterOrDigit || ch == '_')
-          .reverse
-
-      val lineBeforeCaret =
-        textBeforeCaret.drop(textBeforeCaret.lastIndexOf('\n') + 1)
-
-      CompletionContext(textBeforeCaret, prefix, lineBeforeCaret)
 
   private def contextFor(
       area: GenericStyledArea[?, ?, ?]
-  ): CompletionContext =
-    CompletionContext.from(
+  ): CompletionProvider.Context =
+    CompletionProvider.contextFrom(
       text = area.getText,
       caretPosition = area.getCaretPosition
     )
 
-  private def suggestionsFor(
-      context: CompletionContext
-  ): Vector[CompletionItem] =
-    if context.isInsideQuotes then Vector.empty
-    else
-      val candidates =
-        if context.isAfterDot then afterDotCandidates
-        else if context.isAtLineStart then SoundCodeLanguage.Generative.all
-        else Vector.empty
-
-      candidates.filter(
-        _.name.startsWith(context.prefix)
-      )
-
   private def completionFor(
-      context: CompletionContext,
+      context: CompletionProvider.Context,
       caretPosition: Int,
       item: CompletionItem
   ): Completion =
@@ -225,7 +125,7 @@ object AutocompleteSupport:
     val caretPosition = area.getCaretPosition
     val context = contextFor(area)
 
-    suggestionsFor(context).headOption match
+    CompletionProvider.suggestionsFor(context).headOption match
       case Some(item) =>
         val completion =
           completionFor(context, caretPosition, item)
@@ -246,11 +146,11 @@ object AutocompleteSupport:
     popup.getContent.add(list)
 
     list.setFocusTraversable(false)
-    list.setPrefWidth(340)
-    list.setMinHeight(132)
-    list.setMaxHeight(156)
-    list.setFixedCellSize(48)
-    list.setStyle(PopupListStyle)
+    list.setPrefWidth(UITheme.AutocompleteWidth)
+    list.setMinHeight(UITheme.AutocompleteMinHeight)
+    list.setMaxHeight(UITheme.AutocompleteMaxHeight)
+    list.setFixedCellSize(UITheme.AutocompleteCellHeight)
+    list.setStyle(UITheme.autocompletePopupStyle)
 
     def styleScrollBar(): Unit =
       Platform.runLater(() =>
@@ -263,26 +163,20 @@ object AutocompleteSupport:
             bar.setMaxHeight(0)
 
           case bar: ScrollBar if bar.getOrientation == Orientation.VERTICAL =>
-            bar.setPrefWidth(10)
-            bar.setStyle("-fx-background-color: transparent;")
+            bar.setPrefWidth(UITheme.AutocompleteScrollbarWidth)
+            bar.setStyle(UITheme.autocompleteScrollbarStyle)
 
             Option(bar.lookup(".thumb")).foreach(
-              _.setStyle("""
-                |-fx-background-color: #5a5a66;
-                |-fx-background-radius: 999;
-                |""".stripMargin)
+              _.setStyle(UITheme.autocompleteScrollbarThumbStyle)
             )
 
             Option(bar.lookup(".track")).foreach(
-              _.setStyle("-fx-background-color: transparent;")
+              _.setStyle(UITheme.autocompleteScrollbarTrackStyle)
             )
 
             Seq(".increment-button", ".decrement-button").foreach(selector =>
               Option(bar.lookup(selector)).foreach { button =>
-                button.setStyle("""
-                  |-fx-background-color: transparent;
-                  |-fx-padding: 0;
-                  |""".stripMargin)
+                button.setStyle(UITheme.autocompleteScrollbarButtonStyle)
               }
             )
 
@@ -294,12 +188,22 @@ object AutocompleteSupport:
 
     def showPopup(): Unit =
       val context = contextFor(area)
-      val items = suggestionsFor(context)
+      val items = CompletionProvider.suggestionsFor(context)
 
       if items.isEmpty then popup.hide()
       else
         list.getItems.setAll(items.asJava)
-        list.setPrefHeight(math.max(156, math.min(240, items.size * 48 + 10)))
+        list.setPrefHeight(
+          math.max(
+            UITheme.AutocompleteMaxHeight,
+            math.min(
+              UITheme.AutocompleteExpandedMaxHeight,
+              items.size * 
+                UITheme.AutocompleteCellHeight + 
+                UITheme.AutocompleteHeightPadding
+            )
+          )
+        )
         list.getSelectionModel.clearAndSelect(0)
         list.getFocusModel.focus(0)
         list.scrollTo(0)

@@ -2,7 +2,7 @@ package soundcode.ui.visualizer
 
 import scalafx.scene.canvas.GraphicsContext
 import scalafx.scene.paint.Color
-import soundcode.ui.UITheme
+import soundcode.ui.theme.UITheme
 import soundcode.domain.Tempo
 
 final class OscilloscopeView(

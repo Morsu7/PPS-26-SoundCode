@@ -1,7 +1,7 @@
 package soundcode.domain
 
 enum VisualizerKind:
-  case PianoRoll
+  case Pianoroll
   case Oscilloscope
 
 final case class VisualizerRequest(

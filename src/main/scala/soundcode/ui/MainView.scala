@@ -17,6 +17,8 @@ import scala.annotation.nowarn
 import soundcode.domain.Tempo
 import soundcode.mvu.{AppModel, Msg}
 import soundcode.ui.editor.BlockEditorView
+import soundcode.ui.components.ErrorBanner
+import soundcode.ui.theme.UITheme
 
 final class MainView(
     dispatch: Msg => Unit
@@ -83,8 +85,7 @@ final class MainView(
   @nowarn("msg=Implicit parameters should be provided with a `using` clause")
   private val toolbar: ToolBar =
     new ToolBar:
-      style =
-        s"${UITheme.backgroundStyle} -fx-padding: 6;"
+      style = UITheme.toolbarStyle
 
       content = Seq(
         new Button("Play"):

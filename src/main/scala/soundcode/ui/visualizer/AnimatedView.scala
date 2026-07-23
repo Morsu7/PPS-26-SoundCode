@@ -9,7 +9,7 @@ import scalafx.scene.paint.Color
 import scalafx.animation.AnimationTimer
 import scalafx.application.Platform
 import scalafx.scene.layout.Pane
-import soundcode.ui.UITheme
+import soundcode.ui.theme.UITheme
 import soundcode.domain.Tempo
 
 private case class VisualEvent(

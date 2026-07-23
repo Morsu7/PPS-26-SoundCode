@@ -137,11 +137,40 @@ class AutoPairingSupportSpec
       assert(editor.getSelection.getStart == start + 1)
       assert(editor.getSelection.getEnd == end + 1)
 
+  test("uses the provided custom pairs"):
+    onFxThread:
+      val editor = installedEditor(
+        pairs = Seq(
+          AutoPairingSupport.Pair("{", "}")
+        )
+      )
+
+      fireKeyTyped(editor, "{")
+
+      assert(editor.getText == "{}")
+      assert(editor.getCaretPosition == 1)
+
+  test("skips an existing custom closing character"):
+    onFxThread:
+      val editor = installedEditor(
+        initialText = "{}",
+        pairs = Seq(
+          AutoPairingSupport.Pair("{", "}")
+        )
+      )
+      editor.moveTo(1)
+
+      fireKeyTyped(editor, "}")
+
+      assert(editor.getText == "{}")
+      assert(editor.getCaretPosition == 2)
+
   private def installedEditor(
-      initialText: String = ""
+    initialText: String = "",
+    pairs: Seq[AutoPairingSupport.Pair] = AutoPairingSupport.DefaultPairs
   ): InlineCssTextArea =
     val editor = new InlineCssTextArea
     editor.replaceText(initialText)
     editor.moveTo(initialText.length)
-    AutoPairingSupport.install(editor)
+    AutoPairingSupport.install(editor, pairs)
     editor
