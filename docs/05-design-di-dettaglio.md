@@ -3,6 +3,8 @@ layout: default
 title: Design di dettaglio
 ---
 
+# Desing
+
 ## Parser e interprete — Cristian Morbidelli
 
 ## Dalla sintassi alla semantica
@@ -471,46 +473,133 @@ Il modello risultante è completamente indipendente dalla sintassi della DSL e c
 
 ## Engine — Federico Morsucci
 
-### Algebra dei pattern
+## Engine e Risoluzione Temporale
 
-Il nucleo dell'engine opera su un'algebra ricorsiva di pattern. I casi essenziali sono:
+L'engine è progettato come una pipeline di elaborazione nella quale ogni componente svolge una singola responsabilità. L'obiettivo è trasformare il codice scritto dall'utente in una sequenza temporale di eventi musicali sincronizzati con il tempo reale, mantenendo completamente separati il processo di interpretazione del linguaggio, la pianificazione temporale e la riproduzione audio.
 
-- **atomo**, che contiene un singolo valore;
-- **sequenza**, che divide l'intervallo disponibile fra i figli;
-- **parallelo**, che assegna lo stesso intervallo a più figli;
-- **alternanza**, che sceglie il ramo in funzione del ciclo corrente;
-- **estensione**, che associa al pattern principale effetti o configurazioni;
-- **trasformazione temporale**, che modifica la collocazione o l'ordine degli eventi.
-
-Questa rappresentazione esprime *che cosa* deve essere suonato senza fissare anticipatamente istanti reali o tecnologia audio. Inoltre permette di comporre i costrutti in modo uniforme: un pattern complesso è sempre ottenuto combinando pattern più piccoli.
-
-### Risoluzione temporale
-
-La risoluzione valuta un pattern rispetto a una finestra temporale espressa in cicli. Un dispatcher individua la natura del pattern e delega la regola temporale al resolver corrispondente. Tutti i resolver rispettano lo stesso contratto: ricevono un pattern e una finestra, restituiscono eventi collocati o intersecati con quella finestra.
+Il flusso di esecuzione del sistema è illustrato in Figura seguente.
 
 ```mermaid
 flowchart LR
-    P[Pattern] --> R[Resolver specializzato]
-    W[Finestra in cicli] --> R
-    R --> E[Eventi schedulati]
-    E --> B[Timeline finita]
-    E --> I[Timeline ciclica lazy]
+
+Interpreter
+--> Scheduler["Scheduler"]
+
+Scheduler
+--> Resolver["PatternResolver"]
+
+Resolver
+--> Events["ScheduledEvent"]
+
+Events
+--> Scheduler
+
+Scheduler
+--> Timeline["Timeline (LazyList / Lista)"]
+
+Timeline
+--> Player["AudioPlayer"]
+
+Player
+--> Backend["Audio Backend"]
+
+Player
+--> UI["Highlight UI"]
 ```
 
-Il tempo musicale è rappresentato con frazioni, evitando errori cumulativi quando intervalli e trasformazioni vengono composti. Ogni evento schedulato distingue:
+L'interprete costituisce il punto di ingresso dell'engine. Dopo aver ricevuto il codice sorgente, costruisce la rappresentazione interna della composizione sotto forma di pattern e la passa allo scheduler.
 
-- l'intervallo completo a cui appartiene;
-- la porzione che cade nella finestra osservata;
-- il payload da eseguire;
-- le estensioni applicate.
+Lo scheduler rappresenta il componente responsabile della costruzione della timeline musicale. Il suo compito non consiste nell'interpretare direttamente i pattern, bensì nel determinare quale intervallo temporale debba essere valutato in ogni istante. Per ciascun ciclo genera quindi una finestra temporale (`Interval`) e delega la risoluzione del pattern al `PatternResolver`.
 
-La distinzione fra intervallo completo e porzione visibile è necessaria quando un evento attraversa il confine della finestra: la visualizzazione può mostrarne solo la parte pertinente, mentre la durata musicale resta quella originaria.
+Il `PatternResolver` percorre ricorsivamente l'albero dei pattern e produce una collezione di oggetti `ScheduledEvent`, ciascuno dei quali rappresenta un evento musicale completo di informazioni temporali, payload sonoro ed eventuali parametri aggiuntivi. Terminata la risoluzione, gli eventi vengono restituiti allo scheduler, che li ordina cronologicamente e costruisce la timeline finale.
 
-### Scheduling e riproduzione
+Questo scambio di informazioni è rappresentato nella Figura seguente.
 
-Lo scheduler offre due viste dello stesso risultato. Le timeline finite coprono la lunghezza naturale dei pattern e sono adatte alle visualizzazioni; la timeline lazy genera invece i cicli progressivamente ed è adatta alla riproduzione continua senza materializzare una sequenza infinita.
+```mermaid
+sequenceDiagram
 
-Il player converte il tempo logico in millisecondi solo al confine con l'esecuzione. Durante la riproduzione consuma gli eventi maturi, li inoltra al backend audio e mantiene l'insieme delle posizioni sorgente attive. L'aggiornamento del programma sostituisce la timeline e ne reimposta il riferimento temporale; play e stop controllano il consumo della timeline senza coinvolgere parser e resolver.
+participant Interpreter
+participant Scheduler
+participant PatternResolver
+
+Interpreter->>Scheduler: Pattern
+
+loop Per ogni ciclo
+
+Scheduler->>PatternResolver: resolve(pattern, Interval)
+
+PatternResolver-->>Scheduler: List[ScheduledEvent]
+
+end
+
+Scheduler-->>Scheduler: Ordina gli eventi
+
+Scheduler->>AudioPlayer: Timeline
+```
+
+Lo scheduler espone due differenti modalità di generazione della timeline.
+
+La prima produce una sequenza finita di eventi, ottenuta determinando la minima durata necessaria affinché il pattern completi un'intera ripetizione. Questa modalità è utilizzata principalmente per la visualizzazione grafica e per l'analisi statica della composizione.
+
+La seconda modalità genera invece una `LazyList`, costruita dinamicamente un ciclo alla volta. In questo caso gli eventi non vengono calcolati anticipatamente, ma soltanto nel momento in cui risultano necessari alla riproduzione. Tale approccio consente di mantenere un consumo di memoria costante anche durante esecuzioni di durata arbitraria.
+
+Una volta costruita la timeline, il controllo passa all'`AudioPlayer`, che rappresenta il punto di collegamento tra il dominio logico della composizione e il backend audio.
+
+Il player non interpreta il linguaggio né esegue operazioni di scheduling: il suo unico compito consiste nel consumare progressivamente la timeline prodotta dallo scheduler, sincronizzando gli eventi con il tempo fisico del sistema.
+
+Per ogni iterazione del proprio ciclo di esecuzione, il player confronta il tempo corrente con l'istante di attivazione degli eventi presenti nella timeline. Quando un evento diventa attivo, esso viene inviato al backend audio insieme alla durata calcolata e agli eventuali parametri applicati. Contestualmente vengono raccolte le posizioni del codice sorgente associate all'evento e notificate all'interfaccia grafica per aggiornare l'highlighting in tempo reale.
+
+L'interazione tra scheduler e player è riassunta nella Figura seguente.
+
+```mermaid
+sequenceDiagram
+
+participant Scheduler
+participant AudioPlayer
+participant Backend
+participant UI
+
+Scheduler->>AudioPlayer: LazyList[ScheduledEvent]
+
+loop Tick del player
+
+AudioPlayer->>AudioPlayer: Sincronizzazione con Tempo
+
+AudioPlayer->>Backend: triggerSound(...)
+
+AudioPlayer->>UI: updateHighlight(...)
+
+end
+```
+
+L'unità di informazione scambiata tra scheduler e player è rappresentata dallo `ScheduledEvent`. Ogni evento descrive completamente un'azione musicale e contiene sia il payload da riprodurre sia tutte le informazioni temporali necessarie alla sua esecuzione.
+
+```mermaid
+flowchart LR
+
+Whole["Whole"]
+Part["Part"]
+Payload["Payload"]
+Extensions["Extensions"]
+Positions["Modifier Positions"]
+
+Whole --> Event["ScheduledEvent"]
+Part --> Event
+Payload --> Event
+Extensions --> Event
+Positions --> Event
+```
+
+Ogni evento temporale è quindi definito da due intervalli distinti:
+
+* **`whole` (Intero):** rappresenta l'estensione logica originale e completa dell'evento musicale nello spazio temporale assoluto.
+* **`part` (Parte):** rappresenta esclusivamente la porzione dell'evento che risulta effettivamente visibile e attiva all'interno della finestra temporale in fase di elaborazione (il ciclo corrente).
+
+**Perché questa separazione è necessaria?**
+
+Questa distinzione, definita a livello strutturale, è la chiave architetturale per gestire in modo sicuro gli eventi che attraversano i confini di un ciclo ritmico.
+
+Senza questa separazione, un evento a cavallo tra due cicli verrebbe visto dal motore come due frammenti separati. Grazie alla convivenza di `whole` e `part`, invece, il player può applicare una regola di esecuzione rigorosa: esegue il *triggering* della nota **una sola volta** (nell'istante esatto in cui inizia la sua vita effettiva), ma le assegna la durata totale corretta leggendola dal `whole`. Questo approccio previene in modo matematico l'insorgere di artefatti audio, evitando note troncate prematuramente al cambio di ciclo o, peggio, suonate due volte (*double-triggering*).
 
 ## Audio e MIDI — Tommaso Remedi
 
