@@ -528,4 +528,11 @@ class SoundCodeParserSuite extends AnyFunSuite with BeforeAndAfterAll {
         
         assert(result.isInstanceOf[Left[?, ?]])
     }
+
+    test("parsing settings blocks") {
+        val input = "setcps(\"120\")\nsetcps(\"90\")\nnote(\"c4\")"
+        val result = parse(input)
+
+        println(result)
+    }
 }

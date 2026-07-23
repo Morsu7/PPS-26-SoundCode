@@ -66,22 +66,22 @@ object MidiBackend:
   /** `gain` come moltiplicatore sulla velocity di base (96), limitato a 1..127. */
   private def velocityFrom(extensions: List[AudioPayload]): Int =
     extensions
-      .collectFirst { case AudioEffect.Gain(g, _) => clamp(Math.round(DefaultVelocity * g).toInt, 1, 127) }
+      .collectFirst { case AudioEffect.Gain(g) => clamp(Math.round(DefaultVelocity * g.value).toInt, 1, 127) }
       .getOrElse(DefaultVelocity)
 
   /** `pan` 0.0..1.0 (0 = sinistra, 1 = destra) -> valore CC10 0..127; assente -> None (centro). */
   private def panFrom(extensions: List[AudioPayload]): Option[Int] =
-    extensions.collectFirst { case AudioEffect.Pan(p, _) => clamp(Math.round(p * 127).toInt, 0, 127) }
+    extensions.collectFirst { case AudioEffect.Pan(p) => clamp(Math.round(p.value * 127).toInt, 0, 127) }
 
   /** `room` (quantità di riverbero, ~0..1) -> valore CC91 0..127. */
   private def reverbFrom(extensions: List[AudioPayload]): Option[Int] =
-    extensions.collectFirst { case AudioEffect.Room(r, _) => clamp(Math.round(r * 127).toInt, 0, 127) }
+    extensions.collectFirst { case AudioEffect.Room(r) => clamp(Math.round(r.value * 127).toInt, 0, 127) }
 
   /** `lpf` (frequenza di taglio in Hz) -> CC74 0..127 su scala logaritmica:
     * più alto il taglio, più aperto/brillante il suono.
     */
   private def brightnessFrom(extensions: List[AudioPayload]): Option[Int] =
-    extensions.collectFirst { case AudioEffect.LowPass(hz, _) => hzToCc(hz) }
+    extensions.collectFirst { case AudioEffect.LowPass(hz) => hzToCc(hz.value) }
 
   private def hzToCc(hz: Double): Int =
     val clamped = hz.max(MinCutoffHz).min(MaxCutoffHz)

@@ -4,7 +4,7 @@ import soundcode.domain.*
 
 enum Msg:
   case CodeUpdateRequested(code: String)
-  case CodeParsed(streams: List[Pattern[AudioPayload]], visualizerRequests: List[VisualizerRequest], errors: Option[String])
+  case CodeParsed(streams: List[Pattern[AudioPayload]], tempo: Option[Tempo], visualizerRequests: List[VisualizerRequest], errors: Option[String])
   // possible implementation of a tick message to update the current beat in the piano roll view
   case PlaybackTick(currentBeat: Double)
   case UpdateHighlightText(positions: Set[TextPosition])

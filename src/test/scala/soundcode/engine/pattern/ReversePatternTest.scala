@@ -4,15 +4,16 @@ import soundcode.domain.*
 import soundcode.engine.support.*
 
 class ReversePatternTest extends SchedulerTestBase {
+
   test("""sound("bd sn hh").reverse""") {
-    val streams = List(rev(seq(bd, sn, hh)))
+    val pattern = seq(bd, sn, hh).reverse
 
     // L'inversione specchia il tempo all'interno del ciclo:
     // Il rullante (sn) passa all'inizio [0.0 -> 0.5] e la cassa (bd) alla fine [0.5 -> 1.0]
-    assertCycle(streams, 0)(
-      ExpEvent("hh", 0 \ 1, 1 \ 3),
-      ExpEvent("sn", 1 \ 3, 2 \ 3),
-      ExpEvent("bd", 2 \ 3, 1 \ 1)
+    check(pattern).inCycle(0)(
+      ExpectedEvent("hh", 0 -> (1\3)),
+      ExpectedEvent("sn", (1\3) -> (2\3)),
+      ExpectedEvent("bd", (2\3) -> 1)
     )
   }
 
@@ -22,22 +23,22 @@ class ReversePatternTest extends SchedulerTestBase {
     val fxGain = alt(gain(1.0), gain(0.8))
 
     val patternWithEffects = ext(baseSound, fxNote, fxGain)
-    val streams = List(rev(patternWithEffects))
+    val pattern = patternWithEffects.reverse
 
-    assertCycleUnordered(streams, 0)(
-      ExpEvent("clap", 0 \ 1, 1 \ 6, List("G", "1.0")),
-      ExpEvent("rim", 1 \ 6, 1 \ 3, List("G", "1.0")),
-      ExpEvent("sn", 1 \ 3, 2 \ 3, List("C", "1.0")),
-      ExpEvent("bd", 2 \ 3, 1 \ 1, List("C", "1.0")),
-      ExpEvent("hh", 2 \ 3, 1 \ 1, List("C", "1.0"))
+    check(pattern).inCycleUnordered(0)(
+      ExpectedEvent("clap", 0 -> (1\6), "G4", "1.0"),
+      ExpectedEvent("rim", (1\6) -> (1\3), "G4", "1.0"),
+      ExpectedEvent("sn", (1\3) -> (2\3), "C4", "1.0"),
+      ExpectedEvent("bd", (2\3) -> 1, "C4", "1.0"),
+      ExpectedEvent("hh", (2\3) -> 1, "C4", "1.0")
     )
 
-    assertCycleUnordered(streams, 1)(
-      ExpEvent("clap", 1 \ 1, 7 \ 6, List("G", "0.8")),
-      ExpEvent("rim", 7 \ 6, 4 \ 3, List("G", "0.8")),
-      ExpEvent("cp", 4 \ 3, 5 \ 3, List("C", "0.8")),
-      ExpEvent("bd", 5 \ 3, 2 \ 1, List("C", "0.8")),
-      ExpEvent("hh", 5 \ 3, 2 \ 1, List("C", "0.8"))
+    check(pattern).inCycleUnordered(1)(
+      ExpectedEvent("clap", 1 -> (7\6), "G4", "0.8"),
+      ExpectedEvent("rim", (7\6) -> (4\3), "G4", "0.8"),
+      ExpectedEvent("cp", (4\3) -> (5\3), "C4", "0.8"),
+      ExpectedEvent("bd", (5\3) -> 2, "C4", "0.8"),
+      ExpectedEvent("hh", (5\3) -> 2, "C4", "0.8")
     )
   }
 }

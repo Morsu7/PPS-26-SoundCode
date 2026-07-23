@@ -17,15 +17,15 @@ object Cmd:
     override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit =
       val parser = new SoundCodeParser
 
-      val (streams, requests, errors) = parser.parseProgram(code) match {
+      val ((streams, tempo), requests, errors) = parser.parseProgram(code) match {
         case Right(programAST) =>
           (Interpreter.interpret(programAST), Interpreter.extractVisualizerRequests(programAST), None)
 
         case Left(errorMsg) =>
-          (List.empty[Pattern[AudioPayload]], List.empty[VisualizerRequest], Some(s"Parsing failed:\n$errorMsg"))
+          ((List.empty[Pattern[AudioPayload]], None), List.empty[VisualizerRequest], Some(s"Parsing failed:\n$errorMsg"))
       }
 
-      dispatch(Msg.CodeParsed(streams, requests, errors))
+      dispatch(Msg.CodeParsed(streams, tempo, requests, errors))
 
   /** Avvia il loop di riproduzione dell'AudioPlayer. */
   case object StartPlayback extends Cmd:
@@ -38,9 +38,11 @@ object Cmd:
   /** Arma la timeline dell'AudioPlayer con gli stream appena interpretati. */
   case class UpdateTimeline(
     streams: List[Pattern[AudioPayload]],
+    tempo: Tempo,
     visualizers: List[VisualizerRequest]
   ) extends Cmd :
     override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = {
       audio.updateTimeline(SchedulerImpl.generateInfiniteTimeline(streams))
+      audio.updateTempo(tempo)
       dispatch(Msg.UpdateTimelines(SchedulerImpl.generateBoundedTimelines(streams), visualizers))
     }

@@ -17,7 +17,7 @@ import scala.concurrent.duration.Duration
  * @param backend Il motore fisico (es. MIDI o synth) che esegue i comandi sonori.
  * @param onHighlightChange Callback invocata per informare la UI di quali porzioni di testo evidenziare.
  */
-class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Set[TextPosition] => Unit = _ => ()) {
+class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Set[TextPosition] => Unit = _ => ()) {
 
   private val loopResolutionMs = 1L
 
@@ -80,8 +80,9 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
       backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
 
       val allPayloads = nextEvent.value :: nextEvent.appliedExtensions
+      val allPositions = allPayloads.flatMap(_.position) ++ nextEvent.modifierPositions
 
-      val newHighlights = allPayloads.flatMap(_.position).map { pos =>pos -> (now + durationMs)}
+      val newHighlights = allPositions.map { pos => pos -> (now + durationMs) }
       activeHighlights = activeHighlights ++ newHighlights
     }
 
@@ -94,4 +95,5 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
       currentHighlightSet = newSet
       onHighlightChange(currentHighlightSet)
 
+  def updateTempo(newTempo: Tempo): Unit = this.tempo = newTempo
 }

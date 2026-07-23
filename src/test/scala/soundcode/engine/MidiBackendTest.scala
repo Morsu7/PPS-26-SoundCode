@@ -72,8 +72,8 @@ class MidiBackendTest extends AnyFunSuite with Matchers:
   test("il gain scala la velocity: moltiplicatore sulla base 96, clampato 1..127 (story #3)") {
     val engine = new RecordingEngine
     val backend = new MidiBackend(engine)
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Gain(0.5)))
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Gain(2.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Gain(ConfigInText(0.5))))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Gain(ConfigInText(2.0))))
     engine.notes.map(_.velocity) shouldBe List(48, 127) // 96*0.5=48 ; 96*2=192 -> clamp 127
   }
 
@@ -87,9 +87,9 @@ class MidiBackendTest extends AnyFunSuite with Matchers:
   test("il pan 0..1 diventa CC10 0..127 (0=sinistra, 0.5=centro, 1=destra) (story #3)") {
     val engine = new RecordingEngine
     val backend = new MidiBackend(engine)
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(0.0)))
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(0.5)))
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(1.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(ConfigInText(0.0))))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(ConfigInText(0.5))))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Pan(ConfigInText(1.0))))
     engine.notes.map(_.pan) shouldBe List(Some(0), Some(64), Some(127))
   }
 
@@ -103,25 +103,25 @@ class MidiBackendTest extends AnyFunSuite with Matchers:
   test("il room diventa CC91 (reverb) 0..127 (story #3)") {
     val engine = new RecordingEngine
     val backend = new MidiBackend(engine)
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(0.0)))
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(0.8)))
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(2.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(ConfigInText(0.0))))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(ConfigInText(0.8))))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.Room(ConfigInText(2.0))))
     engine.notes.map(_.reverb) shouldBe List(Some(0), Some(102), Some(127)) // 0.8*127=101.6->102 ; 2.0->clamp
   }
 
   test("il lpf (Hz) diventa CC74 (brightness): estremi del range su scala log (story #3)") {
     val engine = new RecordingEngine
     val backend = new MidiBackend(engine)
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(20.0)))
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(20000.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(ConfigInText(20.0))))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(ConfigInText(20000.0))))
     engine.notes.map(_.brightness) shouldBe List(Some(0), Some(127))
   }
 
   test("un cutoff piu' alto produce una brightness maggiore (monotonia)") {
     val engine = new RecordingEngine
     val backend = new MidiBackend(engine)
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(200.0)))
-    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(2000.0)))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(ConfigInText(200.0))))
+    backend.triggerSound(Sound.NoteInText(Note("c", 4), pos), 500, List(AudioEffect.LowPass(ConfigInText(2000.0))))
     val bs = engine.notes.flatMap(_.brightness)
     bs(0) should be < bs(1)
   }

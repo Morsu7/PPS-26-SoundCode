@@ -16,7 +16,7 @@ import soundcode.domain.Pattern.*
 def interpret(input: String): List[Pattern[AudioPayload]] = {
     val ast = new SoundCodeParser().parseProgram(input)
     ast match {
-        case Right(programAST) => Interpreter.interpret(programAST)
+        case Right(programAST) => Interpreter.interpret(programAST)._1
         case Left(errorMsg) => fail(s"Parsing failed: $errorMsg")
     }
 }
@@ -63,8 +63,8 @@ class InterpreterFunSuite extends AnyFunSuite {
                 extensions should have size 2
                 
                 // Verifica effetti in modo leggibile e senza cast
-                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0, _)) => }
-                extensions(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(10.0, _)) => }
+                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(ConfigInText(5.0, _))) => }
+                extensions(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(ConfigInText(10.0, _))) => }
         }
     }
 
@@ -109,7 +109,7 @@ class InterpreterFunSuite extends AnyFunSuite {
                         extensions should have size 2
                         
                         // Verifica il Gain
-                        extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0, _)) => }
+                        extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(ConfigInText(5.0, _))) => }
                         
                         // Verifica il Sound (Sample)
                         extensions(1) should matchPattern { case Pattern.Atom(s: SampleInText) if s.sample.value == "bd" => }
@@ -144,8 +144,8 @@ class InterpreterFunSuite extends AnyFunSuite {
                 inside(modifier) {
                     case PatternModifier.Juxtaposition(modifiers) =>
                         modifiers should have size 3
-                        modifiers(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(5.0, _)) => }
-                        modifiers(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(10.0, _)) => }
+                        modifiers(0) should matchPattern { case Pattern.Atom(AudioEffect.Gain(ConfigInText(5.0, _))) => }
+                        modifiers(1) should matchPattern { case Pattern.Atom(AudioEffect.Room(ConfigInText(10.0, _))) => }
                         modifiers(2) should matchPattern { case PatternModifier.Reverse => }
 
                     case other => fail(s"Expected Juxtaposition, but found $other")
@@ -162,9 +162,9 @@ class InterpreterFunSuite extends AnyFunSuite {
             case Pattern.WithExtensions(base, extensions) =>
                 extensions should have size 3
 
-                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.DelayVolume(5.0, _)) => }
-                extensions(1) should matchPattern { case Pattern.Atom(AudioEffect.DelayTime(2.0, _)) => }
-                extensions(2) should matchPattern { case Pattern.Atom(AudioEffect.DelayFeedback(0.5, _)) => }
+                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.DelayVolume(ConfigInText(5.0, _))) => }
+                extensions(1) should matchPattern { case Pattern.Atom(AudioEffect.DelayTime(ConfigInText(2.0, _))) => }
+                extensions(2) should matchPattern { case Pattern.Atom(AudioEffect.DelayFeedback(ConfigInText(0.5, _))) => }
                 
             case other => fail(s"Expected WithExtensions, but found $other")
         }
@@ -177,7 +177,7 @@ class InterpreterFunSuite extends AnyFunSuite {
             case Pattern.WithExtensions(base, extensions) =>
                 extensions should have size 1
 
-                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.DelayVolume(5.0, _)) => }
+                extensions(0) should matchPattern { case Pattern.Atom(AudioEffect.DelayVolume(ConfigInText(5.0, _))) => }
                 
             case other => fail(s"Expected WithExtensions, but found $other")
         }
