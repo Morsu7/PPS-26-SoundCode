@@ -1,7 +1,7 @@
 package soundcode.audio
 
 import javax.sound.midi.{MidiChannel, MidiSystem, Synthesizer}
-import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
+import java.util.concurrent.{ConcurrentHashMap, Executors, ScheduledExecutorService, ScheduledFuture, TimeUnit}
 import scala.util.Try
 
 /** Backend audio basato su `javax.sound.midi` (incluso nel JDK, nessuna dipendenza esterna).
@@ -28,28 +28,38 @@ final class MidiAudioEngine private (
 
   def playNote(spec: NoteSpec): Unit =
     val voice = Voice(spec.program, spec.pan, spec.reverb, spec.brightness)
-    val channel = channels(allocator.channelFor(voice))
+    val channelIdx = allocator.channelFor(voice)
+    val channel = channels(channelIdx)
     channel.programChange(voice.program)
     // Inviamo solo i CC effettivamente richiesti: senza effetti il canale resta al default.
     voice.pan.foreach(channel.controlChange(Cc.Pan, _))
     voice.reverb.foreach(channel.controlChange(Cc.Reverb, _))
     voice.brightness.foreach(channel.controlChange(Cc.Brightness, _))
-    fire(channel, spec.midiNote, spec.velocity, spec.durationMs)
+    fire(channelIdx, spec.midiNote, spec.velocity, spec.durationMs)
 
   def playDrum(gmNote: Int, velocity: Int, durationMs: Long): Unit =
-    fire(channels(DrumChannelIdx), gmNote, velocity, durationMs)
+    fire(DrumChannelIdx, gmNote, velocity, durationMs)
 
   /** Volume master: invia il CC7 (channel volume) a tutti i canali. `level` in 0..100. */
   override def setVolume(level: Double): Unit =
     val cc = Math.round(level / 100.0 * 127).toInt.max(0).min(127)
     channels.foreach(_.controlChange(Cc.Volume, cc))
 
-  private def fire(channel: MidiChannel, note: Int, velocity: Int, durationMs: Long): Unit =
+  // Un solo noteOff "pendente" per coppia (canale, nota). Se la nota viene ribattuta prima della
+  // fine, annulliamo il vecchio noteOff e ne pianifichiamo uno nuovo: così la nota precedente non
+  // spegne quella nuova. Le chiavi sono limitate (16 canali * 128 note) -> nessuna crescita illimitata.
+  private val pendingNoteOffs = new ConcurrentHashMap[(Int, Int), ScheduledFuture[?]]()
+
+  private def fire(channelIdx: Int, note: Int, velocity: Int, durationMs: Long): Unit =
+    val channel = channels(channelIdx)
     val n = note.max(0).min(127)
     val v = velocity.max(1).min(127) // velocity 0 equivarrebbe a un note-off
+    val key = (channelIdx, n)
+    Option(pendingNoteOffs.get(key)).foreach(_.cancel(false)) // annulla il noteOff precedente per questa nota
     channel.noteOn(n, v)
     val noteOff: Runnable = () => channel.noteOff(n)
-    scheduler.schedule(noteOff, durationMs.max(1), TimeUnit.MILLISECONDS)
+    val future = scheduler.schedule(noteOff, durationMs.max(1), TimeUnit.MILLISECONDS)
+    pendingNoteOffs.put(key, future)
 
   def close(): Unit =
     Try(scheduler.shutdownNow())
