@@ -2,39 +2,38 @@ package soundcode.engine.pattern
 
 import soundcode.domain.*
 import soundcode.engine.support.*
+import soundcode.engine.support.given_Conversion_Double_Pattern
 
 class RepetitionPatternTest extends SchedulerTestBase {
 
   test("sound(\"bd sn\").ply(2)") {
-    // s("bd sn").repeat(2) -> bd da 0 a 0.25 e da 0.25 a 0.5; sn da 0.5 a 0.75 e da 0.75 a 1.0
-    val streams = List(repeat(2.0, seq(bd, sn)))
+    // Usiamo il metodo in catena .ply(2) anziché la funzione vecchia `repeat`
+    val pattern = seq(bd, sn).ply(2.0)
 
-    assertCycle(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 4),
-      ExpEvent("bd", 1 \ 4, 1 \ 2),
-      ExpEvent("sn", 1 \ 2, 3 \ 4),
-      ExpEvent("sn", 3 \ 4, 1 \ 1)
+    check(pattern).inCycle(0)(
+      ExpectedEvent("bd", 0 -> (1\4)),
+      ExpectedEvent("bd", (1\4) -> (1\2)),
+      ExpectedEvent("sn", (1\2) -> (3\4)),
+      ExpectedEvent("sn", (3\4) -> 1)
     )
   }
 
-  test(" sound(\"bd sn\").ply(<1 2>)") {
+  test("sound(\"bd sn\").ply(<1 2>)") {
     // Se il parametro cambia, il ply si adatta
-    // Nel ciclo 0 (param 1): bd sn
-    // Nel ciclo 1 (param 2): bd bd sn sn
-    val streams = List(repeat(alt(num(1), num(2)), seq(bd, sn)))
+    val pattern = seq(bd, sn).ply(alt(1.0, 2.0))
 
     // Ciclo 0 (param 1)
-    assertCycle(streams, 0)(
-      ExpEvent("bd", 0 \ 1, 1 \ 2),
-      ExpEvent("sn", 1 \ 2, 1 \ 1)
+    check(pattern).inCycle(0)(
+      ExpectedEvent("bd", 0 -> (1\2)),
+      ExpectedEvent("sn", (1\2) -> 1)
     )
 
     // Ciclo 1 (param 2)
-    assertCycle(streams, 1)(
-      ExpEvent("bd", 1 \ 1, 5 \ 4),
-      ExpEvent("bd", 5 \ 4, 6 \ 4),
-      ExpEvent("sn", 6 \ 4, 7 \ 4),
-      ExpEvent("sn", 7 \ 4, 8 \ 4)
+    check(pattern).inCycle(1)(
+      ExpectedEvent("bd", 1 -> (5\4)),
+      ExpectedEvent("bd", (5\4) -> (6\4)),
+      ExpectedEvent("sn", (6\4) -> (7\4)),
+      ExpectedEvent("sn", (7\4) -> 2)
     )
   }
 }
