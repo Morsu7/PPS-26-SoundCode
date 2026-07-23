@@ -6,18 +6,18 @@ import soundcode.domain.*
 extension (n: Int)  def \(d: Int): Fraction = Fraction(n.toLong, d.toLong)
 extension (n: Long) def \(d: Long): Fraction = Fraction(n, d)
 
-type PatternParameter = Double | Int | Fraction | Pattern[Double]
+type PatternParameter = Double | Int | Fraction | Pattern[ConfigInText]
 
 extension (value: PatternParameter)
-  def toPattern: Pattern[Double] = value match
+  def toPattern: Pattern[ConfigInText] = value match
     case d: Double          => Pattern.Atom(ConfigInText(d))
     case i: Int             => Pattern.Atom(ConfigInText(i.toDouble))
     case f: Fraction        => Pattern.Atom(ConfigInText(f.toDouble))
-    //case p: Pattern[Double] @unchecked => p
+    case p: Pattern[ConfigInText] @unchecked => p
 
-given Conversion[Double, Pattern[Double]] = num(_)
-given Conversion[Int, Pattern[Double]] = i => num(i.toDouble)
-given Conversion[Fraction, Pattern[Double]] = f => num(f.toDouble)
+given Conversion[Double, Pattern[ConfigInText]] = num(_)
+given Conversion[Int, Pattern[ConfigInText]] = i => num(i.toDouble)
+given Conversion[Fraction, Pattern[ConfigInText]] = f => num(f.toDouble)
 
 private val pos = Some(TextPosition(0, 0))
 private def sample(s: String) = Pattern.Atom(Sound.SampleInText(Sample(s), pos))
@@ -33,7 +33,7 @@ def cSharp4 = note("c#")
 def gain(v: Double) = Pattern.Atom(AudioEffect.Gain(ConfigInText(v)))
 def room(v: Double) = Pattern.Atom(AudioEffect.Room(ConfigInText(v)))
 def pan(v: Double)  = Pattern.Atom(AudioEffect.Pan(ConfigInText(v)))
-def num(v: Double)  = Pattern.Atom(v)
+def num(v: Double)  = Pattern.Atom(ConfigInText(v))
 
 def seq[T](p: Pattern[T]*): Pattern[T] = Pattern.Sequence(p.toList)
 def par[T](p: Pattern[T]*): Pattern[T] = Pattern.Parallel(p.toList)
