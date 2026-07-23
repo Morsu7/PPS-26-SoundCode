@@ -469,7 +469,7 @@ Il backend dipende dal trait `AudioEngine`, non dal sintetizzatore concreto. Nei
 
 La velocity non fa parte dell'identità della voce perché è una proprietà della singola nota. Questa scelta permette a note con gain diverso di condividere il canale senza modificarsi reciprocamente.
 
-L'invio di `noteOn` è sincrono e breve; il corrispondente `noteOff` viene programmato su un `ScheduledExecutorService` daemon. Il thread del player può così continuare a estrarre eventi senza restare bloccato per la durata delle note. Alla chiusura, executor e sintetizzatore sono rilasciati in modo tollerante agli errori.
+L'invio di `noteOn` è sincrono e breve; il corrispondente `noteOff` viene programmato su un `ScheduledExecutorService` daemon. Il thread del player può così continuare a estrarre eventi senza restare bloccato per la durata delle note. Per evitare che una nota ribattuta venga troncata, il motore mantiene un solo `noteOff` pendente per coppia (canale, nota): se la stessa nota riparte prima della fine, il `noteOff` precedente viene annullato e riprogrammato (in MIDI un `noteOff` spegne l'intero numero di nota sul canale). Alla chiusura, executor e sintetizzatore sono rilasciati in modo tollerante agli errori.
 
 ## Interfaccia utente — Giacomo Biagioni
 
