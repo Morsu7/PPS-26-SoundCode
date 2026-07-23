@@ -46,3 +46,7 @@ object Cmd:
       audio.updateTempo(tempo)
       dispatch(Msg.UpdateTimelines(SchedulerImpl.generateBoundedTimelines(streams), visualizers))
     }
+
+  /** Imposta il volume master (0..100) sul motore audio. */
+  case class SetVolume(level: Double) extends Cmd:
+    override def run(dispatch: Msg => Unit, audio: AudioPlayer): Unit = audio.setVolume(level)

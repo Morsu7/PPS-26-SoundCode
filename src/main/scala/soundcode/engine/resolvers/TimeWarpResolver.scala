@@ -52,7 +52,8 @@ object TimeWarpResolver:
           newWholeStart = innerEvent.whole.start + (stepDur * i)
           newWhole = Interval(newWholeStart, newWholeStart + stepDur)
           newPart <- newWhole.intersect(innerEvent.part).toList
-        yield innerEvent.copy(whole = newWhole, part = newPart)
+        yield innerEvent.copy(whole = newWhole, part = newPart,
+          modifierPositions = innerEvent.modifierPositions ++ paramEvent.value.position.toList)
 
         events
 

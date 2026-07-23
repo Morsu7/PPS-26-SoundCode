@@ -10,5 +10,6 @@ final case class AppModel(
     errors: Option[String] = None,
     tempo: Tempo = Tempo.default,
     isPlaying: Boolean = false,
-    timelineRevision: Long = 0L
+    timelineRevision: Long = 0L,
+    volume: Double = 100.0
 )
