@@ -97,9 +97,12 @@ object TimeWarpResolver:
     }
 
   private def applyModifiers[T](basePattern: Pattern[T], modifiers: List[PatternModifier[T] | Pattern[AudioEffect]]): Pattern[T] =
-    modifiers.foldLeft[Pattern[Any]](basePattern) {
-      case (pat, mod: PatternModifier[_]) =>
-        Pattern.TimeWarp(mod.asInstanceOf[PatternModifier[Any]], pat)
-      case (pat, effectPat: Pattern[_]) =>
-        Pattern.WithExtensions(pat.asInstanceOf[Pattern[AudioPayload]], List(effectPat.asInstanceOf[Pattern[AudioPayload]]))
-    }.asInstanceOf[Pattern[T]]
+    modifiers.foldLeft(basePattern) { (currentPat, modifierOrEffect) =>modifierOrEffect match
+
+        case mod: PatternModifier[T @unchecked] => Pattern.TimeWarp(mod, currentPat)
+
+        case effectPat: Pattern[AudioEffect @unchecked] =>
+          val baseAsAudio = currentPat.asInstanceOf[Pattern[AudioPayload]]
+          val effectAsAudio = effectPat.asInstanceOf[Pattern[AudioPayload]]
+          Pattern.WithExtensions(baseAsAudio, List(effectAsAudio)).asInstanceOf[Pattern[T]]
+    }
