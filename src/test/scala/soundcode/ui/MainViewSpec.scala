@@ -1,7 +1,7 @@
 package soundcode.ui
 
 import javafx.scene.Scene
-import javafx.scene.control.{Button, ToolBar}
+import javafx.scene.control.{Button, Slider, ToolBar}
 import javafx.scene.input.{KeyCode, KeyCodeCombination, KeyCombination}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import soundcode.domain.Tempo
@@ -47,6 +47,20 @@ class MainViewSpec
         dispatched.toList ==
           List(Msg.CodeUpdateRequested(view.currentCode))
       )
+
+  test("toolbar contains a volume selector next to Update"):
+    onFxThread:
+      val view = MainView(_ => ())
+      val toolbar =
+        view.root.delegate.getTop.asInstanceOf[ToolBar]
+      val items = toolbar.getItems
+      val updateIndex = items.indexOf(toolbarButton(view, "Update"))
+
+      val slider = items.get(updateIndex + 2).asInstanceOf[Slider]
+
+      assert(slider.getMin == 0)
+      assert(slider.getMax == 100)
+      assert(slider.getValue == 100)
 
   private val shortcutCases = Table(
     ("key", "modifier", "expectedMessage"),

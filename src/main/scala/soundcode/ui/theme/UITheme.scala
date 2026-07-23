@@ -81,6 +81,9 @@ private[ui] object UITheme:
       |-fx-padding: 6;
       |""".stripMargin
 
+  def toolbarLabelStyle: String =
+    s"-fx-text-fill: $Foreground;"
+
   // Autocomplete styles
 
   def autocompletePopupStyle: String =

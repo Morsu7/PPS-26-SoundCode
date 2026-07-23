@@ -12,5 +12,6 @@ enum Msg:
   // Controllo della riproduzione audio (pulsanti Play/Stop)
   case PlayRequested
   case StopRequested
+  case VolumeChangeRequested(volume: Double)
   // Manual error dismissal message
   case ErrorDismissed
