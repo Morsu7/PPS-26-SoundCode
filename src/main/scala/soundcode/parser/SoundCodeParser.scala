@@ -28,7 +28,7 @@ class SoundCodeParser {
     )
 
   private def block(using P[?]): P[Block] =
-    P((streamBlock | settingBlock) ~ ("\n" | End))
+    P((streamBlock | settingBlock) ~ ("\n".rep(1) | End))
 
   private def settingBlock(using P[?]): P[SettingBlock] =
     P( setting ~/ "(" ~ ws ~ wrapped(configAtom) ~ ws ~ ")").map {

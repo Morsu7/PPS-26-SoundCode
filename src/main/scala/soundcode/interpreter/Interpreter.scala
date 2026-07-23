@@ -1,6 +1,7 @@
 package soundcode.interpreter
 
 import soundcode.parser.AST
+import soundcode.parser.AST.Settings._
 import soundcode.domain.*
 import soundcode.domain.Pattern.*
 import soundcode.domain.Sound.SampleInText
@@ -20,14 +21,18 @@ object Interpreter {
         case AST.Visualizers.PianoRollBlock(streamIndex) => VisualizerRequest(index, VisualizerKind.PianoRoll, streamIndex)
     }
 
-    def interpret(tree: AST.ProgramAST): List[Pattern[AudioPayload]] = {
-        tree.blocks.collect {
+    def interpret(tree: AST.ProgramAST): (List[Pattern[AudioPayload]], Option[Tempo]) =
+        tree.blocks.partitionMap {
             case sb: AST.StreamBlock =>
-            val (basePattern, baseType) = interpretGenerativeBlock(sb.base)
-
-            applyExtensions(basePattern, baseType, sb.extensions)
-        }
-    }
+                val (basePattern, baseType) = interpretGenerativeBlock(sb.base)
+                Left(applyExtensions(basePattern, baseType, sb.extensions))
+            case settings: AST.Settings.SettingBlock =>
+                settings match {
+                    case AST.Settings.CPM(config) => Right(Tempo(config.value / 60.0))
+                    case AST.Settings.CPS(config) => Right(Tempo(config.value))
+                }
+        } match
+            case (patterns, tempos) =>(patterns, tempos.lastOption)
 
     private def interpretGenerativeBlock(block: AST.GenerativeBlock): (Pattern[AudioPayload], String) = block match {
         case AST.SoundBlock(pattern) => (interpretPattern(pattern)(c => interpretSoundAtom(c)), "sound")

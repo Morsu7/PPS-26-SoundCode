@@ -25,7 +25,7 @@ class MidiBackendPipelineTest extends AnyFunSuite with Matchers:
   /** Interpreta il codice e restituisce gli eventi del primo ciclo, in ordine temporale. */
   private def firstCycle(code: String): List[ScheduledEvent[AudioPayload]] =
     val ast = new SoundCodeParser().parseProgram(code).toOption.getOrElse(fail(s"parse fallito: $code"))
-    val patterns = Interpreter.interpret(ast)
+    val patterns = Interpreter.interpret(ast)._1
     SchedulerImpl.generateInfiniteTimeline(patterns)
       .dropWhile(_.part.start < Fraction(0))
       .takeWhile(_.part.start < Fraction(1))

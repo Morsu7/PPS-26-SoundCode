@@ -180,6 +180,9 @@ case class Tempo(cps: Double) {
   def offsetMs(phase: Fraction): Long =
     (phase * cycleDurationMs).toLong
 }
+object Tempo:
+  val defaultCps: Double = 0.5
+  val default: Tempo = Tempo(defaultCps)
 
 opaque type AbsoluteTime = Long
 object AbsoluteTime:

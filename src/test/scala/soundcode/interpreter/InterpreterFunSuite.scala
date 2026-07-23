@@ -16,7 +16,7 @@ import soundcode.domain.Pattern.*
 def interpret(input: String): List[Pattern[AudioPayload]] = {
     val ast = new SoundCodeParser().parseProgram(input)
     ast match {
-        case Right(programAST) => Interpreter.interpret(programAST)
+        case Right(programAST) => Interpreter.interpret(programAST)._1
         case Left(errorMsg) => fail(s"Parsing failed: $errorMsg")
     }
 }
