@@ -1,7 +1,6 @@
 package soundcode.ui.editor
 
 import org.fxmisc.richtext.GenericStyledArea
-import soundcode.domain.TextPosition
 import soundcode.ui.theme.UITheme
 
 object SyntaxHighlighter:
@@ -17,36 +16,14 @@ object SyntaxHighlighter:
   private val NumberPattern =
     """(?<![a-zA-Z0-9_.])[+-]?\d+(?:\.\d+)?(?![a-zA-Z0-9_.])""".r
 
-  def applyTo(
-      area: GenericStyledArea[?, ?, String],
-      playbackPositions: Set[TextPosition] = Set.empty
-  ): Unit =
+  def applyTo(area: GenericStyledArea[?, ?, String]): Unit =
     applySyntaxHighlighting(area)
-    applyPlaybackHighlighting(area, playbackPositions)
 
   private def applySyntaxHighlighting(
       area: EditorArea
   ): Unit =
     (0 until area.getParagraphs.size()).foreach { paragraphIndex =>
       applyToParagraph(area, paragraphIndex)
-    }
-
-  private def applyPlaybackHighlighting(
-      area: EditorArea,
-      positions: Set[TextPosition]
-  ): Unit =
-    val textLength = area.getLength
-
-    positions.foreach { position =>
-      val start = position.startIndex.max(0)
-      val end = position.endIndex.min(textLength)
-
-      if start < end then
-        area.setStyle(
-          start,
-          end,
-          UITheme.playbackHighlightStyle
-        )
     }
 
   private def isValidParagraph(

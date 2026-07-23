@@ -52,20 +52,22 @@ class BlockEditorViewSpec
 
         assert(editor.currentCode == expected)
 
-  test("render applies playback highlighting to the requested range"):
+  test("render tracks playback highlighting without restyling the text"):
     onFxThread:
       val code = """note("c4").sound("piano")"""
       val editor = new BlockEditorView(code)
+      val position = TextPosition(0, 4)
 
       editor.render(
-        AppModel(positions = Set(TextPosition(0, 4)))
+        AppModel(positions = Set(position))
       )
 
       val highlightedStyle =
         editor.editorArea.getStyleOfChar(0)
 
-      assert(highlightedStyle.contains("-rtfx-border-stroke-color"))
-      assert(highlightedStyle.contains("-fx-font-weight: bold"))
+      assert(editor.playbackHighlightPositions == Set(position))
+      assert(highlightedStyle.contains(UITheme.Function))
+      assert(!highlightedStyle.contains("-rtfx-background-color"))
 
   test("render preserves syntax highlighting outside playback range"):
     onFxThread:
@@ -98,6 +100,7 @@ class BlockEditorViewSpec
       )
 
       assert(editor.currentCode == code)
+      assert(editor.playbackHighlightPositions.isEmpty)
 
   test("render does not modify source code"):
     onFxThread:

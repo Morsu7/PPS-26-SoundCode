@@ -2,7 +2,6 @@ package soundcode.ui
 
 import org.fxmisc.richtext.InlineCssTextArea
 import org.scalatest.prop.TableDrivenPropertyChecks
-import soundcode.domain.TextPosition
 import soundcode.ui.editor.SyntaxHighlighter
 import soundcode.ui.theme.UITheme
 
@@ -161,99 +160,11 @@ class SyntaxHighlighterSpec
         UITheme.String
       )
 
-  test("applies playback style only to the requested range"):
-    onFxThread:
-      val editor = highlightedEditor(
-        code,
-        Set(TextPosition(0, 4))
-      )
-
-      assertRangeContains(
-        editor,
-        start = 0,
-        length = 4,
-        expectedStyle = "-rtfx-border-stroke-color"
-      )
-
-      val characterAfterRange = editor.getStyleOfChar(4)
-
-      assert(
-        !characterAfterRange.contains(
-          "-rtfx-border-stroke-color"
-        )
-      )
-
-  test("clamps playback ranges to source boundaries"):
-    onFxThread:
-      val editor = highlightedEditor(
-        code,
-        Set(TextPosition(-10, 4))
-      )
-
-      assertRangeContains(
-        editor,
-        start = 0,
-        length = 4,
-        expectedStyle = "-rtfx-border-stroke-color"
-      )
-
-  test("ignores empty and out-of-bounds playback ranges"):
-    onFxThread:
-      val editor = highlightedEditor(
-        code,
-        Set(
-          TextPosition(4, 4),
-          TextPosition(100, 120),
-          TextPosition(-10, -1)
-        )
-      )
-
-      (0 until editor.getLength).foreach { index =>
-        assert(
-          !editor
-            .getStyleOfChar(index)
-            .contains("-rtfx-border-stroke-color")
-        )
-      }
-
-  test("reapplying syntax highlighting removes old playback styles"):
-    onFxThread:
-      val editor = highlightedEditor(
-        code,
-        Set(TextPosition(0, 4))
-      )
-
-      assert(
-        editor
-          .getStyleOfChar(0)
-          .contains("-rtfx-border-stroke-color")
-      )
-
-      SyntaxHighlighter.applyTo(editor)
-
-      assert(
-        !editor
-          .getStyleOfChar(0)
-          .contains("-rtfx-border-stroke-color")
-      )
-
-      assert(
-        editor
-          .getStyleOfChar(0)
-          .contains(UITheme.Function)
-      )
-
-  private def highlightedEditor(
-      source: String,
-      playbackPositions: Set[TextPosition] = Set.empty
-  ): InlineCssTextArea =
+  private def highlightedEditor(source: String): InlineCssTextArea =
     val editor = new InlineCssTextArea
     editor.replaceText(source)
 
-    SyntaxHighlighter.applyTo(
-      editor,
-      playbackPositions
-    )
+    SyntaxHighlighter.applyTo(editor)
 
     editor
 

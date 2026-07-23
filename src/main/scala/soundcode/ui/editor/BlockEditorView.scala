@@ -89,6 +89,9 @@ final class BlockEditorView(
   private val visualizerOverlay =
     new javafx.scene.layout.Pane()
 
+  private val playbackOverlay =
+    new javafx.scene.layout.Pane()
+
   visualizerOverlay.setMouseTransparent(true)
   visualizerOverlay.setPickOnBounds(false)
 
@@ -118,8 +121,18 @@ final class BlockEditorView(
   val root: StackPane = new StackPane:
     children = Seq(
       jfxNode2sfx(scrollPane),
-      jfxNode2sfx(visualizerOverlay)
+      jfxNode2sfx(visualizerOverlay),
+      jfxNode2sfx(playbackOverlay)
     )
+
+  private val playbackHighlightManager =
+    new PlaybackHighlightOverlayManager(
+      area = area,
+      overlay = playbackOverlay
+    )
+
+  private[ui] def playbackHighlightPositions =
+    playbackHighlightManager.positions
 
   configureArea()
   setCode(initialCode)
@@ -175,7 +188,10 @@ final class BlockEditorView(
       .plainTextChanges()
       .subscribe { change =>
         if !viewState.replacingCode then
-          viewState = viewState.copy(playbackHighlightsEnabled = false)
+          viewState = viewState.copy(
+            playbackHighlightsEnabled = false
+          )
+          playbackHighlightManager.render(Set.empty)
 
           visualizerManager.updateAnchors(
             changePosition = change.getPosition,
@@ -193,18 +209,21 @@ final class BlockEditorView(
     visualizerOverlay.widthProperty().addListener { (_, _, _) =>
       Platform.runLater {
         visualizerManager.layout()
+        playbackHighlightManager.layout()
       }
     }
 
     visualizerOverlay.heightProperty().addListener { (_, _, _) =>
       Platform.runLater {
         visualizerManager.layout()
+        playbackHighlightManager.layout()
       }
     }
 
     area.viewportDirtyEvents().subscribe { _ =>
       Platform.runLater {
         visualizerManager.layout()
+        playbackHighlightManager.layout()
       }
     }
 
@@ -233,11 +252,8 @@ final class BlockEditorView(
     val playbackPositions =
       Option.when(viewState.playbackHighlightsEnabled)(state.positions)
         .getOrElse(Set.empty)
-  
-    SyntaxHighlighter.applyTo(
-      area,
-      playbackPositions
-    )
+
+    playbackHighlightManager.render(playbackPositions)
 
   private def renderVisualizers(
       nextState: RenderedVisualizersState,
