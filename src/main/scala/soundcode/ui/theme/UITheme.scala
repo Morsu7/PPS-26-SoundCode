@@ -1,5 +1,7 @@
 package soundcode.ui.theme
 
+import javafx.scene.text.Font
+
 private[ui] object UITheme:
   // Base palette
   val Background = "#1f1f24"
@@ -27,13 +29,23 @@ private[ui] object UITheme:
   val ErrorBackground = "#3f1d24"
 
   // Typography
-  val FontFamily =
-    "'Cascadia Code', 'JetBrains Mono', 'Consolas'"
-
   val EditorFontSize = 15
   val NormalFontSize = 13
   val DetailFontSize = 11
   val CloseButtonFontSize = 18
+
+  private val bundledFont =
+    Option(
+      getClass.getResourceAsStream("/fonts/CascadiaCode-Regular.ttf")
+    ).flatMap { stream =>
+      try Option(Font.loadFont(stream, EditorFontSize))
+      finally stream.close()
+    }
+
+  val FontFamily =
+    bundledFont
+      .map(font => s"'${font.getFamily}'")
+      .getOrElse("'Monospaced'")
 
   // Autocomplete dimensions
   val AutocompleteWidth = 420.0
@@ -214,14 +226,4 @@ private[ui] object UITheme:
     s"""
       |${textStyle(Function)}
       |-fx-font-weight: bold;
-      |""".stripMargin
-
-  def playbackHighlightStyle: String =
-    s"""
-      |-fx-fill: $String;
-      |-fx-font-weight: bold;
-      |-rtfx-background-color: $Transparent;
-      |-rtfx-border-stroke-color: $String;
-      |-rtfx-border-stroke-width: 1px;
-      |-rtfx-border-stroke-type: centered;
       |""".stripMargin
