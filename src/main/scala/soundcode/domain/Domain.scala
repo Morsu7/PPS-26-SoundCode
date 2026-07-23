@@ -126,6 +126,8 @@ enum Sound extends AudioPayload:
 
 case class ConfigInText(value: Double, position: Option[TextPosition] = None)
 
+given Conversion[Double, ConfigInText]= ConfigInText(_,None)
+
 enum AudioEffect(val configVal: ConfigInText) extends AudioPayload:
   case Gain(config: ConfigInText) extends AudioEffect(config)
   case Pan(config: ConfigInText) extends AudioEffect(config)

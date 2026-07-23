@@ -10,10 +10,10 @@ type PatternParameter = Double | Int | Fraction | Pattern[Double]
 
 extension (value: PatternParameter)
   def toPattern: Pattern[Double] = value match
-    case d: Double          => Pattern.Atom(d)
-    case i: Int             => Pattern.Atom(i.toDouble)
-    case f: Fraction        => Pattern.Atom(f.toDouble)
-    case p: Pattern[Double] @unchecked => p
+    case d: Double          => Pattern.Atom(ConfigInText(d))
+    case i: Int             => Pattern.Atom(ConfigInText(i.toDouble))
+    case f: Fraction        => Pattern.Atom(ConfigInText(f.toDouble))
+    //case p: Pattern[Double] @unchecked => p
 
 given Conversion[Double, Pattern[Double]] = num(_)
 given Conversion[Int, Pattern[Double]] = i => num(i.toDouble)
@@ -30,9 +30,9 @@ def c4 = note("c"); def f4 = note("f"); def g4 = note("g"); def e3 = note("e")
 def b6 = note("b"); def a5 = note("a"); def e4 = note("e"); def b4 = note("b")
 def cSharp4 = note("c#")
 
-def gain(v: Double) = Pattern.Atom(AudioEffect.Gain(v, pos))
-def room(v: Double) = Pattern.Atom(AudioEffect.Room(v, pos))
-def pan(v: Double)  = Pattern.Atom(AudioEffect.Pan(v, pos))
+def gain(v: Double) = Pattern.Atom(AudioEffect.Gain(ConfigInText(v)))
+def room(v: Double) = Pattern.Atom(AudioEffect.Room(ConfigInText(v)))
+def pan(v: Double)  = Pattern.Atom(AudioEffect.Pan(ConfigInText(v)))
 def num(v: Double)  = Pattern.Atom(v)
 
 def seq[T](p: Pattern[T]*): Pattern[T] = Pattern.Sequence(p.toList)

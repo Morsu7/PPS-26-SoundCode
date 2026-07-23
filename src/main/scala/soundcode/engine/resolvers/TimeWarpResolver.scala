@@ -1,5 +1,5 @@
 package soundcode.engine.resolvers
-import soundcode.domain.*
+import soundcode.domain.{given_Conversion_Double_ConfigInText, *}
 import soundcode.engine.*
 
 object TimeWarpResolver:
@@ -41,7 +41,7 @@ object TimeWarpResolver:
       case PatternModifier.Repetition(times) =>
         val events = for
           paramEvent <- times.resolve
-          n = math.max(1, math.round(paramEvent.value).toInt)
+          n = math.max(1, math.round(paramEvent.value.value).toInt)
           activeWindow <- paramEvent.part.intersect(timeWindow).toList
           innerEvent <- innerPattern.resolve(using activeWindow)
 
@@ -71,13 +71,13 @@ object TimeWarpResolver:
 
         Pattern.Parallel(List(innerPattern, delayedPattern)).resolve
 
-  private def applyDynamicModifier[T](parameter: Pattern[Double], innerPattern: Pattern[T],
+  private def applyDynamicModifier[T](parameter: Pattern[ConfigInText], innerPattern: Pattern[T],
                                        zoomIn: (Interval, Fraction) => Interval,
                                        zoomOut: (ScheduledEvent[T], Fraction) => ScheduledEvent[T]
                                      )(using timeWindow: Interval): List[ScheduledEvent[T]] =
     for
       paramEvent <- parameter.resolve
-      paramValue = Fraction(paramEvent.value)
+      paramValue = Fraction(paramEvent.value.value)
 
       activeWindow <- paramEvent.part.intersect(timeWindow).toList
       warpedWindow = zoomIn(activeWindow, paramValue)

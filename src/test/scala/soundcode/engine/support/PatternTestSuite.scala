@@ -12,9 +12,9 @@ extension (e: ScheduledEvent[AudioPayload])
       case Sound.SampleInText(s, _) => s.value
       case Sound.NoteInText(n, _)   => n.toString // Stampa 'C4' (molto più leggibile nei test!)
       case Sound.Rest(_)            => "~"
-      case AudioEffect.Gain(v, _)   => v.toString
-      case AudioEffect.Room(v, _)   => v.toString
-      case AudioEffect.Pan(v, _)    => v.toString
+      case AudioEffect.Gain(v)      => v.value.toString
+      case AudioEffect.Room(v)      => v.value.toString
+      case AudioEffect.Pan(v)       => v.value.toString
       case _                        => "effect"
 
     ExpectedEvent(
