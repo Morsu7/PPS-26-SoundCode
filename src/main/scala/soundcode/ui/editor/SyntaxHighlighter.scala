@@ -14,6 +14,9 @@ object SyntaxHighlighter:
   private val FunctionPattern =
     """\b[a-zA-Z_][a-zA-Z0-9_]*(?=\()""".r
 
+  private val NumberPattern =
+    """(?<![a-zA-Z0-9_.])[+-]?\d+(?:\.\d+)?(?![a-zA-Z0-9_.])""".r
+
   def applyTo(
       area: GenericStyledArea[?, ?, String],
       playbackPositions: Set[TextPosition] = Set.empty
@@ -73,6 +76,15 @@ object SyntaxHighlighter:
           matched.start,
           matched.end,
           UITheme.syntaxFunctionStyle
+        )
+      }
+
+      NumberPattern.findAllMatchIn(text).foreach { matched =>
+        area.setStyle(
+          paragraphIndex,
+          matched.start,
+          matched.end,
+          UITheme.syntaxNumberStyle
         )
       }
 

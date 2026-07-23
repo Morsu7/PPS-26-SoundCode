@@ -126,7 +126,6 @@ class InterpreterFunSuite extends AnyFunSuite {
         
         inside(streams.head) {
             case Pattern.WithExtensions(base, extensions) =>
-                println(s"Base: $base")
                 base should matchPattern { case Pattern.Sequence(List(_, Pattern.Atom(Rest(_)), _)) => }
                 extensions(0) should matchPattern { case Pattern.Sequence(List(_, Pattern.Atom(Rest(_)))) => }
                 

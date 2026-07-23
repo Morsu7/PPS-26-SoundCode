@@ -10,6 +10,7 @@ private[ui] object UITheme:
   // Syntax
   val String = "#d9f99d"
   val Function = "#93c5fd"
+  val Number = "#fbbf24"
 
   // Visualizers
   val VisualizerLine = "#505058"
@@ -205,6 +206,9 @@ private[ui] object UITheme:
 
   def syntaxStringStyle: String =
     textStyle(String)
+
+  def syntaxNumberStyle: String =
+    textStyle(Number)
 
   def syntaxFunctionStyle: String =
     s"""

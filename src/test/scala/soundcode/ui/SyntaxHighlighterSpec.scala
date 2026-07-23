@@ -55,6 +55,45 @@ class SyntaxHighlighterSpec
         expectedStyle = UITheme.String
       )
 
+  private val numberCases = Table(
+    ("source", "number"),
+    ("setcps(0.5)", "0.5"),
+    ("setcpm(120)", "120"),
+    ("setcps(-0.25)", "-0.25"),
+    ("setcps(+1.5)", "+1.5")
+  )
+
+  test("highlights numeric configuration values"):
+    forAll(numberCases): (source, number) =>
+      onFxThread:
+        val editor = highlightedEditor(source)
+
+        assertRangeContains(
+          editor,
+          start = source.indexOf(number),
+          length = number.length,
+          expectedStyle = UITheme.Number
+        )
+
+  test("string style takes precedence over numbers inside strings"):
+    onFxThread:
+      val source = """gain("0.5")"""
+      val editor = highlightedEditor(source)
+      val numberStart = source.indexOf("0.5")
+
+      assertRangeContains(
+        editor,
+        start = numberStart,
+        length = "0.5".length,
+        expectedStyle = UITheme.String
+      )
+      assertRangeDoesNotContain(
+        editor,
+        start = numberStart,
+        length = "0.5".length,
+        unexpectedStyle = UITheme.Number
+      )
+
   private val nonFunctionCases = Table(
     ("description", "source", "target"),
     ("identifier without parentheses", "note value", "note"),
