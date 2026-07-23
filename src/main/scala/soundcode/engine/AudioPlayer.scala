@@ -73,17 +73,19 @@ class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
 
   /** Mette in pausa la riproduzione, chiude il thread e registra l'istante dello stop. */
   def stop(): Unit = {
-    val t = lock.synchronized {
-      isRunning = false
-      state = state.copy(
-        activeHighlights = Map.empty,
-        currentHighlightSet = Set.empty,
-        pausedAtMs = Some(System.currentTimeMillis())
-      )
-      onHighlightChange(state.currentHighlightSet)
-      thread
-    }
-    t.foreach(_.join())
+      if isRunning then {
+        val t = lock.synchronized {
+          isRunning = false
+          state = state.copy(
+            activeHighlights = Map.empty,
+            currentHighlightSet = Set.empty,
+            pausedAtMs = Some(System.currentTimeMillis())
+          )
+          onHighlightChange(state.currentHighlightSet)
+          thread
+        }
+        t.foreach(_.join())
+      }
   }
 
   /** Avanza lo stato del player in base all'istante di tempo corrente. */
