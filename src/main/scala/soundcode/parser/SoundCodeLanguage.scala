@@ -2,35 +2,87 @@ package soundcode.parser
 
 object SoundCodeLanguage:
   enum ConstructKind:
-    case Generative, Transformation, Visualization
+    case Generative, Transformation, Visualization, Configuration
 
   final case class Construct(
       name: String,
+      argumentLists: Vector[String],
       snippet: String,
       detail: String,
       kind: ConstructKind
-  )
+  ):
+    require(argumentLists.nonEmpty, "A construct must define at least one signature")
 
-  object Generative:
-    val Sound = "sound"
-    val Note = "note"
+    def signature: String =
+      signatures.head
 
-    val all: Vector[Construct] = Vector(
+    def signatures: Vector[String] =
+      argumentLists.map(arguments => s"$name($arguments)")
+
+  sealed trait ConstructCategory:
+    def kind: ConstructKind
+    def all: Vector[Construct]
+
+    protected final def construct(
+        name: String,
+        arguments: String,
+        snippet: String,
+        detail: String,
+        alternativeArguments: Vector[String] = Vector.empty
+    ): Construct =
       Construct(
-        Sound,
-        """sound("$0")""",
-        "Generates a sample pattern",
-        ConstructKind.Generative
+        name = name,
+        argumentLists = arguments +: alternativeArguments,
+        snippet = snippet,
+        detail = detail,
+        kind = kind
+      )
+
+  object Settings extends ConstructCategory:
+    override val kind: ConstructKind = ConstructKind.Configuration
+
+    val SetCps = "setcps"
+    val SetCpm = "setcpm"
+
+    override val all: Vector[Construct] = Vector(
+      construct(
+        SetCps,
+        "cyclesPerSecond: number",
+        "setcps($0)",
+        "Sets the number of cycles per second"
       ),
-      Construct(
-        Note,
-        """note("$0")""",
-        "Generates a note pattern",
-        ConstructKind.Generative
+      construct(
+        SetCpm,
+        "cyclesPerMinute: number",
+        "setcpm($0)",
+        "Sets the number of cycles per minute"
       )
     )
 
-  object Transformation:
+  object Generative extends ConstructCategory:
+    override val kind: ConstructKind = ConstructKind.Generative
+
+    val Sound = "sound"
+    val Note = "note"
+
+    override val all: Vector[Construct] = Vector(
+      construct(
+        Sound,
+        """pattern: "sample pattern"""",
+        """sound("$0")""",
+        "Generates a sample pattern"
+      ),
+      construct(
+        Note,
+        """pattern: "note pattern"""",
+        """note("$0")""",
+        "Generates a note pattern"
+      )
+    )
+
+  object Transformation extends ConstructCategory:
+    override val kind: ConstructKind = ConstructKind.Transformation
+
     val Gain = "gain"
     val Pan = "pan"
     val Room = "room"
@@ -46,104 +98,112 @@ object SoundCodeLanguage:
     val Juxtaposition = "jux"
     val Offset = "off"
 
-    val all: Vector[Construct] = Vector(
-      Construct(
+    override val all: Vector[Construct] = Vector(
+      construct(
         Gain,
+        """amount: "numeric pattern"""",
         """gain("$0")""",
-        "Changes volume",
-        ConstructKind.Transformation
+        "Changes volume"
       ),
-      Construct(
+      construct(
         Pan,
+        """position: "numeric pattern"""",
         """pan("$0")""",
-        "Moves sound left or right",
-        ConstructKind.Transformation
+        "Moves sound left or right"
       ),
-      Construct(
+      construct(
         Room,
+        """amount: "numeric pattern"""",
         """room("$0")""",
-        "Adds room amount",
-        ConstructKind.Transformation
+        "Adds room amount"
       ),
-      Construct(
+      construct(
         Delay,
+        """amount: "numeric pattern"""",
         """delay("$0")""",
         "Adds delay amount",
-        ConstructKind.Transformation
+        Vector(
+          """amount: "numeric pattern", time: "numeric pattern", feedback: "numeric pattern""""
+        )
       ),
-      Construct(
+      construct(
         LowPassFilter,
+        """cutoff: "numeric pattern"""",
         """lpf("$0")""",
-        "Applies a low-pass filter",
-        ConstructKind.Transformation
+        "Applies a low-pass filter"
       ),
-      Construct(
+      construct(
         HighPassFilter,
+        """cutoff: "numeric pattern"""",
         """hpf("$0")""",
-        "Applies a high-pass filter",
-        ConstructKind.Transformation
+        "Applies a high-pass filter"
       ),
-      Construct(
+      construct(
         Reverse,
+        "",
         """rev()""",
-        "Reverses the pattern",
-        ConstructKind.Transformation
+        "Reverses the pattern"
       ),
-      Construct(
+      construct(
         FastForward,
-        """fast($0)""",
-        "Speeds up the pattern",
-        ConstructKind.Transformation
+        """factor: "numeric pattern"""",
+        """fast("$0")""",
+        "Speeds up the pattern"
       ),
-      Construct(
+      construct(
         SlowMotion,
-        """slow($0)""",
-        "Slows down the pattern",
-        ConstructKind.Transformation
+        """factor: "numeric pattern"""",
+        """slow("$0")""",
+        "Slows down the pattern"
       ),
-      Construct(
+      construct(
         Early,
-        """early($0)""",
-        "Moves events earlier",
-        ConstructKind.Transformation
+        """offset: "numeric pattern"""",
+        """early("$0")""",
+        "Moves events earlier"
       ),
-      Construct(
+      construct(
         Late,
-        """late($0)""",
-        "Moves events later",
-        ConstructKind.Transformation
+        """offset: "numeric pattern"""",
+        """late("$0")""",
+        "Moves events later"
       ),
-      Construct(
+      construct(
         Repetition,
+        """count: "numeric pattern"""",
         """ply("$0")""",
-        "Repeats events",
-        ConstructKind.Transformation
+        "Repeats events"
       ),
-      Construct(
+      construct(
         Juxtaposition,
+        "transformations: transformation*",
         """jux($0)""",
-        "Combines transformations",
-        ConstructKind.Transformation
+        "Combines transformations"
       ),
-      Construct(
+      construct(
         Offset,
+        """offset: "numeric pattern", transformations: transformation*""",
         """off("$0", )""",
-        "Applies transformations with an offset",
-        ConstructKind.Transformation
+        "Applies transformations with an offset"
       )
     )
 
-  object Visualization:
+  object Visualization extends ConstructCategory:
+    override val kind: ConstructKind = ConstructKind.Visualization
+
     val Pianoroll = "_pianoroll"
 
-    val all: Vector[Construct] = Vector(
-      Construct(
+    override val all: Vector[Construct] = Vector(
+      construct(
         Pianoroll,
+        "",
         """_pianoroll()""",
-        "Visualizes the pattern as a pianoroll",
-        ConstructKind.Visualization
+        "Visualizes the pattern as a pianoroll"
       )
     )
 
+  val categories: Vector[ConstructCategory] =
+    Vector(Settings, Generative, Transformation, Visualization)
+
   val all: Vector[Construct] =
-    Generative.all ++ Transformation.all ++ Visualization.all
+    categories.flatMap(_.all)

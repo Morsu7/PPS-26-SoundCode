@@ -1,12 +1,20 @@
 package soundcode.ui.editor
 
-import javafx.scene.control.{Label, ListCell, ListView, OverrunStyle, ScrollBar}
+import javafx.scene.control.{
+  Label,
+  ListCell,
+  ListView,
+  OverrunStyle,
+  ScrollBar,
+  Tooltip
+}
 import javafx.scene.input.{KeyCode, KeyEvent, MouseEvent}
 import javafx.stage.Popup
 import org.fxmisc.richtext.GenericStyledArea
 import javafx.application.Platform
 import javafx.geometry.Orientation
-import javafx.scene.layout.VBox
+import javafx.scene.layout.{HBox, Priority, VBox}
+import javafx.util.Duration
 import scala.jdk.CollectionConverters.*
 import soundcode.parser.SoundCodeLanguage
 import soundcode.ui.theme.UITheme
@@ -26,8 +34,12 @@ object AutocompleteSupport:
   ) extends ListCell[CompletionItem]:
 
     private val keyword = new Label()
+    private val arguments = new Label()
+    private val overloadHint = new Label()
     private val detail = new Label()
-    private val content = new VBox(2, keyword, detail)
+    private val signatureTooltip = new Tooltip()
+    private val argumentsRow = new HBox(6, arguments, overloadHint)
+    private val content = new VBox(2, keyword, argumentsRow, detail)
 
     content.setFillWidth(true)
     content
@@ -35,8 +47,18 @@ object AutocompleteSupport:
       .bind(list.widthProperty().subtract(34))
 
     keyword.setMaxWidth(Double.MaxValue)
-    keyword.setTextOverrun(OverrunStyle.ELLIPSIS)
     keyword.setStyle(UITheme.autocompleteKeywordStyle)
+
+    arguments.setMaxWidth(Double.MaxValue)
+    arguments.setWrapText(true)
+    arguments.setStyle(UITheme.autocompleteArgumentsStyle)
+    HBox.setHgrow(arguments, Priority.ALWAYS)
+
+    overloadHint.setStyle(UITheme.autocompleteOverloadStyle)
+
+    signatureTooltip.setShowDelay(Duration.millis(150))
+    Tooltip.install(arguments, signatureTooltip)
+    Tooltip.install(overloadHint, signatureTooltip)
 
     detail.setMaxWidth(Double.MaxValue)
     detail.setTextOverrun(OverrunStyle.ELLIPSIS)
@@ -61,8 +83,21 @@ object AutocompleteSupport:
         setGraphic(null)
         setStyle(UITheme.autocompleteEmptyCellStyle)
       else
+        val additionalOverloads =
+          getItem.argumentLists.size - 1
+
         keyword.setText(getItem.name)
+        arguments.setText(s"(${getItem.argumentLists.head})")
+        overloadHint.setText(
+          if additionalOverloads == 1 then "+1 overload"
+          else s"+$additionalOverloads overloads"
+        )
+        overloadHint.setVisible(additionalOverloads > 0)
+        overloadHint.setManaged(additionalOverloads > 0)
         detail.setText(getItem.detail)
+        signatureTooltip.setText(
+          getItem.signatures.mkString("\n")
+        )
 
         setText(null)
         setGraphic(content)
@@ -148,8 +183,7 @@ object AutocompleteSupport:
     list.setFocusTraversable(false)
     list.setPrefWidth(UITheme.AutocompleteWidth)
     list.setMinHeight(UITheme.AutocompleteMinHeight)
-    list.setMaxHeight(UITheme.AutocompleteMaxHeight)
-    list.setFixedCellSize(UITheme.AutocompleteCellHeight)
+    list.setMaxHeight(UITheme.AutocompleteExpandedMaxHeight)
     list.setStyle(UITheme.autocompletePopupStyle)
 
     def styleScrollBar(): Unit =
@@ -198,8 +232,8 @@ object AutocompleteSupport:
             UITheme.AutocompleteMaxHeight,
             math.min(
               UITheme.AutocompleteExpandedMaxHeight,
-              items.size * 
-                UITheme.AutocompleteCellHeight + 
+              items.size *
+                UITheme.AutocompleteEstimatedCellHeight +
                 UITheme.AutocompleteHeightPadding
             )
           )

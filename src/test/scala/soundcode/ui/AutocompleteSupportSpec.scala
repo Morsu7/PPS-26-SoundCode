@@ -28,6 +28,12 @@ class AutocompleteSupportSpec
       """sound("bd").gain("""".length
     ),
     (
+      "numeric pattern transformation",
+      """sound("bd").fa""",
+      """sound("bd").fast("")""",
+      """sound("bd").fast("""".length
+    ),
+    (
       "generative block after dot",
       """sound("bd").so""",
       """sound("bd").sound("")""",

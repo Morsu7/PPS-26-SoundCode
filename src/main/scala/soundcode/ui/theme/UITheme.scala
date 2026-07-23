@@ -35,11 +35,11 @@ private[ui] object UITheme:
   val CloseButtonFontSize = 18
 
   // Autocomplete dimensions
-  val AutocompleteWidth = 340.0
+  val AutocompleteWidth = 420.0
   val AutocompleteMinHeight = 132.0
   val AutocompleteMaxHeight = 156.0
   val AutocompleteExpandedMaxHeight = 240.0
-  val AutocompleteCellHeight = 48.0
+  val AutocompleteEstimatedCellHeight = 64.0
   val AutocompleteScrollbarWidth = 10.0
   val AutocompleteHeightPadding = 10.0
 
@@ -103,9 +103,23 @@ private[ui] object UITheme:
       |-fx-font-weight: 700;
       |""".stripMargin
 
+  def autocompleteArgumentsStyle: String =
+    s"""
+      |-fx-text-fill: $Function;
+      |-fx-font-family: $FontFamily;
+      |-fx-font-size: ${DetailFontSize}px;
+      |""".stripMargin
+
+  def autocompleteOverloadStyle: String =
+    s"""
+      |-fx-text-fill: $Muted;
+      |-fx-font-size: ${DetailFontSize}px;
+      |-fx-font-style: italic;
+      |""".stripMargin
+
   def autocompleteDetailStyle: String =
     s"""
-      |-fx-text-fill: $PopupDetail;
+      |-fx-text-fill: $Muted;
       |-fx-font-size: ${DetailFontSize}px;
       |""".stripMargin
 

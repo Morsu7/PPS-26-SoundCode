@@ -27,6 +27,10 @@ private[ui] object CompletionProvider:
       SoundCodeLanguage.Transformation.all ++
       SoundCodeLanguage.Visualization.all
 
+  private val lineStartCandidates =
+    SoundCodeLanguage.Generative.all ++
+      SoundCodeLanguage.Settings.all
+
   def contextFrom(
       text: String,
       caretPosition: Int
@@ -63,7 +67,7 @@ private[ui] object CompletionProvider:
         if context.isAfterDot then
           afterDotCandidates
         else if context.isAtLineStart then
-          SoundCodeLanguage.Generative.all
+          lineStartCandidates
         else
           Vector.empty
 
