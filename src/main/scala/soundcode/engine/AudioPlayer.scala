@@ -27,6 +27,8 @@ class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
   @volatile private var eventStream: LazyList[ScheduledEvent[AudioPayload]] = LazyList.empty
   @volatile private var firstTickTimeMs: Option[AbsoluteTime] = None
 
+  private var pausedAtMs: Option[Long] = None
+
   private var activeHighlights: Map[TextPosition, AbsoluteTime] = Map.empty
   private var currentHighlightSet: Set[TextPosition] = Set.empty
 
@@ -39,6 +41,16 @@ class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
   /** Avvia il thread di riproduzione in background. */
   def start(): Unit = if (!isRunning) {
     isRunning = true
+
+    for
+      pTime <- pausedAtMs
+      ft <- firstTickTimeMs
+    do
+      val pauseDuration = System.currentTimeMillis() - pTime
+      firstTickTimeMs = Some(ft + pauseDuration)
+
+    pausedAtMs = None
+
     thread = Some(new Thread(() => while (isRunning) {
       val now = System.currentTimeMillis()
       tick(AbsoluteTime(now))
@@ -54,6 +66,7 @@ class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
     isRunning = false
     thread.foreach(_.join())
     activeHighlights = Map.empty
+    pausedAtMs = Some(System.currentTimeMillis())
     notifyHighlightsChanged()
 
   /** Avanza lo stato del player in base all'istante di tempo corrente.
@@ -75,6 +88,7 @@ class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
       now >= expectedTriggerMs
     }
     eventStream = futureEvents
+
     toProcess.filter(e => e.part.start == e.whole.start).foreach { nextEvent =>
       val durationMs = tempo.durationMs(nextEvent.whole.start, nextEvent.whole.end)
       backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
