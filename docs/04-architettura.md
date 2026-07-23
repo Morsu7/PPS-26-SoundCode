@@ -1,4 +1,7 @@
-# Design architetturale
+---
+layout: default
+title: Design architetturale
+---
 
 ## Architettura complessiva
 
@@ -68,6 +71,14 @@ Le interazioni dell'utente e le notifiche del motore sono rappresentate come mes
 
 MVU centralizza lo stato, rende esplicite le transizioni e separa la logica applicativa dagli effetti collaterali. Nel contesto del live coding, questa separazione consente di segnalare gli errori del nuovo programma senza sostituire una timeline valida già in esecuzione.
 
+In questo ciclo, `Cmd` rappresenta esplicitamente gli effetti collaterali
+richiesti da una transizione, come il parsing, l'aggiornamento della timeline e
+l'avvio o l'arresto della riproduzione. La funzione di aggiornamento non esegue
+direttamente queste operazioni, ma restituisce una descrizione dell'effetto al
+runtime, che la interpreta e ne reinserisce l'esito nel flusso sotto forma di
+messaggio. `Cmd` completa quindi la separazione fra la decisione applicativa e
+l'interazione concreta con i sottosistemi.
+
 ### Architettura a livelli e pipeline
 
 Il nucleo segue anche un'architettura **a livelli**, organizzata come una pipeline di trasformazioni prevalentemente unidirezionale:
@@ -89,13 +100,6 @@ Ogni passaggio introduce una rappresentazione con uno scopo distinto:
 - i comandi MIDI realizzano l'esecuzione audio.
 
 La separazione permette di modificare e verificare ciascuna fase con un impatto limitato sulle altre. In particolare, parser e interprete non dipendono dall'infrastruttura audio, mentre scheduler e visualizzazioni lavorano sul modello del dominio.
-
-### Pattern di supporto
-
-#### Command
-
-Il tipo `Cmd` rappresenta esplicitamente gli effetti collaterali prodotti da una transizione MVU, come il parsing, l'aggiornamento della timeline e l'avvio o l'arresto della riproduzione. In questo modo la decisione di eseguire un'operazione rimane separata dalla sua esecuzione concreta.
-
 
 ## Scelte tecnologiche rilevanti
 

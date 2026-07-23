@@ -1,4 +1,7 @@
-# Metodologia di sviluppo
+---
+layout: default
+title: Metodologia di sviluppo
+---
 
 In questa sezione si descriverà l'organizzazione del team di sviluppo.
 

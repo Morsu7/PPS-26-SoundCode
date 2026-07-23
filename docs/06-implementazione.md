@@ -1,4 +1,7 @@
-# Implementazione
+---
+layout: default
+title: Implementazione
+---
 
 Questa sezione approfondisce soltanto le soluzioni realizzative che concretizzano decisioni rilevanti del design. Non costituisce una descrizione esaustiva di ogni classe: nomi e frammenti di codice sono riportati quando chiariscono l'uso di Scala, gli algoritmi adottati o l'integrazione con librerie esterne.
 
@@ -129,35 +132,108 @@ L'invio di `noteOn` è sincrono e breve; il corrispondente `noteOff` viene progr
 
 ## Interfaccia utente — Giacomo Biagioni
 
-### Runtime MVU
+### Ciclo MVU e integrazione con i sottosistemi
 
-Il package `mvu` implementa esplicitamente i quattro elementi descritti nel design:
+Il runtime conserva un solo `AppModel` e tratta la vista come una funzione di
+rendering dello stato. `Update.update` è una funzione basata su pattern matching
+che restituisce la coppia `(AppModel, Cmd)`: le transizioni rimangono quindi
+separate dall'esecuzione degli effetti. Ogni `Cmd` implementa un trait sigillato
+e riceve due dipendenze esplicite, la funzione `dispatch` e l'`AudioPlayer`.
+Questo permette a un comando di reinserire il proprio risultato nel ciclo senza
+conoscere la vista.
 
-- `AppModel` è una case class immutabile;
-- `Msg` è un enum chiuso di eventi applicativi;
-- `Update.update` è una funzione che restituisce la coppia nuovo modello/comando;
-- `Cmd` descrive ed esegue parsing, scheduling e controllo del player;
-- `SoundCodeRuntime` conserva il modello corrente, esegue il rendering e interpreta i comandi.
+In particolare, parsing e interpretazione producono un nuovo messaggio; solo in
+caso di successo vengono aggiornate insieme la timeline infinita del player e
+le timeline finite dei visualizzatori. Una revisione numerica
+(`timelineRevision`) identifica ogni aggiornamento accettato e impedisce
+rendering duplicati o il ripristino di visualizzazioni più vecchie. Le callback
+del player possono arrivare dal thread audio: `SoundCodeFrame` le inoltra al
+thread JavaFX con `Platform.runLater`, evitando accessi concorrenti ai nodi
+grafici. Nello stesso punto sono gestiti costruzione e arresto del backend, in
+modo che il ciclo di vita delle risorse coincida con quello dell'applicazione.
 
-Il comando di aggiornamento analizza e interpreta il testo. In caso di successo arma il player con la timeline lazy e invia alla UI timeline finite e richieste di visualizzazione. In caso di errore invia soltanto il messaggio diagnostico: poiché non viene emesso alcun comando di sostituzione, il player conserva la timeline precedente.
+### Editor e operazioni di modifica
 
-`timelineRevision` viene incrementato a ogni aggiornamento valido. La UI lo usa per riconoscere una nuova versione delle timeline anche quando gli altri campi osservabili potrebbero risultare uguali.
+`BlockEditorView` usa una sola `GenericStyledArea` di RichTextFX. La scelta
+consente di appoggiarsi alla cronologia testuale nativa per **undo/redo** e alle
+operazioni standard della text area per **copia, taglia e incolla**, mantenendo
+compatibili scorciatoie, selezione e cursore. Gli stili non entrano nella
+cronologia, come stabilito nella configurazione della `GenericStyledArea`: una
+ricolorazione o un highlight di riproduzione non genera quindi passi di undo.
+Dopo il caricamento del testo
+iniziale la cronologia viene dimenticata, così il primo undo riguarda una
+modifica dell'utente e non l'inizializzazione dell'editor.
 
-### Editor RichTextFX
+Le responsabilità aggiuntive sono installate come componenti indipendenti:
 
-`BlockEditorView` usa una `GenericStyledArea` RichTextFX all'interno di uno scroll pane virtualizzato. Le funzionalità ortogonali sono isolate in moduli dedicati:
+- `LineNumberFactory` adatta una funzione Scala a `IntFunction[Node]`, richiesta
+  dall'API Java di RichTextFX, e costruisce il gutter in modo lazy per ogni
+  paragrafo;
+- `SyntaxHighlighter` applica prima lo stile sintattico, riconoscendo stringhe e
+  chiamate tramite espressioni regolari, poi sovrappone le posizioni attive
+  ricevute dal player. Gli intervalli vengono limitati alla lunghezza corrente
+  del documento per tollerare coordinate calcolate su una versione precedente;
+- le modifiche ravvicinate non causano una ricolorazione per ogni carattere:
+  un flag accorpa le richieste e pianifica un solo aggiornamento sul successivo
+  turno JavaFX;
+- il testo esposto al parser normalizza i newline, rendendo stabili gli offset
+  fra piattaforme diverse.
 
-- `SyntaxHighlighter` applica stili distinti a stringhe e nomi di funzione, poi sovrappone lo stile delle posizioni in riproduzione;
-- `AutocompleteSupport` determina il contesto del cursore e propone costrutti compatibili;
-- `AutoPairingSupport` gestisce parentesi, virgolette e selezioni;
-- `LineNumberFactory` costruisce il gutter con i numeri di riga.
+`AutoPairingSupport` intercetta gli eventi prima dell'inserimento standard.
+Parentesi, quadre, angolari e virgolette vengono inserite a coppie; se esiste
+una selezione, questa viene racchiusa e resta selezionata all'interno dei nuovi
+delimitatori. Digitando una chiusura già presente, il cursore la oltrepassa
+senza duplicarla. Per le virgolette viene inoltre controllata la parità di
+quelle precedenti al cursore, così una citazione aperta può essere chiusa
+normalmente.
 
-L'evidenziazione viene accodata con `Platform.runLater`, evitando modifiche grafiche fuori dal thread JavaFX e raggruppando più richieste ravvicinate. Quando l'utente cambia il testo dopo un update, gli highlight della vecchia timeline vengono temporaneamente nascosti perché i relativi offset non descrivono più necessariamente gli stessi caratteri.
+Il completamento è diviso fra logica pura e presentazione.
+`CompletionProvider` ricava dal testo un `Context` e propone costrutti diversi
+all'inizio della riga o dopo un punto, escludendo l'interno delle stringhe. Le
+descrizioni provengono da `SoundCodeLanguage`, condiviso con il parser, per non
+duplicare nomi, firme e snippet della DSL. `AutocompleteSupport` realizza il
+popup navigabile da tastiera o mouse, mostra argomenti, overload e descrizione,
+sostituisce soltanto il prefisso corrente e interpreta il marcatore `$0` per
+posizionare il cursore nel punto utile dello snippet.
 
 ### Visualizzazioni incorporate
 
-I visualizzatori sono nodi JavaFX sovrapposti all'editor e ancorati all'offset del comando che li ha richiesti. Lo stile di paragrafo riserva lo spazio verticale necessario; a ogni modifica del testo gli offset degli ancoraggi successivi vengono traslati della differenza tra caratteri inseriti e rimossi. Scroll e ridimensionamento provocano un nuovo calcolo della posizione sullo schermo.
+Le visualizzazioni condividono il trait `AnimatedView`, che espone solamente il
+nodo radice e i controlli `play`/`stop`. `CanvasAnimatedView` implementa la
+parte comune: canvas responsivo, pulizia del frame e `AnimationTimer`. Il tempo
+trascorso è misurato con il clock monotono in nanosecondi e convertito in cicli
+tramite `Tempo.cps`; le sottoclassi devono implementare soltanto `draw`.
+`VisualizerViewFactory` effettua il pattern matching sul `VisualizerKind` e
+isola così dall'editor la scelta della vista concreta.
 
-`CanvasAnimatedView` implementa il comportamento comune su un canvas ridimensionabile. Un `AnimationTimer` usa il tempo monotono in nanosecondi e il valore `cps` per ricavare il ciclo corrente. `PianorollView` converte la timeline in eventi grafici, assegna una corsia a ogni nota o sample e replica visivamente la timeline finita per simulare il ciclo continuo attorno a un playhead centrale.
+`PianorollView` trasforma la timeline in una rappresentazione grafica più
+compatta (`VisualEvent`). Note e sample sono distribuiti in corsie determinate
+da etichette distinte e ordinate. A ogni frame viene calcolata soltanto la
+porzione di loop visibile attorno alla testina centrale; gli eventi vengono
+ripetuti nei loop necessari, traslati rispetto al ciclo corrente e disegnati
+con larghezza proporzionale alla durata. L'evento attivo cambia resa grafica e
+le etichette vengono limitate allo spazio disponibile.
 
-`MainView` non chiama direttamente parser o player: pulsanti e scorciatoie producono messaggi. Durante il rendering aggiorna editor e banner e avvia o arresta le animazioni soltanto quando cambia lo stato di riproduzione.
+`VisualizerOverlayManager` mantiene per ogni vista un offset sorgente. A
+inserimenti e cancellazioni applica il delta agli ancoraggi successivi e
+ricolloca quelli contenuti nel testo rimosso. Lo spazio verticale è riservato
+tramite uno stile di paragrafo, mentre i canvas sono collocati in un overlay
+separato e ritrasformati dalle coordinate schermo a quelle locali durante
+scroll e resize. In questo modo i visualizzatori sembrano appartenere
+all'editor senza essere caratteri del documento e senza interferire con
+selezione, copia-incolla o undo.
+
+### Vista principale, feedback e tema
+
+`MainView` compone toolbar, editor ed `ErrorBanner` e traduce pulsanti e
+scorciatoie (`Shortcut+Enter`, `Shortcut+.` e `Shortcut+U`) in messaggi, senza
+invocare direttamente parser o player. Durante il rendering memorizza l'ultimo
+stato di riproduzione per avviare o fermare le animazioni soltanto quando il
+valore cambia. Il banner degli errori gestisce visibilità e layout insieme e
+usa transizioni di fade; la chiusura genera un messaggio solo al termine
+dell'animazione.
+
+Colori, tipografia, dimensioni e stringhe CSS sono raccolti in `UITheme`. Oltre
+a mantenere coerenti editor, gutter, popup, scrollbar, visualizzatori ed
+errori, questa centralizzazione evita che le classi comportamentali conoscano
+valori grafici specifici.

@@ -30,6 +30,13 @@ object BlockEditorView:
       timelineRevision: Long
   )
 
+  private case class ViewState(
+      visualizers: Option[RenderedVisualizersState] = None,
+      highlightScheduled: Boolean = false,
+      replacingCode: Boolean = false,
+      playbackHighlightsEnabled: Boolean = true
+  )
+
 final class BlockEditorView(
     initialCode: String =
       """|note("<c4 e4 g4 e4> <a3 c4 e4 c4> <f3 a3 c4 a3> <g3 b3 d4 b3>").sound("piano")
@@ -74,11 +81,7 @@ final class BlockEditorView(
   // for testing purposes expose the underlying area
   private[ui] def editorArea: GenericStyledArea[?, String, String] = area
 
-  private var visualizersState: Option[RenderedVisualizersState] = None
-
-  private var highlightScheduled = false
-  private var replacingCode = false
-  private var playbackHighlightsEnabled = true
+  private var viewState = ViewState()
 
   private val scrollPane =
     new VirtualizedScrollPane(area)
@@ -129,19 +132,20 @@ final class BlockEditorView(
       tempo = state.tempo,
       timelineRevision = state.timelineRevision
     )
-
     val isStaleVisualizerState =
-      visualizersState.exists(
+      viewState.visualizers.exists(
         _.timelineRevision > nextVisualizersState.timelineRevision
       )
 
-    if !isStaleVisualizerState && !visualizersState.contains(nextVisualizersState) then
+    if !isStaleVisualizerState && !viewState.visualizers.contains(nextVisualizersState) then
       renderVisualizers(
         nextState = nextVisualizersState,
         isPlaying = state.isPlaying
       )
-      visualizersState = Some(nextVisualizersState)
-      playbackHighlightsEnabled = true
+      viewState = viewState.copy(
+        visualizers = Some(nextVisualizersState),
+        playbackHighlightsEnabled = true
+      )
 
     renderHighlights(state)
 
@@ -170,8 +174,8 @@ final class BlockEditorView(
     area
       .plainTextChanges()
       .subscribe { change =>
-        if !replacingCode then
-          playbackHighlightsEnabled = false
+        if !viewState.replacingCode then
+          viewState = viewState.copy(playbackHighlightsEnabled = false)
 
           visualizerManager.updateAnchors(
             changePosition = change.getPosition,
@@ -218,16 +222,16 @@ final class BlockEditorView(
   private def setCode(code: String): Unit =
     val normalized = normalizeNewlines(code)
 
-    replacingCode = true
+    viewState = viewState.copy(replacingCode = true)
 
     try
       area.replaceText(normalized)
       SyntaxHighlighter.applyTo(area)
-    finally replacingCode = false
+    finally viewState = viewState.copy(replacingCode = false)
 
   private def renderHighlights(state: AppModel): Unit =
     val playbackPositions =
-      Option.when(playbackHighlightsEnabled)(state.positions)
+      Option.when(viewState.playbackHighlightsEnabled)(state.positions)
         .getOrElse(Set.empty)
   
     SyntaxHighlighter.applyTo(
@@ -247,12 +251,12 @@ final class BlockEditorView(
     )
 
   private def scheduleHighlight(): Unit =
-    if !highlightScheduled && !replacingCode then
-      highlightScheduled = true
+    if !viewState.highlightScheduled && !viewState.replacingCode then
+      viewState = viewState.copy(highlightScheduled = true)
 
       Platform.runLater {
         try SyntaxHighlighter.applyTo(area)
-        finally highlightScheduled = false
+        finally viewState = viewState.copy(highlightScheduled = false)
       }
 
   private def normalizeNewlines(text: String): String =

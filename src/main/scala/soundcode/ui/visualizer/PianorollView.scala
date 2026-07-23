@@ -12,7 +12,7 @@ final class PianorollView(
     timeline: Seq[ScheduledEvent[AudioPayload]],
     tempo: Tempo
 ) extends CanvasAnimatedView(tempo):
-  val visualEvents: Seq[VisualEvent] = toVisualEvents()
+  private val visualEvents: Seq[VisualEvent] = toVisualEvents()
 
   private val loopLength = timeline
     .map(_.whole.end)
@@ -42,8 +42,8 @@ final class PianorollView(
       )
     }
 
-  val laneCount = visualEvents.map(_.lane).maxOption.getOrElse(0) + 1
-  val laneHeight = (canvasHeight - config.verticalPadding * 2) / laneCount
+  private val laneCount = visualEvents.map(_.lane).maxOption.getOrElse(0) + 1
+  private val laneHeight = (canvasHeight - config.verticalPadding * 2) / laneCount
 
   override protected def draw(
       gc: GraphicsContext,

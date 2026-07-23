@@ -1,4 +1,7 @@
-# Verifica e validazione
+---
+layout: default
+title: Verifica e Validazione
+---
 
 ## Strategia
 

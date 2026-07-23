@@ -1,4 +1,8 @@
-# Specifica dei requisiti e analisi del dominio
+---
+layout: default
+title: Specifica dei requisiti e analisi del dominio
+---
+
 
 ## 1. Scopo e criteri di successo
 

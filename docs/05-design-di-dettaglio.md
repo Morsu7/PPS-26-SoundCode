@@ -1,4 +1,7 @@
-# Design di dettaglio
+---
+layout: default
+title: Design di dettaglio
+---
 
 ## Parser e interprete — Cristian Morbidelli
 
@@ -116,35 +119,96 @@ L'avvio di una nota è immediato, mentre la sua terminazione è pianificata in m
 
 ### Coordinamento tramite Model–View–Update
 
-L'interfaccia è progettata attorno a un ciclo Model–View–Update. Lo stato applicativo comprende timeline finite, visualizzatori richiesti, errore corrente, stato di riproduzione e posizioni sorgente attive. Gli eventi dell'utente e le notifiche del player sono rappresentati come messaggi.
+Come descritto nell'architettura, la UI viene coordinata tramite MVU. I
+messaggi usati nel progetto si possono dividere in tre gruppi:
+
+- richieste dell'utente, ad esempio aggiornare il codice, avviare la
+  riproduzione o fermarla;
+- risultati delle operazioni, come l'esito del parsing e le nuove timeline;
+- aggiornamenti che arrivano durante la riproduzione, in particolare le
+  posizioni del codice da evidenziare.
+
+In questo modo la vista invia solo messaggi e non deve chiamare direttamente il
+parser o il player. Anche i risultati ritornano nello stesso flusso e vengono
+gestiti dalla funzione di aggiornamento. I casi principali sono:
+
+| Messaggio | Variazione del modello | Operazione richiesta |
+|---|---|---|
+| Aggiornamento del codice | Nessuna variazione immediata | Analisi del testo |
+| Analisi riuscita | Rimozione dell'errore precedente | Costruzione e sostituzione delle timeline |
+| Analisi fallita | Aggiornamento della diagnostica | Nessuna |
+| Play o stop | Aggiornamento dello stato di riproduzione | Avvio o arresto del player |
+| Nuove timeline | Timeline, visualizzazioni e revisione vengono aggiornate insieme | Nessuna |
+| Nuove posizioni attive | Sostituzione delle evidenziazioni correnti | Nessuna |
+
+Il testo presente nell'editor non coincide necessariamente con lo stato
+musicale in esecuzione. L'utente può continuare a scrivere, ma timeline e
+visualizzazioni vengono sostituite solo quando preme Update e il nuovo codice è
+valido. Se il parsing fallisce viene mostrato l'errore e la timeline precedente
+rimane disponibile. Il modello contiene anche un numero di revisione, utile
+alla vista per capire che è arrivato un nuovo aggiornamento anche quando le
+timeline ottenute sono uguali alle precedenti.
+
+Le timeline per il player e quelle finite usate dai visualizzatori vengono
+prodotte nello stesso aggiornamento. Questo evita che audio e piano roll si
+riferiscano a due versioni diverse del programma.
+
+### Editor come composizione di responsabilità
+
+L'editor è il componente principale della UI, ma non contiene direttamente
+tutte le funzionalità. La parte di base gestisce testo, cursore, selezione e
+cronologia delle modifiche. Numeri di riga, syntax highlighting, autocomplete
+e inserimento automatico delle parentesi sono aggiunti da componenti separati.
+Anche i visualizzatori vengono mantenuti separati dal testo: sono mostrati
+sopra l'editor e collegati alla posizione del comando che li ha richiesti.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Editing
-    Editing --> Validating: Update
-    Validating --> Ready: programma valido
-    Validating --> Editing: errore mostrato
-    Ready --> Playing: Play
-    Playing --> Ready: Stop
-    Playing --> Validating: Update
-    Validating --> Playing: errore / timeline precedente
+flowchart TB
+    EDITOR[Editor del sorgente]
+    EDITOR --- TEXT[Testo e selezione]
+    EDITOR --- AID[Supporto alla scrittura]
+    EDITOR --- FEEDBACK[Feedback visivo]
+
+    AID --> SYNTAX[Colorazione sintattica]
+    AID --> COMPLETE[Completamento]
+    AID --> PAIR[Delimitatori bilanciati]
+
+    FEEDBACK --> ERROR[Diagnostica]
+    FEEDBACK --> ACTIVE[Elementi in riproduzione]
+    FEEDBACK --> ROLL[Piano roll incorporato]
 ```
 
-La funzione di aggiornamento decide la nuova versione del modello e descrive l'eventuale effetto da eseguire. Il runtime applica la transizione, richiede il rendering della vista ed esegue l'effetto. Gli effetti che producono un risultato rientrano nel ciclo come nuovi messaggi. In questo modo la vista non orchestra direttamente parser, scheduler o audio.
+La separazione è utile perché queste parti si aggiornano in momenti diversi. La
+colorazione segue subito le modifiche al testo, gli errori dipendono dall'ultimo
+Update, mentre gli highlight cambiano durante la riproduzione. Il piano roll
+riceve invece una timeline già calcolata dall'engine e si occupa solamente di
+disegnarla.
 
-Una proprietà importante per il live coding è la gestione dell'errore: un programma non valido aggiorna il messaggio mostrato, ma non sostituisce la timeline valida già caricata. Un aggiornamento valido, invece, produce sia la timeline infinita per il player sia quelle finite necessarie alla rappresentazione grafica.
+### Coerenza del feedback visivo
 
-### Editor e feedback visivo
+Il parser salva le posizioni degli elementi nel testo e queste coordinate
+arrivano fino alla UI. Servono sia per evidenziare la nota o il sample in
+riproduzione, sia per inserire il piano roll vicino al relativo comando.
 
-La vista principale compone tre responsabilità:
+Il problema è che le coordinate appartengono alla versione di codice usata per
+creare la timeline. Se l'utente modifica il testo prima di fare un nuovo
+Update, gli highlight precedenti vengono quindi nascosti, perché potrebbero
+indicare caratteri sbagliati. Per i visualizzatori viene invece aggiornato
+l'offset dell'ancoraggio quando vengono inseriti o rimossi dei caratteri, in
+modo che restino vicino alla riga corretta.
 
-- l'editor acquisisce il programma e offre evidenziazione sintattica, completamento, auto-pairing, numeri di riga e scorciatoie;
-- il banner presenta gli errori senza interrompere la sessione;
-- i visualizzatori rappresentano l'evoluzione temporale degli stream richiesti.
+I diversi tipi di feedback hanno quindi compiti distinti:
 
-Le posizioni sorgente costituiscono il collegamento fra riproduzione ed editor. Il player comunica l'insieme delle posizioni attive; il modello le registra e la vista le rende come evidenziazioni, senza dipendere dai dettagli dello scheduling.
+- la colorazione aiuta a leggere il codice, ma non dice se è valido;
+- il banner mostra gli errori senza modificare il testo;
+- gli highlight mostrano quali elementi stanno suonando;
+- il piano roll mostra la disposizione degli eventi nel tempo e segue lo stato
+  di play e stop.
 
-I visualizzatori sono associati allo stream e ancorati alla posizione del relativo comando nel testo. Una revisione della timeline consente alla vista di distinguere un nuovo contenuto musicale da un semplice ridisegno. Il contratto comune di avvio e arresto mantiene inoltre sincronizzato il loro stato con quello della riproduzione, senza vincolare il coordinamento a una specifica rappresentazione grafica.
+Questa divisione si vede anche nei package: `soundcode.mvu` contiene stato,
+messaggi e comandi, mentre `soundcode.ui` contiene i componenti grafici. In
+questo modo i dettagli di ScalaFX e RichTextFX rimangono nella UI e non entrano
+nella gestione dello stato.
 
 ## Contratti tra i sottosistemi
 

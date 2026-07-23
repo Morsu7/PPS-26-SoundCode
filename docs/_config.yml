@@ -1,0 +1,16 @@
+title: SoundCode
+description: Relazione del progetto SoundCode
+lang: it-IT
+
+theme: jekyll-theme-cayman
+
+markdown: kramdown
+kramdown:
+  input: GFM
+
+plugins:
+  - jekyll-relative-links
+
+relative_links:
+  enabled: true
+  collections: true
