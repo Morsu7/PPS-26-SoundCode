@@ -28,9 +28,9 @@ class SoundCodeParser {
     ) // One or more audio Streams
 
   private def settingBlock(using P[?]): P[SettingBlock] =
-    P( setting ~ "(" ~ ws ~ wrapped(configAtom) ~ ws ~ ")").map {
-      case _ => ???
-    }
+    P( setting ~/ "(" ~ ws ~ wrapped(configAtom) ~ ws ~ ")").map {
+      case (constructor, value) => constructor(value)
+    }.opaque("Setting command")
 
   private def setting(using P[?]): P[Config => SettingBlock] = 
     P(
