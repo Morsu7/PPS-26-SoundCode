@@ -12,6 +12,8 @@ final class PianorollView(
     timeline: Seq[ScheduledEvent[AudioPayload]],
     tempo: Tempo
 ) extends CanvasAnimatedView(tempo):
+  override protected val pixelsPerCycle: Double = 180.0
+
   private val visualEvents: Seq[VisualEvent] = toVisualEvents()
 
   private val loopLength = timeline
@@ -44,6 +46,7 @@ final class PianorollView(
 
   private val laneCount = visualEvents.map(_.lane).maxOption.getOrElse(0) + 1
   private val laneHeight = (canvasHeight - config.verticalPadding * 2) / laneCount
+  private val noteFont = Font.font(math.min(12.0, laneHeight * 0.55))
 
   override protected def draw(
       gc: GraphicsContext,
@@ -82,45 +85,47 @@ final class PianorollView(
     val lastLoop =
       Math.ceil(lastVisibleCycle / loopLength).toInt
 
-    val repeatedEvents =
-      for
-        loop <- firstLoop to lastLoop
-        event <- visualEvents
-      yield event.copy(start = event.start + loop * loopLength)
+    gc.font = noteFont
+    gc.textAlign = TextAlignment.Left
+    gc.textBaseline = VPos.Center
 
-    repeatedEvents.foreach { event =>
-      val x = playheadX + (event.start - currentCycle) * pixelsPerCycle
-      val y = event.lane * laneHeight + config.verticalPadding
-      val width = event.duration * pixelsPerCycle
-      val height = laneHeight
+    var loop = firstLoop
+    while loop <= lastLoop do
+      val loopOffset = loop * loopLength
 
-      val isActive =
-        currentCycle >= event.start && currentCycle < event.start + event.duration
+      visualEvents.foreach { event =>
+        val eventStart = event.start + loopOffset
+        val x = playheadX + (eventStart - currentCycle) * pixelsPerCycle
+        val y = event.lane * laneHeight + config.verticalPadding
+        val width = event.duration * pixelsPerCycle
 
-      if isActive then
-        gc.stroke = event.color
-        gc.lineWidth = 2
-        gc.strokeRect(x, y, width, height)
-      else
-        gc.fill = event.color
-        gc.fillRect(x, y, width, height)
+        if x + width >= 0 && x <= canvasWidth then
+          val isActive =
+            currentCycle >= eventStart &&
+              currentCycle < eventStart + event.duration
 
-      val horizontalTextPadding = 4.0
-      val availableTextWidth = width - horizontalTextPadding * 2
+          if isActive then
+            gc.stroke = event.color
+            gc.lineWidth = 2
+            gc.strokeRect(x, y, width, laneHeight)
+          else
+            gc.fill = event.color
+            gc.fillRect(x, y, width, laneHeight)
 
-      if availableTextWidth > 0 then
-        gc.fill =
-          if isActive then Color.web(UITheme.Foreground)
-          else Color.web(UITheme.Background)
+          val horizontalTextPadding = 4.0
+          val availableTextWidth = width - horizontalTextPadding * 2
 
-        gc.font = Font.font(math.min(12.0, height * 0.55))
-        gc.textAlign = TextAlignment.Left
-        gc.textBaseline = VPos.Center
+          if availableTextWidth > 0 then
+            gc.fill =
+              if isActive then Color.web(UITheme.Foreground)
+              else Color.web(UITheme.Background)
 
-        gc.fillText(
-          event.label,
-          x + horizontalTextPadding,
-          y + height / 2,
-          availableTextWidth
-        )
-    }
+            gc.fillText(
+              event.label,
+              x + horizontalTextPadding,
+              y + laneHeight / 2,
+              availableTextWidth
+            )
+      }
+
+      loop += 1

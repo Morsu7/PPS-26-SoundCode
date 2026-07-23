@@ -66,7 +66,9 @@ abstract class CanvasAnimatedView(
 
   private var running = false
   private var startNano: Long = 0L
+  private var lastFrameNano: Long = 0L
   private var lastCycle = 0.0
+  private val frameIntervalNanos = 1_000_000_000L / 60L
 
   private[ui] def isRunning: Boolean = running
 
@@ -100,16 +102,20 @@ abstract class CanvasAnimatedView(
   private val timer = AnimationTimer { now =>
     if startNano == 0L then startNano = now
 
-    val elapsedSeconds = (now - startNano) / 1e9
-    val currentCycle = elapsedSeconds * tempo.cps
+    if lastFrameNano == 0L || now - lastFrameNano >= frameIntervalNanos then
+      lastFrameNano = now
 
-    redraw(currentCycle)
+      val elapsedSeconds = (now - startNano) / 1e9
+      val currentCycle = elapsedSeconds * tempo.cps
+
+      redraw(currentCycle)
   }
 
   override def play(): Unit =
     if !running then
       running = true
       startNano = 0L
+      lastFrameNano = 0L
       timer.start()
 
   override def stop(): Unit =
