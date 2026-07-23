@@ -15,4 +15,5 @@ object Update:
       case Msg.UpdateHighlightText(positions) => (model.copy(positions = positions), NoOp)
       case Msg.UpdateTimelines(timelines, visualizers) => (model.copy(visualizers = visualizers, timelines = timelines, timelineRevision = model.timelineRevision + 1), NoOp)
       case Msg.ErrorDismissed => (model.copy(errors = None), NoOp)
+      case Msg.VolumeChangeRequested(volume) => (model.copy(volume = volume), Cmd.SetVolume(volume))
       case _ => (model, NoOp)

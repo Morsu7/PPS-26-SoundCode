@@ -44,7 +44,10 @@ class MidiBackend(engine: AudioEngine = AudioEngine.default()) extends AudioBack
       case _ => () // Sound.Rest, AudioEffect
 
   /** Rilascia le risorse del motore audio (synth + executor). */
-  def close(): Unit = engine.close()
+  override def close(): Unit = engine.close()
+
+  /** Inoltra il volume master al motore audio. */
+  override def setVolume(level: Double): Unit = engine.setVolume(level)
 
 object MidiBackend:
   private val DefaultVelocity = 96 // corrisponde a gain(1): assenza di gain = gain neutro
