@@ -409,43 +409,222 @@ che viene convertito in una richiesta contenente l'identificatore dello stream a
 
 ## Engine — Federico Morsucci
 
-### Dispatch e resolver specializzati
+## Modellazione del Pattern e del Dominio Temporale
 
-`PatternResolver` è l'unico punto che effettua il pattern matching sulla forma generale di `Pattern`. Ogni caso viene inoltrato a un resolver dedicato, mentre un extension method offre al resto del codice l'operazione uniforme `resolve` con la finestra temporale fornita come parametro contestuale `using`.
+La scelta fondamentale alla base del dominio è stata quella di rappresentare la struttura musicale come un **Albero Sintattico Astratto (Abstract Syntax Tree, AST)** mediante **Algebraic Data Types (ADT)**. Questa rappresentazione non ha il solo scopo di disaccoppiare il parser dall'engine di scheduling, ma permette di descrivere qualsiasi pattern musicale attraverso una struttura ricorsiva, fortemente tipizzata e facilmente estendibile.
 
-L'implementazione dei casi più significativi è la seguente:
+L'intera algebra dei pattern è costruita attorno al trait sigillato e covariante `Pattern[+T]`, i cui costruttori rappresentano le principali operazioni compositive del linguaggio:
 
-- **atomo:** produce un evento che occupa l'intera finestra ricevuta;
-- **parallelo:** risolve tutti i livelli nella stessa finestra e ne concatena gli eventi;
-- **sequenza:** suddivide ogni ciclo in intervalli uguali, porta la finestra del figlio nelle sue coordinate locali e rimappa gli eventi nel relativo slot;
-- **alternanza:** usa il numero del ciclo per scegliere il ramo e trasla la finestra nelle coordinate del pattern selezionato;
-- **estensioni:** risolve i pattern di configurazione sulla finestra dell'evento base e allega i valori attivi nell'istante iniziale;
-- **time warp:** trasforma la finestra in ingresso, risolve il pattern interno e applica agli eventi la trasformazione inversa.
+- `Atom[T]` rappresenta un singolo evento atomico (nota, sample o parametro).
+- `Sequence[T]` descrive la composizione sequenziale nel tempo.
+- `Parallel[T]` permette la sovrapposizione polifonica di più pattern.
+- `Alternation[T]` introduce una variazione ciclica selezionando un ramo differente ad ogni ciclo.
+- `TimeWarp[T]` racchiude tutte le trasformazioni geometriche del tempo.
+- `WithExtensions[T]` consente di associare effetti audio e parametri aggiuntivi al pattern.
 
-La sequenza esemplifica la tecnica generale. Se contiene `n` elementi, ogni slot misura `1/n`; l'intersezione con la finestra richiesta evita di valutare porzioni non osservabili. La finestra viene prima ingrandita nelle coordinate del figlio e gli eventi risultanti vengono poi ridotti e traslati nello slot originale.
+L'utilizzo degli `enum` per `Sound`, `AudioEffect` e `PatternModifier` garantisce l'esaustività del *pattern matching* già in fase di compilazione, eliminando la possibilità di casi non gestiti.
 
-Reverse scambia gli estremi rispetto al ciclo corrente. Fast, slow, early e late usano invece un helper comune che risolve il pattern dinamico del parametro e applica due funzioni: una per trasformare la finestra interrogata e una per riportare l'evento nelle coordinate esterne. Repetition suddivide la durata dell'evento nel numero richiesto di copie; juxtaposition e offset compongono pattern già esistenti invece di introdurre un secondo meccanismo di scheduling.
+Per i tipi primitivi del dominio sono stati inoltre utilizzati gli **Opaque Types**. Tipi come `Note`, `Sample` e `AbsoluteTime` risultano quindi completamente distinti dal livello implementativo.
 
-### Timeline finite e infinite
+### Il Dominio Temporale
 
-Lo scheduler riusa i resolver in due modalità:
+La gestione del tempo rappresenta il motore di scheduling. Per garantire precisione ritmica assoluta ed evitare la propagazione di errori, l'architettura modella il tempo suddividendolo in quattro distinti livelli di astrazione, ognuno con responsabilità e strutture dati dedicate.
 
-- `generateBoundedTimelines` calcola, per ciascun pattern, i cicli necessari a mostrarne una ripetizione completa;
-- `generateInfiniteTimeline` produce una `LazyList`, risolvendo un ciclo alla volta e ordinando gli eventi per istante iniziale.
+* **Tempo Logico (`Fraction`):** La timeline musicale è calcolata tramite una classe custom implementata come numero razionale. L'uso esclusivo di frazioni esatte evita completamente la deriva aritmetica e i difetti di arrotondamento tipici dei numeri in virgola mobile (`Double`), che altrimenti corromperebbero i calcoli di terzine, tuple irregolari o combinazioni di distorsioni temporali. Ogni frazione viene normalizzata all'istanziazione (denominatore positivo e riduzione matematica tramite Massimo Comune Divisore), garantendo confronti e operazioni algebricamente perfetti.
+* **Tempo Musicale (`Interval`):** Costruito componendo due frazioni (inizio e fine), modella una precisa porzione della timeline. Costituisce la "finestra geometrica" che viene propagata e partizionata ricorsivamente dai resolver durante la discesa lungo l'AST.
+* **Tempo Fisico (`Tempo`):** Rappresenta il livello di traduzione. Terminata la risoluzione logica dell'AST, la classe `Tempo` mappa gli intervalli metrico-frazionari in durate fisiche (millisecondi) applicando il parametro di velocità CPS (*Cycles Per Second*).
+* **Tempo Assoluto (`AbsoluteTime`):** É isolato tramite un *Opaque Type* (`opaque type AbsoluteTime = Long`) che incapsula il valore di `System.currentTimeMillis()`. Questa astrazione *a costo zero* previene, già a tempo di compilazione, la possibilità di mescolare accidentalmente timestamp di sistema con durate relative.
 
-La lunghezza ciclica è calcolata ricorsivamente sull'algebra dei pattern. La timeline infinita non cresce tutta in memoria in anticipo: i cicli vengono generati man mano che il player consuma la lista.
+**Vantaggi Architetturali**
 
-### Player e concorrenza
+Questa stratificazione impone una rigorosa *Separation of Concerns* (separazione delle responsabilità). Il dominio matematico e compositivo (Frazioni e Intervalli) può essere calcolato, testato e manipolato in modo puro, rimanendo totalmente de-contestualizzato sia dalla velocità di riproduzione fisica, sia dalla sincronizzazione con il clock del sistema operativo.
 
-`AudioPlayer` mantiene la timeline residua, l'istante di riferimento e le posizioni attualmente evidenziate. Un thread dedicato esegue un tick con risoluzione nominale di un millisecondo. Ogni tick:
+---
 
-1. rimuove gli highlight scaduti;
-2. separa dalla `LazyList` gli eventi ormai maturi;
-3. esegue soltanto gli eventi che iniziano nella loro porzione completa, evitando di riattivare un suono iniziato prima della finestra;
-4. calcola la durata in millisecondi e chiama il backend;
-5. associa alle posizioni sorgente la rispettiva scadenza.
+## Il Dispatcher e i Pattern di Risoluzione
 
-Timeline e flag di esecuzione sono `volatile` perché possono essere aggiornati dal thread applicativo mentre il player opera in background. La callback degli highlight rientra nel runtime sotto forma di messaggio MVU, mantenendo l'engine indipendente dalla GUI.
+Invece di implementare la logica di valutazione direttamente all'interno dei nodi dell'AST (violando il principio di singola responsabilità e accoppiando i dati al comportamento), l'algoritmo di risoluzione è centralizzato nel modulo `PatternResolver`, che funge da **dispatcher**.
+
+Sfruttando le capacità di pattern matching di Scala su strutture ADT chiuse, il dispatcher instrada l'esecuzione verso resolver specifici. L'utilizzo di parametri contestuali (`using`) consente di propagare in modo trasparente la finestra temporale da analizzare:
+
+```scala
+object PatternResolver:
+  def resolve[T](pattern: Pattern[T])(using timeWindow: Interval): List[ScheduledEvent[T]] =
+    // Ottimizzazione preventiva: scarta i cicli vuoti o malformati
+    if timeWindow.start >= timeWindow.end then Nil
+    else pattern match
+      // Il compilatore verifica che tutti i rami del sealed trait Pattern[+T] siano gestiti
+      case a @ Pattern.Atom(_)          => AtomResolver.resolve(a)
+      case s @ Pattern.Sequence(_)      => SequenceResolver.resolve(s)
+      case p @ Pattern.Parallel(_)      => ParallelResolver.resolve(p)
+      case alt @ Pattern.Alternation(_) => AlternationResolver.resolve(alt)
+      case tw @ Pattern.TimeWarp(_, _)  => TimeWarpResolver.resolve(tw)
+      case p: Pattern.WithExtensions    => WithExtensionsResolver.resolve(p)
+```
+
+Per rendere l'API più ergonomica e favorire una scrittura fluida del codice, viene inoltre esposto un *extension method* che nasconde il passaggio esplicito del parametro contestuale:
+
+```scala
+extension [T](pattern: Pattern[T])
+  def resolve(using timeWindow: Interval): List[ScheduledEvent[T]] =
+    PatternResolver.resolve(pattern)
+```
+
+Questo approccio architetturale garantisce un'estrema modularità: ogni resolver implementa esclusivamente la geometria di un singolo problema (composizione, traslazione, inversione), rendendo il motore facilmente estensibile in futuro senza modificare le strutture dati esistenti.
+
+### AtomResolver
+Costituisce il caso base della ricorsione. Non applica trasformazioni: riceve la finestra temporale (`timeWindow`) e genera un singolo evento atomico in cui la durata originale (`whole`) e la porzione visibile (`part`) coincidono esattamente con l'intervallo ricevuto.
+
+### SequenceResolver
+Realizza la suddivisione ritmica lineare dividendo il ciclo in *n* slot. Il funzionamento è lo **zoom geometrico**: anziché passare semplicemente la finestra tagliata, proietta l'intervallo nello spazio temporale del nodo figlio. Questo permette al pattern innestato di calcolare la sua durata logica completa (`whole`). Successivamente, le coordinate vengono riportate nel sistema del padre (`mapTime`) e tagliate sulla finestra effettivamente osservabile (`clipTo`).
+
+### ParallelResolver e AlternationResolver
+* **ParallelResolver:** Gestisce la polifonia inoltrando la medesima finestra temporale a tutti i figli, senza alterazioni spaziali, concatenandone i risultati.
+* **AlternationResolver:** Crea variazioni cicliche selezionando un ramo tramite la funzione modulo sull'indice assoluto (`cycle.abs % elements.size`). Applica poi un offset temporale per riallineare metricamente il pattern generato sulla timeline globale.
+
+### TimeWarpResolver
+
+Gestisce tutte le distorsioni geometriche del tempo (`fast`, `slow`, `late`, `early`, `reverse`). Una particolarità architetturale dell'engine è che i modificatori temporali sono a loro volta dei pattern dinamici (ad esempio, è possibile alternare ciclicamente la velocità di esecuzione tra 1 e 2).
+
+Per gestire questa dinamicità in modo pulito ed evitare duplicazioni, il concetto di distorsione è astratto in un unico flusso geometrico. Il motore non altera i singoli eventi *a posteriori*, ma deforma lo spazio di osservazione *a priori*, operando in due fasi simmetriche:
+
+1. **Proiezione (`zoomIn`):** Converte la finestra reale in una "finestra distorta" (compressa, dilatata o traslata). Il nodo figlio viene interrogato come se si trovasse in questo nuovo spaziotempo.
+2. **Ripristino (`zoomOut`):** Applica la trasformazione geometrica inversa agli eventi generati, ricollocandoli sulle coordinate della timeline globale.
+
+Questo approccio è riassunto dal *core loop* del resolver (qui semplificato omettendo i dettagli implementativi sui limiti dei cicli):
+
+```scala
+for
+  // 1. Calcola il valore puntuale del modificatore (es. la velocità corrente)
+  paramEvent <- parameter.resolve
+  currentValue = Fraction(paramEvent.value)
+  
+  // 2. Proiezione: deforma la finestra temporale di esplorazione
+  warpedWindow = zoomIn(timeWindow, currentValue)
+  
+  // 3. Risoluzione: valuta il pattern figlio nello spazio temporale alterato
+  innerEvent <- innerPattern.resolve(using warpedWindow)
+  
+yield
+  // 4. Ripristino: riallinea l'evento prodotto sulla timeline globale
+  val finalEvent = zoomOut(innerEvent, currentValue)
+  
+  // 5. Traccia l'origine testuale per l'highlighting dinamico
+  finalEvent.trackModifierPositions(paramEvent)
+```
+
+Lo stesso rigore geometrico viene applicato ai modificatori statici privi di parametri, come il **reverse**. Non potendo usare l'astrazione dinamica, il reverse applica direttamente la specchiatura matematica rispetto ai confini del ciclo:
+
+\[
+t' = cycleStart + cycleEnd - t
+\]
+
+Il resolver inietta questa funzione \( f(t) \) sia per deformare la finestra di interrogazione iniziale, sia per mappare al contrario le coordinate (**whole** e **part**) degli eventi restituiti dal figlio, garantendo una simmetria perfetta.
+
+Infine, come evidenziato dalla tracciatura delle posizioni, il resolver accumula in background l'origine sintattica dei parametri. Questo metadato è essenziale per l'interfaccia grafica: consente alla UI di evidenziare (**highlighting**) l'esatto blocco di codice in esecuzione a runtime, mantenendo l'engine temporale rigorosamente isolato e indipendente dal livello di presentazione.
+
+#### Composizione e Ricorsione Strutturale (Repetition, Juxtaposition, Offset)
+
+L'eleganza dell'approccio basato su AST si esprime al massimo nei modificatori di natura strutturale, che non applicano semplici deformazioni ma alterano la topologia stessa del pattern:
+
+* **Repetition (`ply`):** Anziché deformare la finestra di interrogazione, intercetta l'evento generato e ne suddivide dinamicamente la durata originale (`whole`) in **n** frammenti equi-spaziati. Il risultato è una sequenza ritmica perfettamente isocrona, incastonata nello spazio logico della nota di partenza.
+* **Juxtaposition (`jux`) e Offset (`off`):** Dimostrano la potenza ricorsiva dell'engine operando attraverso la riscrittura dell'albero sintattico. Anziché manipolare i singoli eventi matematicamente, essi trasformano il pattern a runtime creando nuovi nodi AST. `Offset`, ad esempio, costruisce un nodo `Parallel` che accoppia il pattern originale con una sua versione traslata tramite `Late(offset)`. Delegando ricorsivamente la risoluzione a questo nuovo sotto-albero, il sistema ottiene "gratuitamente" la corretta traslazione geometrica e la propagazione delle `modifierPositions`, garantendo un'assoluta coerenza architetturale senza alcuna duplicazione logica.
+
+### WithExtensionsResolver
+
+Gestisce l'associazione e la propagazione degli effetti audio e dei parametri di configurazione. Per attuare questa logica, il resolver opera in tre fasi distinte:
+
+1. **Risoluzione primaria:** Valuta il pattern musicale di base all'interno della finestra temporale corrente.
+2. **Valutazione delle estensioni:** Risolve i pattern associati alle estensioni limitatamente alla porzione attiva (`part`).
+3. **Fusione e risoluzione dei conflitti:** Unisce i risultati applicando una politica di sovrascrittura gerarchica (tramite il metodo `overriddenBy`).
+
+In caso di parametri duplicati (ad esempio due effetti `gain` concorrenti nello stesso intervallo), l'ultimo valore sovrascrive il precedente in base a regole di precedenza strutturate. Questo design mantiene l'engine temporale completamente agnostico rispetto al backend di sintesi audio: il resolver si limita a produrre un set strutturato e ordinato di estensioni, demandando ogni interpretazione sonora al livello sottostante.
+
+---
+
+## Scheduling e Concorrenza nel Player
+
+Riprendendo la distinzione tra le modalità di generazione della timeline, l'implementazione tecnica adotta strategie differenti a seconda del contesto d'uso:
+
+### Timeline Limitata (Bounded)
+Utilizzata principalmente dalla GUI per la rappresentazione statica, calcola la finestra temporale minima sfruttando il **minimo comune multiplo** delle periodicità dei pattern, restituendo una lista finita di eventi.
+
+### Timeline Infinita (`LazyList`)
+Per il live coding e la riproduzione in tempo reale, lo scheduler sfrutta la valutazione pigra di Scala per produrre una sequenza infinita valutata un ciclo alla volta:
+
+```scala
+def generateInfiniteTimeline(...): LazyList[...] =
+  def loop(nCycle: Int): LazyList[....] =
+    given Interval = Interval(Fraction(nCycle), Fraction(nCycle + 1))
+    val cycleEvents =patterns
+        .flatMap(_.resolve)
+        .sortBy(_.part.start.toDouble)
+    LazyList.from(cycleEvents) #::: loop(nCycle + 1)
+
+  loop(0)
+```
+
+Grazie alla concatenazione differita (`#:::`), in memoria risiede unicamente il ciclo corrente, garantendo un'occupazione di memoria costante anche durante sessioni di riproduzione prolungate.
+
+## L'AudioPlayer e la Sincronizzazione in Tempo Reale
+
+L'`AudioPlayer` rappresenta il componente incaricato dell'esecuzione effettiva della timeline. L'esecuzione avviene su un thread in background a bassa latenza che esegue un ciclo di polling continuo, invocando ad ogni iterazione il metodo `tick` con risoluzione al millisecondo.
+
+### Gestione dello Stato e Thread Safety
+
+Per supportare il *live coding* (ovvero la sostituzione a caldo dei pattern in esecuzione senza interrompere o bloccare il flusso audio) l'architettura adotta un pattern di **stato immutabile racchiuso in un blocco di sincronizzazione (`lock.synchronized`)**.
+
+Tutti i dati critici di riproduzione (la `LazyList` degli eventi, il timestamp di avvio, la mappa degli highlight attivi) sono racchiusi all'interno di una case class privata (`PlayerState`) e aggiornati in modo atomico:
+
+```scala
+private case class PlayerState(
+    eventStream: LazyList[ScheduledEvent[AudioPayload]] = LazyList.empty,
+    firstTickTimeMs: Option[AbsoluteTime] = None,
+    activeHighlights: Map[TextPosition, AbsoluteTime] = Map.empty,
+    currentHighlightSet: Set[TextPosition] = Set.empty
+)
+```
+## Il Ciclo di Elaborazione (*tick*)
+
+Questo approccio previene in modo rigoroso qualsiasi **condizione di gara** (*race condition*) tra il thread che ricompila il codice (`updateTimeline`) e il thread che consuma gli eventi audio.
+
+Ad ogni *tick* del player, lo stato viene valutato eseguendo tre macro-operazioni sequenziali.
+
+### Pulizia degli Highlight Scaduti
+
+Vengono filtrate e rimosse tutte le evidenziazioni testuali il cui termine temporale (`expireAtMs`) è inferiore al tempo corrente (`now`), ripulendo la UI in modo incrementale.
+
+### Consumo degli Eventi e Filtraggio Anti-Duplicazione
+
+Lo stream viene partizionato tramite lo `span` in base al tempo reale calcolato (`firstPerformance + tempo.offsetMs(...)`).
+
+Per impedire che una nota venga riprodotta due volte quando attraversa il confine tra due cicli consecutivi, viene applicato il seguente filtro strutturale:
+
+```scala
+toProcess.filter(e => e.part.start == e.whole.start)
+```
+
+L'evento viene così inviato al backend solamente nell'istante della sua effettiva nascita, pur mantenendo disponibile la sua durata completa (`whole`).
+
+### Dispatch al Backend e Notifica della UI
+
+Il player inoltra il payload al generico `AudioBackend`, insieme alla durata calcolata e alle eventuali estensioni.
+
+Parallelamente:
+
+- raccoglie tutte le posizioni testuali associate (`position` dei payload e `modifierPositions`);
+- calcola la scadenza temporale degli highlight;
+- notifica asincronamente la GUI tramite la callback `onHighlightChange` soltanto quando il set delle evidenziazioni risulta effettivamente modificato.
+
+## Disaccoppiamento Architetturale
+
+Questa organizzazione garantisce un isolamento completo tra:
+
+- l'engine di scheduling e calcolo logico;
+- il backend di sintesi e riproduzione audio;
+- il livello di presentazione e interazione grafica.
+
+La logica musicale risulta così completamente indipendente sia dalla tecnologia audio sottostante sia dal framework grafico impiegato.
 
 ## Audio e MIDI — Tommaso Remedi
 

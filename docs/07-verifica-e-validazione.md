@@ -78,3 +78,42 @@ I test automatici verificano la conformità delle singole parti, ma non sostitui
 - avvio sia con sintetizzatore disponibile sia con fallback silenzioso.
 
 Per ogni passo vanno annotati input, risultato atteso, risultato osservato, revisione del software, sistema operativo, JDK e dispositivo MIDI. Le proprietà percettive — udibilità, correttezza apparente del ritmo e chiarezza del feedback grafico — richiedono infatti una valutazione umana e non sono deducibili dalla sola copertura del codice.
+
+
+# Strategia dei Test Engine
+
+La strategia di testing è stata progettata per validare l'integrità della geometria temporale dell'AST e il corretto consumo della timeline. Per mantenere i test puliti e focalizzati, l'architettura si avvale principalmente di due pattern di testing mirati:
+
+## DSL Dichiarativo per la Verifica dell'AST
+
+Per testare la correttezza geometrica dell'algebra dei pattern senza rumore (*boilerplate*), è stato sviluppato un Domain-Specific Language (DSL) interno basato su `AnyFunSuite`.
+
+Sfruttando extension methods e la valutazione pigra (`LazyList`), i test valutano lo stesso *execution path* di produzione proiettando i complessi `ScheduledEvent` nel record semplificato `ExpectedEvent`:
+
+```scala
+check(seq(bd, hh).late(1\4)).inCycle(0)(
+  ExpectedEvent("bd", part = (1\4) -> (1\2)),
+  ExpectedEvent("hh", part = 0 -> (1\4), whole = (-1\4) -> (1\4))
+)
+```
+
+Questo approccio verifica in modo sistematico l'invariante fondamentale tra **whole** (durata logica originaria) e **part** (porzione visibile nel ciclo), coprendo scenari di partizionamento, polifonia, estensioni e distorsioni geometriche complesse (*fast*, *slow*, *late* e *reverse*).
+
+## Controllo Deterministico del Tempo nell'AudioPlayer
+
+Per testare l'integrazione del player ed evitare test fluttuanti dovuti ai thread asincroni o al clock reale di sistema (`System.currentTimeMillis()`), l'architettura dell'`AudioPlayer` espone esplicitamente il metodo di avanzamento:
+
+```scala
+tick(now: AbsoluteTime)
+```
+
+Questo design consente al *test runner* di pilotare manualmente lo scorrere del tempo, millisecondo per millisecondo, in modo completamente deterministico.
+
+```scala
+// Simulazione manuale e deterministica del tempo nel test runner
+for (t <- startMs to endMs) {
+  audioPlayer.tick(AbsoluteTime(t))
+}
+```
+
+In questo modo è possibile ispezionare direttamente il backend audio e validare con assoluta precisione la sequenza, il *timing* e la durata degli eventi emessi, garantendo la massima robustezza dell'intera suite di test.
