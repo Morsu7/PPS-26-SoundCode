@@ -78,17 +78,16 @@ object Interpreter {
             timeP.map(_ -> AudioEffect.DelayTime.apply).toList ++
             feedbackP.map(_ -> AudioEffect.DelayFeedback.apply).toList
         ).map{ case (pattern, constructor) =>
-            interpretPattern(pattern)(c => Atom(constructor(c.value, TextPosition.some(c.startIndex, c.endIndex)))
-            )
+            interpretPattern(pattern)(c => Atom(constructor(config(c.value, c.startIndex, c.endIndex))))
         }
 
     private def interpretAudioEffect(transBlock: AST.Transformations.TransformationBlock): List[Pattern[AudioPayload]] = transBlock match{
-        case AST.Transformations.Gain(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Gain(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
-        case AST.Transformations.Pan(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Pan(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
-        case AST.Transformations.Room(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Room(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.Gain(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Gain(config(c.value, c.startIndex, c.endIndex)))))
+        case AST.Transformations.Pan(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Pan(config(c.value, c.startIndex, c.endIndex)))))
+        case AST.Transformations.Room(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.Room(config(c.value, c.startIndex, c.endIndex)))))
         case AST.Transformations.Delay(value, time, feedback) => interpretDelay(value, time, feedback)
-        case AST.Transformations.LowPassFilter(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
-        case AST.Transformations.HighPassFilter(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(c.value, TextPosition.some(c.startIndex, c.endIndex)))))
+        case AST.Transformations.LowPassFilter(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.LowPass(config(c.value, c.startIndex, c.endIndex)))))
+        case AST.Transformations.HighPassFilter(pattern) => List(interpretPattern(pattern)(c => Atom(AudioEffect.HighPass(config(c.value, c.startIndex, c.endIndex)))))
 
         case _ => List.empty
     }
@@ -191,8 +190,10 @@ object Interpreter {
         case _ => throw new IllegalArgumentException("Expected Sample or Note")
     }
 
-    private def interpretConfigAtom(atom: AST.Atom): Pattern[Double] = atom match {
-        case AST.Config(value, startPos, endPos) => Pattern.Atom(value)
+    private def interpretConfigAtom(atom: AST.Atom): Pattern[ConfigInText] = atom match {
+        case AST.Config(value, startPos, endPos) => Pattern.Atom(ConfigInText(value, TextPosition.some(startPos, endPos)))
         case _ => throw new IllegalArgumentException("Expected Config")
     }
+
+    private def config(value: Double, startPos: Int, endPos: Int): ConfigInText = ConfigInText(value, TextPosition.some(startPos, endPos))
 }

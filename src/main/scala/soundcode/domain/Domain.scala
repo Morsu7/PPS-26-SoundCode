@@ -111,25 +111,30 @@ enum Sound extends AudioPayload:
   case SampleInText(sample: Sample, position: Option[TextPosition] = None)
   case Rest(position: Option[TextPosition] = None)
 
-enum AudioEffect extends AudioPayload:
-  case Gain(value: Double, position: Option[TextPosition] = None)
-  case Pan(value: Double, position: Option[TextPosition] = None)
-  case Room(value: Double, position: Option[TextPosition] = None)
-  case LowPass(value: Double, position: Option[TextPosition] = None)
-  case HighPass(value: Double, position: Option[TextPosition] = None)
-  case DelayVolume(value: Double, position: Option[TextPosition] = None)
-  case DelayTime(value: Double, position: Option[TextPosition] = None)
-  case DelayFeedback(value: Double, position: Option[TextPosition] = None)
+case class ConfigInText(value: Double, position: Option[TextPosition] = None)
+
+enum AudioEffect(val configVal: ConfigInText) extends AudioPayload:
+  case Gain(config: ConfigInText) extends AudioEffect(config)
+  case Pan(config: ConfigInText) extends AudioEffect(config)
+  case Room(config: ConfigInText) extends AudioEffect(config)
+  case LowPass(config: ConfigInText) extends AudioEffect(config)
+  case HighPass(config: ConfigInText) extends AudioEffect(config)
+  case DelayVolume(config: ConfigInText) extends AudioEffect(config)
+  case DelayTime(config: ConfigInText) extends AudioEffect(config)
+  case DelayFeedback(config: ConfigInText) extends AudioEffect(config)
+
+  def position: Option[TextPosition] = configVal.position
+  def value: Double = configVal.value
 
 enum PatternModifier[+T]:
   case Reverse
-  case FastForward(factor: Pattern[Double])
-  case SlowMotion(factor: Pattern[Double])
-  case Late(offset: Pattern[Double])
-  case Early(offset: Pattern[Double])
-  case Repetition(times: Pattern[Double])
+  case FastForward(factor: Pattern[ConfigInText])
+  case SlowMotion(factor: Pattern[ConfigInText])
+  case Late(offset: Pattern[ConfigInText])
+  case Early(offset: Pattern[ConfigInText])
+  case Repetition(times: Pattern[ConfigInText])
   case Juxtaposition(modifiers: List[PatternModifier[T] | Pattern[AudioEffect]])
-  case Offset(offset: Pattern[Double], modifiers: List[PatternModifier[T] | Pattern[AudioEffect]])
+  case Offset(offset: Pattern[ConfigInText], modifiers: List[PatternModifier[T] | Pattern[AudioEffect]])
 
 
 sealed trait Pattern[+T]
