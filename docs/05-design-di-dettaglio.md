@@ -3,7 +3,9 @@ layout: default
 title: Design di dettaglio
 ---
 
-# Parser e interprete — Cristian Morbidelli
+# Desing
+
+## Parser e interprete — Cristian Morbidelli
 
 ## Dalla sintassi alla semantica
 
@@ -36,7 +38,7 @@ Questa separazione rende i due sottosistemi indipendenti e permette di evolvere 
 
 ---
 
-### Il modello sintattico
+# Il modello sintattico
 
 L'AST rappresenta esclusivamente la struttura del programma, senza attribuire alcun significato esecutivo ai nodi.
 
@@ -88,7 +90,7 @@ Questa organizzazione rende l'AST facilmente estendibile: l'introduzione di un n
 
 ---
 
-### Lo stream musicale
+## Lo stream musicale
 
 Lo stream rappresenta l'unità fondamentale di composizione della DSL. Ogni stream descrive un flusso musicale indipendente, eventualmente riprodotto in parallelo ad altri stream se ve ne sono.
 
@@ -115,7 +117,7 @@ Questa organizzazione riflette direttamente la sintassi della DSL, nella quale l
 
 ---
 
-### Pattern sintattici
+# Pattern sintattici
 
 L'elemento centrale dell'AST è il **Pattern**, scelto come rappresentazione ricorsiva della struttura ritmica del linguaggio.
 
@@ -135,7 +137,7 @@ Pattern
 
 Ogni livello della gerarchia rappresenta un costrutto della DSL con un significato e comportamento ben specifici.
 
-### Pattern
+## Pattern
 
 Un pattern rappresenta l'intero contenuto di un ciclo musicale, ed occupa quindi interamente la durata del ciclo in cui viene contenuto.
 
@@ -145,7 +147,7 @@ Il pattern costituisce quindi l'unità temporale principale sulla quale operano 
 
 ---
 
-### Sequence
+## Sequence
 
 Una sequenza rappresenta una successione ordinata di elementi consecutivi.
 
@@ -155,7 +157,7 @@ La sequenza costituisce quindi la struttura temporale di base del linguaggio.
 
 ---
 
-### Element
+## Element
 
 L'elemento rappresenta la più piccola unità componibile di una sequenza.
 
@@ -168,7 +170,7 @@ Per evitare duplicazioni strutturali, il modello distingue quattro tipologie:
 
 ---
 
-### Atomi
+# Atomi
 
 Alla base della gerarchia si trovano gli **atomi**, ovvero gli elementi indivisibili riconosciuti dal parser.
 
@@ -189,19 +191,19 @@ Questa uniformità costituisce uno dei principi progettuali dell'interprete, che
 
 ---
 
-### Estensioni
+# Estensioni
 
 Le operazioni applicabili ad uno stream vengono modellate separatamente dal generatore.
 
 Dal punto di vista concettuale il linguaggio distingue due categorie di estensioni.
 
-### Estensioni generative
+## Estensioni generative
 
 Le estensioni generative introducono nuovi pattern sonori destinati ad essere combinati con il pattern corrente.
 
 Esse rappresentano quindi nuove sorgenti musicali che partecipano alla costruzione del risultato finale.
 
-### Trasformazioni
+## Trasformazioni
 
 Le trasformazioni modificano invece il comportamento del pattern già esistente.
 
@@ -211,7 +213,7 @@ Questa distinzione rende esplicito il ruolo di ciascun costrutto della DSL e per
 
 ---
 
-### Conservazione delle informazioni sorgente
+# Conservazione delle informazioni sorgente
 
 Una caratteristica progettuale dell'AST consiste nel mantenere il collegamento con il testo originale.
 
@@ -223,7 +225,7 @@ L'AST assume quindi anche il ruolo di ponte tra editor ed engine, consentendo la
 
 ---
 
-## Interpretazione semantica
+# Interpretazione semantica
 
 L'interpretazione rappresenta il passaggio dall'AST, costruito secondo le esigenze della grammatica, alle strutture utilizzate dal motore musicale.
 
@@ -245,7 +247,7 @@ In questo modo le informazioni relative alla composizione musicale rimangono com
 
 ---
 
-## Interpretazione semantica
+# Interpretazione semantica
 
 L'interprete costituisce il collegamento tra il linguaggio e il motore musicale.
 
@@ -261,7 +263,7 @@ Questa separazione mantiene completamente indipendenti il linguaggio, il modello
 
 ---
 
-### Separazione delle responsabilità
+## Separazione delle responsabilità
 
 L'AST può contenere tre categorie di informazioni differenti:
 
@@ -281,7 +283,7 @@ Questa scelta impedisce che il motore audio debba conoscere aspetti relativi all
 
 ---
 
-### Interpretazione ricorsiva dei pattern
+## Interpretazione ricorsiva dei pattern
 
 L'interpretazione dei pattern segue fedelmente la struttura ricorsiva dell'AST.
 
@@ -300,7 +302,7 @@ Ciò consente di mantenere una corrispondenza diretta tra il modello sintattico 
 
 ---
 
-### Uniformità dell'interpretazione
+## Uniformità dell'interpretazione
 
 Una delle principali scelte progettuali consiste nel riutilizzare il medesimo processo di interpretazione per tutte le tipologie di pattern presenti nel linguaggio.
 
@@ -316,7 +318,7 @@ Questa scelta riduce la duplicazione di codice e garantisce un comportamento uni
 
 ---
 
-### Interpretazione degli stream
+## Interpretazione degli stream
 
 Ogni stream viene interpretato a partire dal proprio generatore.
 
@@ -334,7 +336,7 @@ Questa distinzione riflette il diverso significato che tali operazioni assumono 
 
 ---
 
-### Estensioni generative
+## Estensioni generative
 
 Le estensioni generative introducono nuovi pattern sonori che devono essere riprodotti insieme al pattern principale.
 
@@ -344,7 +346,7 @@ Per questo motivo vengono mantenute come componenti indipendenti fino alla costr
 
 ---
 
-### Gestione degli effetti audio
+## Gestione degli effetti audio
 
 Gli effetti audio rappresentano proprietà associate agli eventi musicali.
 
@@ -382,7 +384,7 @@ L'introduzione di nuovi effetti risulta inoltre particolarmente semplice, poich�
 
 ---
 
-### Gestione delle trasformazioni temporali
+## Gestione delle trasformazioni temporali
 
 Le trasformazioni temporali seguono una filosofia completamente differente.
 
@@ -411,7 +413,7 @@ Ogni trasformazione opera quindi sul risultato prodotto dalla precedente, preser
 
 ---
 
-### Trasformazioni composte
+## Trasformazioni composte
 
 Alcune trasformazioni consentono di combinare più operazioni elementari.
 
@@ -423,7 +425,7 @@ Questa scelta evita di introdurre casi particolari nel motore di esecuzione, che
 
 ---
 
-### Combinazione tra effetti e trasformazioni temporali
+## Combinazione tra effetti e trasformazioni temporali
 
 La presenza contemporanea di effetti audio e trasformazioni temporali richiede una specifica strategia di interpretazione.
 
@@ -449,7 +451,7 @@ La distinzione tra proprietà del suono e trasformazioni del tempo rappresenta u
 
 ---
 
-### Conservazione del collegamento con il sorgente
+## Conservazione del collegamento con il sorgente
 
 Durante l'intero processo di interpretazione viene mantenuto il collegamento con il programma sorgente.
 
@@ -459,7 +461,7 @@ Questa informazione viene utilizzata dalla componente grafica per sincronizzare 
 
 ---
 
-### Risultato dell'interpretazione
+## Risultato dell'interpretazione
 
 Al termine dell'interpretazione il programma viene trasformato in tre insiemi di informazioni indipendenti:
 
