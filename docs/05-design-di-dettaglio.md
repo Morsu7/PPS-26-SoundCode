@@ -538,7 +538,7 @@ Il backend distingue tre casi:
 - i nomi dei suoni percussivi vengono convertiti nelle note del canale percussionistico;
 - i silenzi non producono comandi sonori.
 
-Le estensioni udibili vengono trasformate in parametri della nota o controlli di canale. Il guadagno determina la velocity; pan, riverbero e filtro passa-basso sono approssimati tramite controlli MIDI. Gli effetti privi di una corrispondenza MIDI adeguata restano nel modello, senza introdurre dipendenze nell'engine.
+Le estensioni udibili vengono trasformate in parametri della nota o controlli di canale. Il guadagno determina la velocity; pan, riverbero e filtro passa-basso sono approssimati tramite controlli MIDI. Gli effetti privi di una corrispondenza MIDI adeguata (`hpf` e `delay`) restano nel modello, senza introdurre dipendenze nell'engine.
 
 I canali melodici sono assegnati per voce, dove una voce identifica una combinazione compatibile di strumento e controlli. In questo modo note simultanee con configurazioni diverse non si sovrascrivono a vicenda, mentre il canale General MIDI dedicato alle percussioni resta riservato.
 

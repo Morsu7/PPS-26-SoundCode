@@ -39,9 +39,9 @@ Non fanno parte della versione descritta:
 - collaborazione remota;
 - oscilloscopio richiamabile dalla DSL;
 - sintesi audio continua configurabile dall'utente;
-- resa sonora degli effetti `gain`, `pan`, `room`, `delay`, `lpf` e `hpf` nel backend MIDI corrente.
+- resa sonora degli effetti `delay` e `hpf` nel backend MIDI corrente.
 
-Gli ultimi effetti appartengono alla sintassi e al modello dei pattern, ma sono metadati non tradotti in comandi udibili dal backend MIDI. La distinzione è specificata in RF-19 e RF-26.
+`gain`, `pan`, `room` e `lpf` sono invece resi udibili dal backend MIDI (rispettivamente tramite velocity e Control Change), mentre `delay` e `hpf` appartengono alla sintassi e al modello dei pattern ma restano metadati non tradotti in comandi udibili. La distinzione è specificata in RF-19 e RF-26.
 
 ## 3. Glossario e concetti di dominio
 
@@ -387,7 +387,7 @@ La modifica manuale del testo disabilita gli highlight di riproduzione, perché 
 
 ### RF-26 — Backend MIDI
 
-Le note devono essere riprodotte sul canale melodico 0; le percussioni sul canale General MIDI 10, indice 9. La velocity corrente è fissa a 96. Per ogni `noteOn`, il sistema deve pianificare un `noteOff` dopo almeno 1 ms e dopo la durata teorica convertita in millisecondi.
+Le note devono essere riprodotte su canali melodici allocati per voce, così che voci simultanee diverse non si sovrascrivano; le percussioni sul canale General MIDI 10, indice 9. La velocity di base è 96 ed è modulata dal `gain`. Per ogni `noteOn`, il sistema deve pianificare un `noteOff` dopo almeno 1 ms e dopo la durata teorica convertita in millisecondi.
 
 Per una nota, il backend deve applicare il primo identificatore di strumento riconosciuto fra le estensioni `sound`. Per una percussione deve usare la mappa di RF-11. Silenzi, effetti usati come payload e identificatori sconosciuti non devono produrre audio.
 
