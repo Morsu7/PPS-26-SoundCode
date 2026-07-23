@@ -37,8 +37,8 @@ class SoundCodeParser {
 
   private def setting(using P[?]): P[Config => SettingBlock] = 
     P(
-      "setcpm".!.map(_ => Settings.CPM.apply) |
-      "setcps".!.map(_ => Settings.CPS.apply)
+      SoundCodeLanguage.Settings.SetCpm.!.map(_ => Settings.CPM.apply) |
+      SoundCodeLanguage.Settings.SetCps.!.map(_ => Settings.CPS.apply)
     )
 
   // A "stream" is a generative block optionally chained with generative or transformation blocks
