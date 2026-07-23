@@ -33,6 +33,8 @@ object BlockEditorView:
   private case class ViewState(
       visualizers: Option[RenderedVisualizersState] = None,
       highlightScheduled: Boolean = false,
+      pendingHighlightParagraphs: Set[Int] = Set.empty,
+      overlayLayoutScheduled: Boolean = false,
       replacingCode: Boolean = false,
       playbackHighlightsEnabled: Boolean = true
   )
@@ -199,32 +201,38 @@ final class BlockEditorView(
             insertedLength = change.getInserted.length
           )
 
-          Platform.runLater {
-            visualizerManager.applySpacing()
-          }
+          val lineStructureChanged =
+            change.getRemoved.indexOf('\n') >= 0 ||
+              change.getInserted.indexOf('\n') >= 0
 
-        scheduleHighlight()
+          if lineStructureChanged then
+            Platform.runLater {
+              visualizerManager.applySpacing()
+            }
+          else
+            scheduleOverlayLayout()
+
+        val firstChangedParagraph =
+          area.getText
+            .take(change.getPosition.min(area.getLength))
+            .count(_ == '\n')
+        val insertedParagraphs = change.getInserted.count(_ == '\n')
+
+        scheduleHighlight(
+          firstChangedParagraph to firstChangedParagraph + insertedParagraphs
+        )
       }
 
     visualizerOverlay.widthProperty().addListener { (_, _, _) =>
-      Platform.runLater {
-        visualizerManager.layout()
-        playbackHighlightManager.layout()
-      }
+      scheduleOverlayLayout()
     }
 
     visualizerOverlay.heightProperty().addListener { (_, _, _) =>
-      Platform.runLater {
-        visualizerManager.layout()
-        playbackHighlightManager.layout()
-      }
+      scheduleOverlayLayout()
     }
 
     area.viewportDirtyEvents().subscribe { _ =>
-      Platform.runLater {
-        visualizerManager.layout()
-        playbackHighlightManager.layout()
-      }
+      scheduleOverlayLayout()
     }
 
   private def applyEditorChrome(): Unit =
@@ -266,13 +274,40 @@ final class BlockEditorView(
       isPlaying = isPlaying
     )
 
-  private def scheduleHighlight(): Unit =
+  private def scheduleHighlight(paragraphs: Iterable[Int]): Unit =
+    if !viewState.replacingCode then
+      viewState = viewState.copy(
+        pendingHighlightParagraphs =
+          viewState.pendingHighlightParagraphs ++ paragraphs
+      )
+
     if !viewState.highlightScheduled && !viewState.replacingCode then
       viewState = viewState.copy(highlightScheduled = true)
 
       Platform.runLater {
-        try SyntaxHighlighter.applyTo(area)
-        finally viewState = viewState.copy(highlightScheduled = false)
+        val paragraphsToHighlight =
+          viewState.pendingHighlightParagraphs
+
+        viewState = viewState.copy(
+          highlightScheduled = false,
+          pendingHighlightParagraphs = Set.empty
+        )
+
+        paragraphsToHighlight.foreach { paragraph =>
+          SyntaxHighlighter.applyTo(area, paragraph)
+        }
+      }
+
+  private def scheduleOverlayLayout(): Unit =
+    if !viewState.overlayLayoutScheduled then
+      viewState = viewState.copy(overlayLayoutScheduled = true)
+
+      Platform.runLater {
+        try
+          visualizerManager.layout()
+          playbackHighlightManager.layout()
+        finally
+          viewState = viewState.copy(overlayLayoutScheduled = false)
       }
 
   private def normalizeNewlines(text: String): String =
