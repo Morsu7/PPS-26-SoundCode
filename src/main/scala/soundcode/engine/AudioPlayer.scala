@@ -62,7 +62,7 @@ class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
   def stop(): Unit = {
     val t = lock.synchronized {
       isRunning = false
-      state = state.copy(activeHighlights = Map.empty, currentHighlightSet = Set.empty)
+      state = state.copy(activeHighlights = Map.empty, currentHighlightSet = Set.empty, firstTickTimeMs = None)
       onHighlightChange(state.currentHighlightSet)
       thread
     }
