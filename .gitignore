@@ -42,6 +42,7 @@ build/
 .bloop/
 .metals/
 project/**
+!project/plugins.sbt
 
 ### Mac OS ###
 .DS_Store
