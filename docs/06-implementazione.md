@@ -132,76 +132,66 @@ L'invio di `noteOn` è sincrono e breve; il corrispondente `noteOff` viene progr
 
 ## Interfaccia utente — Giacomo Biagioni
 
-### Ciclo MVU e integrazione con i sottosistemi
-
-Il runtime conserva un solo `AppModel` e tratta la vista come una funzione di
-rendering dello stato. `Update.update` è una funzione basata su pattern matching
-che restituisce la coppia `(AppModel, Cmd)`: le transizioni rimangono quindi
-separate dall'esecuzione degli effetti. Ogni `Cmd` implementa un trait sigillato
-e riceve due dipendenze esplicite, la funzione `dispatch` e l'`AudioPlayer`.
-Questo permette a un comando di reinserire il proprio risultato nel ciclo senza
-conoscere la vista.
-
-In particolare, parsing e interpretazione producono un nuovo messaggio; solo in
-caso di successo vengono aggiornate insieme la timeline infinita del player e
-le timeline finite dei visualizzatori. Una revisione numerica
-(`timelineRevision`) identifica ogni aggiornamento accettato e impedisce
-rendering duplicati o il ripristino di visualizzazioni più vecchie. Le callback
-del player possono arrivare dal thread audio: `SoundCodeFrame` le inoltra al
-thread JavaFX con `Platform.runLater`, evitando accessi concorrenti ai nodi
-grafici. Nello stesso punto sono gestiti costruzione e arresto del backend, in
-modo che il ciclo di vita delle risorse coincida con quello dell'applicazione.
+La UI aggiorna i visualizzatori soltanto quando l'analisi del codice termina con
+successo. Il valore `timelineRevision` consente di riconoscere una nuova
+timeline, evitando sia rendering duplicati sia il ripristino di una
+visualizzazione precedente. Durante la riproduzione, le callback del player
+possono provenire dal thread audio; `SoundCodeFrame` le trasferisce quindi sul
+thread JavaFX tramite `Platform.runLater`, così che i nodi grafici siano
+modificati in sicurezza. `SoundCodeFrame` gestisce inoltre l'avvio e l'arresto
+del backend insieme al ciclo di vita dell'applicazione.
 
 ### Editor e operazioni di modifica
 
-`BlockEditorView` usa una sola `GenericStyledArea` di RichTextFX. La scelta
-consente di appoggiarsi alla cronologia testuale nativa per **undo/redo** e alle
-operazioni standard della text area per **copia, taglia e incolla**, mantenendo
-compatibili scorciatoie, selezione e cursore. Gli stili non entrano nella
-cronologia, come stabilito nella configurazione della `GenericStyledArea`: una
-ricolorazione o un highlight di riproduzione non genera quindi passi di undo.
-Dopo il caricamento del testo
-iniziale la cronologia viene dimenticata, così il primo undo riguarda una
-modifica dell'utente e non l'inizializzazione dell'editor.
+`BlockEditorView` si basa su una singola `GenericStyledArea` di RichTextFX e ne
+riutilizza le funzionalità native per annullamento, ripristino, copia, taglio e
+incolla. In questo modo rimangono disponibili anche le consuete scorciatoie da
+tastiera e la gestione standard di cursore e selezione. La cronologia registra
+soltanto le modifiche al testo: la colorazione della sintassi e le
+evidenziazioni della riproduzione non introducono quindi operazioni da
+annullare. Al termine dell'inizializzazione la cronologia viene azzerata, così
+il primo annullamento riguarda sempre un'azione dell'utente.
 
-Le responsabilità aggiuntive sono installate come componenti indipendenti:
+Attorno all'area di testo sono integrate alcune funzionalità aggiuntive:
 
-- `LineNumberFactory` adatta una funzione Scala a `IntFunction[Node]`, richiesta
-  dall'API Java di RichTextFX, e costruisce il gutter in modo lazy per ogni
-  paragrafo;
-- `SyntaxHighlighter` applica prima lo stile sintattico, riconoscendo stringhe e
-  chiamate tramite espressioni regolari, poi sovrappone le posizioni attive
-  ricevute dal player. Gli intervalli vengono limitati alla lunghezza corrente
-  del documento per tollerare coordinate calcolate su una versione precedente;
-- le modifiche ravvicinate non causano una ricolorazione per ogni carattere:
-  un flag accorpa le richieste e pianifica un solo aggiornamento sul successivo
-  turno JavaFX;
-- il testo esposto al parser normalizza i newline, rendendo stabili gli offset
-  fra piattaforme diverse.
+- `LineNumberFactory` fornisce a RichTextFX la funzione Java
+  `IntFunction[Node]` necessaria per generare, su richiesta, il numero associato
+  a ciascuna riga;
+- `SyntaxHighlighter` riconosce stringhe e chiamate tramite espressioni regolari
+  e combina la colorazione sintattica con le evidenziazioni ricevute dal player.
+  Gli intervalli vengono limitati alla lunghezza corrente del documento, così
+  da gestire in sicurezza posizioni riferite a una versione precedente del
+  testo;
+- le richieste di ricolorazione prodotte da modifiche ravvicinate vengono
+  accorpate e una sola operazione viene inserita nella coda degli eventi
+  JavaFX;
+- prima di essere inviato al parser, il testo viene normalizzato per mantenere
+  coerenti le posizioni dei caratteri sulle diverse piattaforme.
 
-`AutoPairingSupport` intercetta gli eventi prima dell'inserimento standard.
-Parentesi, quadre, angolari e virgolette vengono inserite a coppie; se esiste
-una selezione, questa viene racchiusa e resta selezionata all'interno dei nuovi
-delimitatori. Digitando una chiusura già presente, il cursore la oltrepassa
-senza duplicarla. Per le virgolette viene inoltre controllata la parità di
-quelle precedenti al cursore, così una citazione aperta può essere chiusa
-normalmente.
+`AutoPairingSupport` gestisce l'inserimento dei delimitatori. Parentesi tonde,
+quadre e angolari, insieme alle virgolette, vengono completate automaticamente;
+se è presente una selezione, questa viene racchiusa tra i due delimitatori.
+Quando il carattere di chiusura è già presente, il cursore lo oltrepassa senza
+inserirne un duplicato. Nel caso delle virgolette viene considerato anche il
+contesto precedente al cursore, in modo da distinguere l'apertura di una coppia
+dalla chiusura di una stringa.
 
-Il completamento è diviso fra logica pura e presentazione.
-`CompletionProvider` ricava dal testo un `Context` e propone costrutti diversi
-all'inizio della riga o dopo un punto, escludendo l'interno delle stringhe. Le
-descrizioni provengono da `SoundCodeLanguage`, condiviso con il parser, per non
-duplicare nomi, firme e snippet della DSL. `AutocompleteSupport` realizza il
-popup navigabile da tastiera o mouse, mostra argomenti, overload e descrizione,
-sostituisce soltanto il prefisso corrente e interpreta il marcatore `$0` per
-posizionare il cursore nel punto utile dello snippet.
+Il completamento automatico mantiene separate la ricerca dei suggerimenti e la
+loro visualizzazione. `CompletionProvider` analizza il contesto corrente e
+propone costrutti diversi all'inizio di una riga o dopo un punto, senza
+intervenire all'interno delle stringhe. Nomi, firme, descrizioni e frammenti di
+codice provengono da `SoundCodeLanguage`, condiviso con il parser.
+`AutocompleteSupport` presenta i risultati in un popup navigabile tramite
+tastiera o mouse, sostituisce soltanto il prefisso corrente e usa il marcatore
+`$0` per collocare il cursore nel punto previsto dal frammento inserito.
 
 ### Visualizzazioni incorporate
 
 Le visualizzazioni condividono il trait `AnimatedView`, che espone solamente il
 nodo radice e i controlli `play`/`stop`. `CanvasAnimatedView` implementa la
 parte comune: canvas responsivo, pulizia del frame e `AnimationTimer`. Il tempo
-trascorso è misurato con il clock monotono in nanosecondi e convertito in cicli
+trascorso viene misurato in nanosecondi tramite il clock di `AnimationTimer`,
+che non risente delle modifiche all'orologio di sistema, e convertito in cicli
 tramite `Tempo.cps`; le sottoclassi devono implementare soltanto `draw`.
 `VisualizerViewFactory` effettua il pattern matching sul `VisualizerKind` e
 isola così dall'editor la scelta della vista concreta.

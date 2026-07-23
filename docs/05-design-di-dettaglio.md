@@ -119,18 +119,14 @@ L'avvio di una nota è immediato, mentre la sua terminazione è pianificata in m
 
 ### Coordinamento tramite Model–View–Update
 
-Come descritto nell'architettura, la UI viene coordinata tramite MVU. I
-messaggi usati nel progetto si possono dividere in tre gruppi:
+La UI è organizzata secondo il modello MVU. Le azioni dell'utente, come
+l'aggiornamento del codice o il controllo della riproduzione, vengono
+trasformate in messaggi. La stessa modalità viene usata per comunicare alla UI
+i risultati del parser e l'avanzamento della riproduzione. La funzione di
+aggiornamento modifica quindi lo stato dell'interfaccia, dal quale viene
+generata la nuova vista.
 
-- richieste dell'utente, ad esempio aggiornare il codice, avviare la
-  riproduzione o fermarla;
-- risultati delle operazioni, come l'esito del parsing e le nuove timeline;
-- aggiornamenti che arrivano durante la riproduzione, in particolare le
-  posizioni del codice da evidenziare.
-
-In questo modo la vista invia solo messaggi e non deve chiamare direttamente il
-parser o il player. Anche i risultati ritornano nello stesso flusso e vengono
-gestiti dalla funzione di aggiornamento. I casi principali sono:
+I casi principali sono:
 
 | Messaggio | Variazione del modello | Operazione richiesta |
 |---|---|---|
@@ -149,10 +145,6 @@ rimane disponibile. Il modello contiene anche un numero di revisione, utile
 alla vista per capire che è arrivato un nuovo aggiornamento anche quando le
 timeline ottenute sono uguali alle precedenti.
 
-Le timeline per il player e quelle finite usate dai visualizzatori vengono
-prodotte nello stesso aggiornamento. Questo evita che audio e piano roll si
-riferiscano a due versioni diverse del programma.
-
 ### Editor come composizione di responsabilità
 
 L'editor è il componente principale della UI, ma non contiene direttamente
@@ -164,38 +156,44 @@ sopra l'editor e collegati alla posizione del comando che li ha richiesti.
 
 ```mermaid
 flowchart TB
-    EDITOR[Editor del sorgente]
-    EDITOR --- TEXT[Testo e selezione]
-    EDITOR --- AID[Supporto alla scrittura]
-    EDITOR --- FEEDBACK[Feedback visivo]
+    EDITOR[Editor del codice]
+    EDITOR --- EDITING[Modifica del testo]
+    EDITOR --- ASSIST[Assistenza alla scrittura]
+    EDITOR --- FEEDBACK[Feedback contestuale]
+    EDITOR --- VISUAL[Visualizzatori integrati]
 
-    AID --> SYNTAX[Colorazione sintattica]
-    AID --> COMPLETE[Completamento]
-    AID --> PAIR[Delimitatori bilanciati]
+    EDITING --> CURSOR[Cursore e selezione]
+    EDITING --> HISTORY[Cronologia delle modifiche]
 
-    FEEDBACK --> ERROR[Diagnostica]
-    FEEDBACK --> ACTIVE[Elementi in riproduzione]
-    FEEDBACK --> ROLL[Piano roll incorporato]
+    ASSIST --> SYNTAX[Evidenziazione della sintassi]
+    ASSIST --> COMPLETE[Completamento automatico]
+    ASSIST --> PAIR[Chiusura automatica dei delimitatori]
+
+    FEEDBACK --> ERROR[Segnalazione degli errori]
+    FEEDBACK --> ACTIVE[Evidenziazione del codice in esecuzione]
+
+    VISUAL --> ROLL[Piano roll]
 ```
 
-La separazione è utile perché queste parti si aggiornano in momenti diversi. La
-colorazione segue subito le modifiche al testo, gli errori dipendono dall'ultimo
-Update, mentre gli highlight cambiano durante la riproduzione. Il piano roll
-riceve invece una timeline già calcolata dall'engine e si occupa solamente di
-disegnarla.
+Ogni componente segue un ciclo di aggiornamento distinto. L'evidenziazione
+della sintassi reagisce alle modifiche del testo, la diagnostica riflette
+l'ultimo aggiornamento del codice e l'indicazione degli elementi in esecuzione
+segue l'avanzamento della riproduzione. Il piano roll, invece, visualizza la
+timeline prodotta dall'engine senza modificarne il contenuto.
 
 ### Coerenza del feedback visivo
 
-Il parser salva le posizioni degli elementi nel testo e queste coordinate
-arrivano fino alla UI. Servono sia per evidenziare la nota o il sample in
-riproduzione, sia per inserire il piano roll vicino al relativo comando.
+Il parser associa a ogni elemento la sua posizione nel codice sorgente e
+propaga questa informazione fino alla UI. In questo modo l'editor può
+evidenziare la nota o il sample in riproduzione e collocare il piano roll in
+prossimità del comando corrispondente.
 
-Il problema è che le coordinate appartengono alla versione di codice usata per
-creare la timeline. Se l'utente modifica il testo prima di fare un nuovo
-Update, gli highlight precedenti vengono quindi nascosti, perché potrebbero
-indicare caratteri sbagliati. Per i visualizzatori viene invece aggiornato
-l'offset dell'ancoraggio quando vengono inseriti o rimossi dei caratteri, in
-modo che restino vicino alla riga corretta.
+Le posizioni fanno però riferimento alla versione del codice da cui è stata
+generata la timeline. Se il testo viene modificato senza eseguire un nuovo
+aggiornamento, le evidenziazioni della riproduzione vengono nascoste per evitare
+di indicare porzioni di codice non più valide. La posizione dei visualizzatori
+integrati viene invece adattata alle modifiche del testo, così da mantenerli
+associati alla riga che contiene il relativo comando.
 
 I diversi tipi di feedback hanno quindi compiti distinti:
 
@@ -204,11 +202,6 @@ I diversi tipi di feedback hanno quindi compiti distinti:
 - gli highlight mostrano quali elementi stanno suonando;
 - il piano roll mostra la disposizione degli eventi nel tempo e segue lo stato
   di play e stop.
-
-Questa divisione si vede anche nei package: `soundcode.mvu` contiene stato,
-messaggi e comandi, mentre `soundcode.ui` contiene i componenti grafici. In
-questo modo i dettagli di ScalaFX e RichTextFX rimangono nella UI e non entrano
-nella gestione dello stato.
 
 ## Contratti tra i sottosistemi
 

@@ -35,27 +35,52 @@
         display: none;
     }
 
-    .back-button {
+    .chapter-menu {
         position: fixed;
         top: 0.75rem;
         left: 0.75rem;
-        z-index: 1000;
-        padding: 0.5rem 0.75rem;
-        border: 1px solid rgb(240 246 252 / 25%);
+        z-index: 999;
+        width: 14.5rem;
+        max-height: calc(100vh - 1.5rem);
+        overflow-y: auto;
+        border: 1px solid var(--border);
         border-radius: 0.375rem;
-        background-color: rgb(13 17 23 / 85%);
-        color: var(--heading);
+        background-color: rgb(13 17 23 / 92%);
+        color: var(--text);
         font-size: 0.875rem;
-        line-height: 1;
-        text-decoration: none;
         backdrop-filter: blur(0.5rem);
     }
 
-    .back-button:hover {
-        border-color: rgb(240 246 252 / 40%);
-        background-color: var(--surface);
-        color: #ffffff;
+    .chapter-menu summary {
+        padding: 0.65rem 0.75rem;
+        color: var(--heading);
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .chapter-menu ul {
+        margin: 0;
+        padding: 0 0.75rem 0.75rem;
+        list-style: none;
+    }
+
+    .chapter-menu li {
+        padding: 0.25rem 0;
+    }
+
+    .chapter-menu a {
+        color: var(--text);
         text-decoration: none;
+    }
+
+    .chapter-menu a:hover {
+        color: var(--accent-hover);
+        text-decoration: underline;
+    }
+
+    .chapter-menu a[aria-current="page"] {
+        color: var(--accent);
+        font-weight: 600;
     }
 
     .site-footer-owner {
@@ -153,26 +178,46 @@
     }
 </style>
 
-{% unless page.url == "/" %}
 <script>
     document.addEventListener("DOMContentLoaded", async () => {
-        const backButton = document.createElement("a");
-        backButton.className = "back-button";
-        backButton.href = "{{ '/' | relative_url }}";
-        backButton.textContent = "← Indietro";
-        backButton.setAttribute("aria-label", "Torna alla pagina precedente");
-        backButton.addEventListener("click", (event) => {
-            const previousPage = document.referrer;
+        const chapterMenu = document.createElement("details");
+        chapterMenu.className = "chapter-menu";
+        chapterMenu.open = window.matchMedia("(min-width: 80rem)").matches;
+        chapterMenu.innerHTML = `
+            <summary>Capitoli</summary>
+            <ul>
+                <li><a href="{{ '/' | relative_url }}">Indice</a></li>
+                <li><a href="{{ '/01-introduzione.html' | relative_url }}">Introduzione</a></li>
+                <li><a href="{{ '/02-processo-di-sviluppo.html' | relative_url }}">Processo di sviluppo</a></li>
+                <li><a href="{{ '/03-requisiti-e-analisi.html' | relative_url }}">Requisiti e analisi</a></li>
+                <li><a href="{{ '/04-architettura.html' | relative_url }}">Architettura</a></li>
+                <li><a href="{{ '/05-design-di-dettaglio.html' | relative_url }}">Design di dettaglio</a></li>
+                <li><a href="{{ '/06-implementazione.html' | relative_url }}">Implementazione</a></li>
+                <li><a href="{{ '/07-verifica-e-validazione.html' | relative_url }}">Verifica e validazione</a></li>
+                <li><a href="{{ '/08-conclusioni.html' | relative_url }}">Conclusioni</a></li>
+            </ul>
+        `;
 
-            if (previousPage && new URL(previousPage).origin === window.location.origin) {
-                event.preventDefault();
-                window.history.back();
+        chapterMenu.querySelectorAll("a").forEach((link) => {
+            if (new URL(link.href).pathname === window.location.pathname) {
+                link.setAttribute("aria-current", "page");
             }
         });
-        document.body.prepend(backButton);
+
+        const placeMenuBelowHeader = () => {
+            const header = document.querySelector(".page-header");
+            const headerBottom = header ? header.getBoundingClientRect().bottom : 0;
+            const top = Math.max(12, headerBottom + 12);
+
+            chapterMenu.style.top = `${top}px`;
+            chapterMenu.style.maxHeight = `calc(100vh - ${top + 12}px)`;
+        };
+
+        document.body.prepend(chapterMenu);
+        placeMenuBelowHeader();
+        window.addEventListener("resize", placeMenuBelowHeader);
     });
 </script>
-{% endunless %}
 
 <script type="module">
     import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
