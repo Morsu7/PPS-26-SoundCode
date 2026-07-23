@@ -1,3 +1,131 @@
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0d1117">
+
+<style>
+    :root {
+        color-scheme: dark;
+        --background: #0d1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --text: #c9d1d9;
+        --heading: #f0f6fc;
+        --muted: #8b949e;
+        --accent: #58a6ff;
+        --accent-hover: #79c0ff;
+    }
+
+    body {
+        background-color: var(--background);
+        color: var(--text);
+    }
+
+    .page-header {
+        padding: 1.25rem 1rem;
+        background-color: #111827;
+        background-image: linear-gradient(120deg, #111827, #1e3a5f);
+    }
+
+    .page-header .project-name {
+        margin: 0;
+        font-size: 2rem;
+    }
+
+    .page-header .project-tagline,
+    .page-header .btn {
+        display: none;
+    }
+
+    .main-content {
+        color: var(--text);
+    }
+
+    .main-content h1,
+    .main-content h2,
+    .main-content h3,
+    .main-content h4,
+    .main-content h5,
+    .main-content h6 {
+        color: var(--heading);
+    }
+
+    .main-content a {
+        color: var(--accent);
+    }
+
+    .main-content a:hover {
+        color: var(--accent-hover);
+    }
+
+    .main-content code {
+        background-color: var(--surface);
+        color: #ff7b72;
+    }
+
+    .main-content pre {
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+    }
+
+    .main-content pre code {
+        background-color: transparent;
+        color: inherit;
+    }
+
+    .main-content blockquote {
+        border-left-color: var(--border);
+        color: var(--muted);
+    }
+
+    .main-content table th,
+    .main-content table td {
+        border-color: var(--border);
+    }
+
+    .main-content table tr {
+        background-color: var(--background);
+        border-top-color: var(--border);
+    }
+
+    .main-content table tr:nth-child(2n) {
+        background-color: var(--surface);
+    }
+
+    .main-content hr {
+        background-color: var(--border);
+        border-color: var(--border);
+    }
+
+    .site-footer {
+        border-top-color: var(--border);
+        color: var(--muted);
+    }
+
+    .site-footer-credits {
+        color: var(--muted);
+    }
+
+    .btn {
+        color: var(--heading);
+        background-color: rgb(240 246 252 / 8%);
+        border-color: rgb(240 246 252 / 25%);
+    }
+
+    .btn:hover {
+        color: #ffffff;
+        background-color: rgb(240 246 252 / 16%);
+        border-color: rgb(240 246 252 / 40%);
+    }
+
+    .mermaid {
+        overflow-x: auto;
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 0.375rem;
+        background-color: var(--surface);
+    }
+</style>
+
 <script type="module">
     import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
 
@@ -11,7 +139,7 @@
 
         mermaid.initialize({
             startOnLoad: false,
-            theme: "default"
+            theme: "dark"
         });
 
         await mermaid.run({

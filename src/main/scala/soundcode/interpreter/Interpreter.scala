@@ -9,12 +9,14 @@ import soundcode.domain.Sound.SampleInText
 object Interpreter {
 
     def extractVisualizerRequests(tree: AST.ProgramAST): List[VisualizerRequest] =
-        tree.blocks.zipWithIndex.flatMap {
-            case (sb: AST.StreamBlock, index) =>
-            sb.visualizer.map(v => interpretVisualizerRequest(v, index)).toList
-
-            case _ =>
-            Nil
+        tree.blocks
+        .collect { case stream: AST.StreamBlock => stream }
+        .zipWithIndex
+        .flatMap { case (stream, streamIndex) =>
+            stream.visualizer
+                .map(visualizer =>
+                    interpretVisualizerRequest(visualizer, streamIndex)
+                )
         }
 
     def interpretVisualizerRequest(block: AST.Visualizers.VisualizerBlock, index: Int): VisualizerRequest = block match {
