@@ -24,9 +24,9 @@ final class PianorollView(
 
   private def toVisualEvents(): Seq[VisualEvent] =
     val events = timeline.collect {
-      case ScheduledEvent(_, part, Sound.NoteInText(note, _), _) =>
+      case ScheduledEvent(_, part, Sound.NoteInText(note, _), _, _) =>
         (note.toString, part)
-      case ScheduledEvent(_, part, Sound.SampleInText(sample, _), _) =>
+      case ScheduledEvent(_, part, Sound.SampleInText(sample, _), _, _) =>
         (sample.toString, part)
     }
 

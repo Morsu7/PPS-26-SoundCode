@@ -80,8 +80,9 @@ class AudioPlayer(val tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
       backend.triggerSound(nextEvent.value, durationMs, nextEvent.appliedExtensions)
 
       val allPayloads = nextEvent.value :: nextEvent.appliedExtensions
+      val allPositions = allPayloads.flatMap(_.position) ++ nextEvent.modifierPositions
 
-      val newHighlights = allPayloads.flatMap(_.position).map { pos =>pos -> (now + durationMs)}
+      val newHighlights = allPositions.map { pos => pos -> (now + durationMs) }
       activeHighlights = activeHighlights ++ newHighlights
     }
 

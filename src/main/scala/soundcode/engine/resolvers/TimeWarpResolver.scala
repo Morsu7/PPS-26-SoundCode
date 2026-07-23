@@ -88,7 +88,13 @@ object TimeWarpResolver:
       cycleWindow <- Interval(cycleStart, cycleStart + 1).intersect(warpedWindow).toList
       
       innerEvent <- innerPattern.resolve(using cycleWindow)
-    yield zoomOut(innerEvent, paramValue)
+    yield {
+      val zoomedEvent = zoomOut(innerEvent, paramValue)
+      
+      zoomedEvent.copy(
+        modifierPositions = zoomedEvent.modifierPositions ++ paramEvent.value.position.toList
+      )
+    }
 
   private def applyModifiers[T](basePattern: Pattern[T], modifiers: List[PatternModifier[T] | Pattern[AudioEffect]]): Pattern[T] =
     modifiers.foldLeft[Pattern[Any]](basePattern) {
