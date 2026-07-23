@@ -61,7 +61,7 @@ object TimeWarpResolver:
 
         List(innerPattern -> 0.0, rightPattern -> 1.0).flatMap { case (pattern, pan) =>
           pattern.resolve.map { e =>
-            e.copy(appliedExtensions = e.appliedExtensions :+ AudioEffect.Pan(pan))
+            e.copy(appliedExtensions = e.appliedExtensions.overriddenBy(List(AudioEffect.Pan(pan))))
           }
         }
 
