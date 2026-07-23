@@ -34,6 +34,9 @@ trait AudioEngine:
   /** Rilascia le risorse (synth, executor). Deve essere idempotente. */
   def close(): Unit
 
+  /** Imposta il volume master (0..100). Default: nessun effetto (es. NoopAudioEngine). */
+  def setVolume(level: Double): Unit = ()
+
 /** Engine silenzioso: fallback usato quando nessun sintetizzatore MIDI è disponibile
   * (es. ambiente headless / CI). Non produce suono e non lancia mai eccezioni.
   */

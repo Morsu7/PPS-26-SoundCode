@@ -39,6 +39,11 @@ final class MidiAudioEngine private (
   def playDrum(gmNote: Int, velocity: Int, durationMs: Long): Unit =
     fire(channels(DrumChannelIdx), gmNote, velocity, durationMs)
 
+  /** Volume master: invia il CC7 (channel volume) a tutti i canali. `level` in 0..100. */
+  override def setVolume(level: Double): Unit =
+    val cc = Math.round(level / 100.0 * 127).toInt.max(0).min(127)
+    channels.foreach(_.controlChange(Cc.Volume, cc))
+
   private def fire(channel: MidiChannel, note: Int, velocity: Int, durationMs: Long): Unit =
     val n = note.max(0).min(127)
     val v = velocity.max(1).min(127) // velocity 0 equivarrebbe a un note-off
@@ -56,6 +61,7 @@ object MidiAudioEngine:
   /** Control Change usati per rendere udibili gli effetti (numeri standard GM/MIDI). */
   private object Cc:
     val Pan = 10
+    val Volume = 7
     val Reverb = 91
     val Brightness = 74
 

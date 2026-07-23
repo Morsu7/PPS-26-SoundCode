@@ -116,4 +116,7 @@ class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
   def updateTempo(newTempo: Tempo): Unit = lock.synchronized {
     this.tempo = newTempo
   }
+
+  /** Imposta il volume master (0..100), delegando al backend audio. */
+  def setVolume(level: Double): Unit = backend.setVolume(level)
 }
