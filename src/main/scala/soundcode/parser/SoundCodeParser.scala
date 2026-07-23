@@ -4,6 +4,7 @@ import fastparse._, NoWhitespace._
 import soundcode.parser.AST._
 import soundcode.parser.AST.Transformations._
 import soundcode.parser.AST.Visualizers._
+import soundcode.parser.AST.Settings._
 
 import soundcode.utils.parser.formatParseError
 import soundcode.domain.VisualizerRequest
@@ -22,9 +23,20 @@ class SoundCodeParser {
   }
 
   private def prog(using P[?]): P[ProgramAST] =
-    P(streamBlock.rep(1, sep = P("\n".rep(1))) ~ End).map(streams =>
+    P((streamBlock | settingBlock).rep(1, sep = P("\n".rep(1))) ~ End).map(streams =>
       ProgramAST(streams.toList)
     ) // One or more audio Streams
+
+  private def settingBlock(using P[?]): P[SettingBlock] =
+    P( setting ~ "(" ~ ws ~ wrapped(configAtom) ~ ws ~ ")").map {
+      case _ => ???
+    }
+
+  private def setting(using P[?]): P[Config => SettingBlock] = 
+    P(
+      "cpm".!.map(_ => Settings.CPM.apply) |
+      "cps".!.map(_ => Settings.CPS.apply)
+    )
 
   // A "stream" is a generative block optionally chained with generative or transformation blocks
   private def streamBlock(using P[?]): P[StreamBlock] =
@@ -51,15 +63,15 @@ class SoundCodeParser {
 
   private def noteBlock(using P[?]): P[NoteBlock] =
     P(
-      SoundCodeLanguage.Generative.Note ~/ "(" ~ ws ~ wrappedPattern(
-        notePatternAtom
+      SoundCodeLanguage.Generative.Note ~/ "(" ~ ws ~ wrapped(pattern(
+        notePatternAtom)
       ) ~ ws ~ ")"
     ).map(NoteBlock.apply)
 
   private def soundBlock(using P[?]): P[SoundBlock] =
     P(
-      SoundCodeLanguage.Generative.Sound ~/ "(" ~ ws ~ wrappedPattern(
-        samplePatternAtom
+      SoundCodeLanguage.Generative.Sound ~/ "(" ~ ws ~ wrapped(pattern(
+        samplePatternAtom)
       ) ~ ws ~ ")"
     ).map(SoundBlock.apply)
 
@@ -67,10 +79,13 @@ class SoundCodeParser {
 
   private def samplePatternAtom(using P[?]): P[Sample | Silence] = P(sampleAtom | silenceAtom)
 
-  private def wrappedPattern[T <: Atom](atom: => P[T])(using
+  private def wrapped[T](parser: => P[T])(using P[?]): P[T] =
+    P(quote ~/ ws ~ parser ~ ws ~ quote)
+
+  /*private def wrappedPattern[T <: Atom](atom: => P[T])(using
       P[?]
   ): P[Pattern[T]] =
-    P(quote ~/ ws ~ pattern(atom) ~ ws ~ quote)
+    P(quote ~/ ws ~ pattern(atom) ~ ws ~ quote)*/
 
   private def pattern[T <: Atom](atom: => P[T])(using P[?]): P[Pattern[T]] =
     P(sequence(atom).rep(1, sep = P(ws ~ "," ~ ws))).map(seq =>
@@ -127,61 +142,42 @@ class SoundCodeParser {
     )
 
   private def unknownExtension(using P[?]): P[Unknown] = P(
-    identifier ~ "(" ~ wrappedPattern(configAtom) ~ ")"
+    identifier ~ "(" ~ wrapped(pattern(configAtom)) ~ ")"
   ).map { case (name, pat) => Unknown(name, pat) }
 
   private def gain(using P[?]): P[Gain] =
     P(
-      SoundCodeLanguage.Transformation.Gain ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.Gain ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     ).map(Gain.apply)
 
   private def pan(using P[?]): P[Pan] =
     P(
-      SoundCodeLanguage.Transformation.Pan ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.Pan ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     ).map(Pan.apply)
 
   private def room(using P[?]): P[Room] =
     P(
-      SoundCodeLanguage.Transformation.Room ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.Room ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     ).map(Room.apply)
-
-  /*private def delay(using P[?]): P[Delay] =
-    P(
-      SoundCodeLanguage.Transformation.Delay ~/
-      "(" ~ ws ~
-      wrappedPattern(configAtom) ~/
-      (
-        ws ~ "," ~/ ws ~ wrappedPattern(configAtom) ~
-        ws ~ "," ~/ ws ~ wrappedPattern(configAtom)
-      ).? ~
-      ws ~ ")"
-    ).map {
-      case (value, Some((time, feedback))) =>
-        Delay(value, Some(time), Some(feedback))
-      case (value, None) =>
-        Delay(value, None, None)
-    }*/
 
   private def delay(using P[?]): P[Delay] =
     P(
       SoundCodeLanguage.Transformation.Delay ~/
       "(" ~/ ws ~
-      wrappedPattern(configAtom) ~/
+      wrapped(pattern(configAtom)) ~/
       (
-        // Ramo 1: Nessun altro parametro, chiude subito la tonda
         (ws ~ ")").map(_ => None)
         |
-        // Ramo 2: Trova una virgola, quindi ESIGE che ci siano tempo e feedback
         (
-          ws ~ "," ~/ ws ~ wrappedPattern(configAtom) ~/
+          ws ~ "," ~/ ws ~ wrapped(pattern(configAtom)) ~/
           (ws ~ ",").opaque("\",\" (il metodo delay richiede esattamente 1 o 3 parametri)") ~/
-          ws ~ wrappedPattern(configAtom) ~ 
+          ws ~ wrapped(pattern(configAtom)) ~ 
           ws ~ ")"
         ).map(Some(_))
       )
@@ -194,45 +190,45 @@ class SoundCodeParser {
 
   private def lowPassFilter(using P[?]): P[LowPassFilter] =
     P(
-      SoundCodeLanguage.Transformation.LowPassFilter ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.LowPassFilter ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     ).map(LowPassFilter.apply)
 
   private def highPassFilter(using P[?]): P[HighPassFilter] =
     P(
-      SoundCodeLanguage.Transformation.HighPassFilter ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.HighPassFilter ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     ).map(HighPassFilter.apply)
 
   private def fastForward(using P[?]): P[FastForward] =
     P(
-      SoundCodeLanguage.Transformation.FastForward ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.FastForward ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     ).map(FastForward.apply)
 
   private def slowMotion(using P[?]): P[SlowMotion] =
     P(
-      SoundCodeLanguage.Transformation.SlowMotion ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.SlowMotion ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     ).map(SlowMotion.apply)
 
   private def early(using P[?]): P[Early] =
     P(
-      SoundCodeLanguage.Transformation.Early ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.Early ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     )
       .map(Early.apply)
 
   private def late(using P[?]): P[Late] =
     P(
-      SoundCodeLanguage.Transformation.Late ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.Late ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     )
       .map(Late.apply)
 
@@ -241,9 +237,9 @@ class SoundCodeParser {
 
   private def repetition(using P[?]): P[Repetition] =
     P(
-      SoundCodeLanguage.Transformation.Repetition ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.Repetition ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ ")"
+      )) ~ ws ~ ")"
     )
       .map(Repetition.apply)
 
@@ -256,9 +252,9 @@ class SoundCodeParser {
 
   private def offset(using P[?]): P[Offset] =
     P(
-      SoundCodeLanguage.Transformation.Offset ~/ "(" ~ ws ~ wrappedPattern(
+      SoundCodeLanguage.Transformation.Offset ~/ "(" ~ ws ~ wrapped(pattern(
         configAtom
-      ) ~ ws ~ "," ~/ ws ~
+      )) ~ ws ~ "," ~/ ws ~
         inlineTransformation.rep(1, sep = CharsWhileIn(" \t", 1)) ~
         ws ~ ")"
     ).map { case (offsetPattern, transSeq) =>
