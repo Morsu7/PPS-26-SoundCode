@@ -1,4 +1,7 @@
-# Relazione di SoundCode
+---
+layout: default
+title: Indice
+---
 
 Ambiente desktop di live coding musicale in Scala 3.
 
@@ -21,4 +24,3 @@ Corso di Paradigmi di Programmazione e Sviluppo — A.A. 2025/2026.
 6. [Implementazione](06-implementazione.md)
 7. [Verifica e validazione](07-verifica-e-validazione.md)
 8. [Conclusioni](08-conclusioni.md)
-9. [Tracciabilità](09-tracciabilita.md)
