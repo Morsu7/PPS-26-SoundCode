@@ -10,7 +10,7 @@ class SoundCodeRuntime(
 ):
   private var model: AppModel = initialModel
 
-  private val audioPlayer = new AudioPlayer(
+  private var audioPlayer = new AudioPlayer(
     initialModel.tempo,
     backend,
     positions => {
