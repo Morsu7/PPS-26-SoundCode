@@ -9,7 +9,7 @@ import javafx.scene.input.{
 }
 
 import scalafx.geometry.Insets
-import scalafx.scene.control.{Button, ToolBar}
+import scalafx.scene.control.{Button, Label, Slider, ToolBar}
 import scalafx.scene.layout.BorderPane
 
 import scala.annotation.nowarn
@@ -42,6 +42,9 @@ final class MainView(
     dispatch(
       Msg.CodeUpdateRequested(editorView.currentCode)
     )
+
+  private def requestVolumeChange(volume: Double): Unit =
+    dispatch(Msg.VolumeChangeRequested(volume))
 
   private def installShortcuts(scene: Scene): Unit =
     val accelerators = scene.getAccelerators
@@ -96,6 +99,17 @@ final class MainView(
         ,
         new Button("Update"):
           onAction = _ => requestCodeUpdate()
+        ,
+        new Label("Volume"):
+          style = UITheme.toolbarLabelStyle
+        ,
+        new Slider:
+          min = 0
+          max = 100
+          value = 100
+          prefWidth = 120
+          blockIncrement = 5
+          onMouseReleased = _ => requestVolumeChange(value.value)
       )
 
   val root: BorderPane = new BorderPane:
