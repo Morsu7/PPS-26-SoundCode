@@ -23,9 +23,12 @@ class SoundCodeParser {
   }
 
   private def prog(using P[?]): P[ProgramAST] =
-    P((streamBlock | settingBlock).rep(1, sep = P("\n".rep(1))) ~ End).map(streams =>
-      ProgramAST(streams.toList)
-    ) // One or more audio Streams
+    P((block).rep(1) ~ End)
+      .map(streams => ProgramAST(streams.toList)
+    )
+
+  private def block(using P[?]): P[Block] =
+    P((streamBlock | settingBlock) ~ ("\n" | End))
 
   private def settingBlock(using P[?]): P[SettingBlock] =
     P( setting ~/ "(" ~ ws ~ wrapped(configAtom) ~ ws ~ ")").map {
@@ -34,8 +37,8 @@ class SoundCodeParser {
 
   private def setting(using P[?]): P[Config => SettingBlock] = 
     P(
-      "cpm".!.map(_ => Settings.CPM.apply) |
-      "cps".!.map(_ => Settings.CPS.apply)
+      "setcpm".!.map(_ => Settings.CPM.apply) |
+      "setcps".!.map(_ => Settings.CPS.apply)
     )
 
   // A "stream" is a generative block optionally chained with generative or transformation blocks

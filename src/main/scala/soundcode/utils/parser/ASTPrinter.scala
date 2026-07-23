@@ -3,6 +3,7 @@ package soundcode.utils.parser
 import soundcode.parser.AST._
 import soundcode.parser.AST.Transformations._
 import soundcode.parser.AST.Visualizers._
+import soundcode.parser.AST.Settings._
 
 object ASTPrinter {
   extension (program: ProgramAST) {
@@ -86,6 +87,9 @@ object ASTPrinter {
         
       case NoteBlock(pat) =>
         s"$indent${marker}NoteBlock\n${formatPattern(pat, nextIndent, isLast = true)}"
+    
+      case setting : SettingBlock =>
+        s"$indent${marker}${setting.getClass.getSimpleName.stripSuffix("$")}(${setting.value.value}) [${setting.value.startIndex}:${setting.value.endIndex}]"
     }
   }
 
