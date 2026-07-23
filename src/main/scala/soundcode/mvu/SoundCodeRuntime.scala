@@ -1,7 +1,7 @@
 package soundcode.mvu
 
-import soundcode.domain.Tempo
 import soundcode.engine.*
+import scala.collection.mutable
 
 class SoundCodeRuntime(
     initialModel: AppModel,
@@ -10,15 +10,46 @@ class SoundCodeRuntime(
 ):
   private var model: AppModel = initialModel
 
-  private var audioPlayer = new AudioPlayer(
+  private val dispatchLock = new Object
+  private val pendingMessages = mutable.Queue.empty[Msg]
+  private var isDraining = false
+
+  private val audioPlayer = new AudioPlayer(
     initialModel.tempo,
     backend,
-    positions => {
-      dispatch(Msg.UpdateHighlightText(positions))
-    }
+    positions => dispatch(Msg.UpdateHighlightText(positions))
   )
 
   def dispatch(msg: Msg): Unit =
+    val mustDrain = dispatchLock.synchronized {
+      pendingMessages.enqueue(msg)
+
+      if isDraining then
+        false
+      else
+        isDraining = true
+        true
+    }
+
+    if mustDrain then drainMessages()
+
+  private def drainMessages(): Unit =
+    var continue = true
+
+    while continue do
+      val nextMessage = dispatchLock.synchronized {
+        pendingMessages.dequeueFirst(_ => true) match
+          case some @ Some(_) => some
+
+          case None =>
+            isDraining = false
+            continue = false
+            None
+      }
+
+      nextMessage.foreach(processMessage)
+
+  private def processMessage(msg: Msg): Unit =
     val (nextModel, cmd) = Update.update(model, msg)
 
     if nextModel != model then
@@ -27,6 +58,9 @@ class SoundCodeRuntime(
 
     cmd.run(dispatch, audioPlayer)
 
-  def currentModel: AppModel = model
+  def currentModel: AppModel =
+    dispatchLock.synchronized(model)
 
-  def shutdown(): Unit = audioPlayer.stop()
+  def shutdown(): Unit =
+    try audioPlayer.stop()
+    finally backend.close()

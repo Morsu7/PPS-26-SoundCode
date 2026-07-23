@@ -35,36 +35,377 @@ Le operazioni dei resolver rimangono quindi razionali. La conversione in `Double
 
 ## Parser e interprete — Cristian Morbidelli
 
-### Implementazione della grammatica
+### Implementazione del parser
 
-`SoundCodeParser` usa FastParse senza gestione automatica degli spazi (`NoWhitespace`). Gli spazi ammessi sono dichiarati nelle singole produzioni, rendendo esplicita la distinzione fra separatori della Mini Notation, spazi facoltativi e newline che separano gli stream.
+Il parser di SoundCode è implementato tramite **FastParse**, utilizzando parser combinator definiti direttamente in Scala.
 
-Le funzioni del parser rispecchiano la struttura grammaticale: programma, stream, generatore, estensione, pattern, sequenza, elemento e atomo. I combinatori `rep`, `.?`, alternative e `map` costruiscono direttamente i nodi dell'AST. Il parser pubblico converte il risultato di FastParse in:
+L'implementazione segue la struttura dell'AST definito nel progetto, con una corrispondenza diretta tra le funzioni del parser e i costruttori sintattici del linguaggio.
+
+Le principali produzioni implementate sono:
+
+```text
+Program
+ └── Block
+      ├── StreamBlock
+      │    ├── GenerativeBlock
+      │    ├── ExtensionBlock
+      │    └── VisualizerBlock
+      └── SettingBlock
+```
+
+Ogni funzione del parser ha quindi il compito di riconoscere una specifica categoria sintattica e produrre direttamente il relativo nodo AST tramite operazioni di trasformazione `.map`.
+
+---
+
+### Gestione degli spazi nella grammatica
+
+Il parser utilizza `NoWhitespace`, disabilitando la gestione automatica degli spazi fornita da FastParse.
+
+Questa scelta richiede che ogni regola specifichi esplicitamente dove gli spazi sono ammessi tramite un parser dedicato:
+
+```scala
+private def ws(using P[?]): P[Unit] =
+    P(CharsWhileIn(" \t", 0))
+```
+
+In questo modo è possibile controllare il comportamento degli spazi nei diversi contesti della grammatica.
+
+In particolare:
+
+- gli spazi tra elementi di un pattern vengono interpretati come separatori della Mini Notation;
+- gli spazi interni alle chiamate dei comandi vengono accettati in modo opzionale;
+- i caratteri di nuova linea vengono gestiti esclusivamente a livello di blocco.
+
+---
+
+### Costruzione diretta dell'AST
+
+Le regole del parser costruiscono direttamente gli oggetti AST senza passaggi intermedi.
+
+Ad esempio, il parsing di uno stream combina:
+
+```scala
+generativeBlock ~
+("." ~ extensionBlock).rep ~
+("." ~/ visualizerBlock).?
+```
+
+e il risultato viene trasformato in:
+
+```scala
+StreamBlock(
+    baseBlock,
+    extensionSeq.toList,
+    visualizerSeq
+)
+```
+
+Lo stesso approccio viene utilizzato per generatori, trasformazioni e pattern.
+
+---
+
+### Parsing parametrico dei pattern
+
+La gestione dei pattern utilizza funzioni generiche parametrizzate sul tipo di atomo.
+
+La funzione:
+
+```scala
+pattern[T <: Atom](atom: => P[T])
+```
+
+viene riutilizzata per:
+
+- pattern di note;
+- pattern di sample;
+- pattern numerici utilizzati dalle trasformazioni.
+
+Questo evita di implementare versioni duplicate della stessa grammatica mantenendo il vincolo sul tipo di elemento ammesso.
+
+Le strutture ricorsive:
+
+```text
+Pattern
+ └── Sequence
+      └── Element
+```
+
+vengono costruite tramite parser riutilizzabili:
+
+- `pattern`;
+- `sequence`;
+- `element`;
+- `baseElement`.
+
+---
+
+### Gestione degli elementi ricorsivi
+
+Gli elementi annidati vengono gestiti attraverso parser ricorsivi.
+
+La produzione di un elemento può riconoscere:
+
+```scala
+AtomElement
+SubPatternElement
+AlternationElement
+```
+
+attraverso la funzione:
+
+```scala
+baseElement
+```
+
+Questo permette di supportare pattern arbitrariamente annidati senza introdurre regole separate per ogni livello di profondità.
+
+---
+
+### Conservazione delle posizioni nel sorgente
+
+Durante il parsing degli elementi vengono utilizzati i combinatori `Index` per acquisire le posizioni nel testo originale.
+
+Le informazioni raccolte vengono salvate direttamente nei nodi AST.
+
+Esempio:
+
+```scala
+Note(
+    name,
+    accidental,
+    octave,
+    startIndex,
+    endIndex
+)
+```
+
+La stessa tecnica viene applicata a:
+
+- sample;
+- configurazioni numeriche;
+- silenzi;
+- comandi di visualizzazione.
+
+Le posizioni vengono poi utilizzate dall'interprete per costruire oggetti di dominio contenenti riferimenti al testo sorgente.
+
+---
+
+### Gestione degli errori FastParse
+
+Il metodo pubblico del parser converte il risultato di FastParse in:
 
 ```scala
 Either[String, ProgramAST]
 ```
 
-Il ramo destro contiene l'albero valido; il ramo sinistro contiene un errore già formattato con riga, colonna, aspettative e indicatore della posizione. L'uso di `Either` impedisce che un normale errore dell'utente venga trattato come un'eccezione applicativa.
+In caso di errore viene utilizzata una funzione dedicata per trasformare il risultato di FastParse in un messaggio leggibile.
 
-I combinatori `Index` acquisiscono gli offset prima e dopo note, sample, configurazioni, silenzi e comandi di visualizzazione. Tali valori vengono memorizzati nell'AST e successivamente trasferiti ai tipi di dominio. Le descrizioni `opaque` di FastParse rendono inoltre più leggibili gli elementi attesi nei messaggi di errore.
+L'errore contiene:
 
-I pattern di note, sample e valori numerici riusano funzioni generiche parametrizzate sul tipo di atomo. Questa scelta evita tre grammatiche quasi identiche per sequenze, gruppi, alternanze e modificatori `*` e `/`, pur impedendo che un tipo di atomo compaia in un contesto non compatibile.
+- posizione del problema;
+- riga e colonna;
+- elemento atteso;
+- indicazione del punto del sorgente.
 
-### Traduzione dell'AST
+Le regole utilizzano inoltre il metodo `opaque` per sostituire descrizioni generiche con messaggi specifici del linguaggio.
 
-`Interpreter` è implementato principalmente mediante pattern matching e trasformazioni di liste. La conversione procede dal basso verso l'alto:
+---
 
-- gli atomi sintattici diventano `Pattern.Atom` contenenti note, sample, silenzi o numeri;
-- una sequenza con più elementi diventa `Pattern.Sequence`;
-- le sequenze parallele diventano `Pattern.Parallel`;
-- le alternative diventano `Pattern.Alternation`;
-- gli operatori temporali producono `Pattern.TimeWarp`;
-- gli effetti e i generatori aggiuntivi producono `Pattern.WithExtensions`.
+### Implementazione dell'interprete
 
-Le funzioni di costruzione evitano wrapper inutili quando una sequenza o un parallelo contiene un solo elemento. Le estensioni vengono elaborate con un `foldLeft`, preservandone l'ordine: questo è importante perché una trasformazione può racchiudere il risultato delle estensioni precedenti anziché essere semplicemente accodata.
+L'interprete riceve un `ProgramAST` e costruisce gli oggetti appartenenti al dominio musicale.
 
-Le richieste `_pianoroll()` sono estratte separatamente dai pattern audio. L'indice dello stream e l'offset nel sorgente formano il collegamento necessario alla UI senza inserire elementi grafici nell'algebra musicale.
+L'implementazione utilizza principalmente:
+
+- pattern matching sulle gerarchie dell'AST;
+- trasformazioni ricorsive;
+- accumulo dello stato tramite fold sulle liste.
+
+---
+
+### Conversione ricorsiva dei pattern
+
+La conversione dei pattern è implementata tramite tre funzioni principali:
+
+```scala
+interpretPattern
+interpretSequence
+interpretElement
+```
+
+La prima gestisce il livello superiore del pattern, la seconda converte le sequenze, mentre la terza interpreta i singoli elementi.
+
+La conversione dei nodi AST produce direttamente oggetti del dominio:
+
+```text
+AST.Element
+      |
+      v
+Pattern dominio
+```
+
+Per evitare strutture inutilmente profonde sono presenti funzioni di costruzione "smart":
+
+```scala
+smartSequence
+smartParallel
+```
+
+che evitano di creare wrapper superflui come:
+
+```text
+Sequence(List(  Sequence(List(elemento))  ))
+```
+
+quando il risultato può essere rappresentato direttamente dall'elemento.
+
+---
+
+### Interpretazione degli stream e delle estensioni
+
+L'elaborazione degli stream avviene nella funzione:
+
+```scala
+applyExtensions
+```
+
+La lista delle estensioni viene attraversata tramite:
+
+```scala
+foldLeft
+```
+
+mantenendo uno stato composto da:
+
+```scala
+(
+    currentBase,
+    accumulatedEffects,
+    foundGenerator
+)
+```
+
+Questo permette di elaborare progressivamente lo stream mantenendo informazioni sulle estensioni già applicate.
+
+---
+
+### Implementazione degli effetti audio
+
+Gli effetti audio vengono trasformati tramite funzioni dedicate:
+
+```scala
+interpretAudioEffect
+interpretDelay
+```
+
+Ogni trasformazione viene convertita in uno o più:
+
+```scala
+Pattern[AudioEffect]
+```
+
+Il caso particolare di `Delay` viene gestito separatamente perché può produrre fino a tre effetti distinti:
+
+- volume del delay;
+- tempo del delay;
+- feedback.
+
+L'interprete accumula questi pattern di effetti durante il processamento delle estensioni.
+
+Al termine vengono inseriti nel dominio tramite:
+
+```scala
+Pattern.WithExtensions
+```
+
+---
+
+### Implementazione delle trasformazioni temporali
+
+Le trasformazioni temporali vengono convertite tramite:
+
+```scala
+interpretTimeWarp
+```
+
+che produce oggetti:
+
+```scala
+PatternModifier
+```
+
+Successivamente vengono applicate costruendo:
+
+```scala
+Pattern.TimeWarp(
+    modifier,
+    pattern
+)
+```
+
+A differenza degli effetti audio, queste trasformazioni modificano immediatamente il pattern corrente durante l'attraversamento delle estensioni.
+
+---
+
+### Gestione delle trasformazioni composte
+
+Le trasformazioni `Juxtaposition` e `Offset` vengono risolte tramite una funzione comune:
+
+```scala
+interpretInnerTransformation
+```
+
+Questa funzione può restituire alternativamente:
+
+```scala
+List[Pattern[AudioEffect]]
+```
+
+oppure:
+
+```scala
+PatternModifier[AudioPayload]
+```
+
+Gli elementi ottenuti vengono poi trasformati nei corrispondenti modificatori composti:
+
+```scala
+PatternModifier.Juxtaposition
+PatternModifier.Offset
+```
+
+Questo permette di riutilizzare la stessa logica di interpretazione anche all'interno delle trasformazioni annidate.
+
+---
+
+### Estrazione dei visualizzatori
+
+L'estrazione dei visualizzatori è implementata separatamente tramite:
+
+```scala
+extractVisualizerRequests
+```
+
+La funzione attraversa gli stream presenti nel programma e converte ogni:
+
+```scala
+VisualizerBlock
+```
+
+nella relativa:
+
+```scala
+VisualizerRequest
+```
+
+Attualmente viene gestito:
+
+```scala
+PianoRollBlock
+```
+
+che viene convertito in una richiesta contenente l'identificatore dello stream associato.
+
 
 ## Engine — Federico Morsucci
 

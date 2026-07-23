@@ -16,5 +16,3 @@ object VisualizerViewFactory:
     kind match
       case VisualizerKind.Pianoroll =>
         new PianorollView(timeline, tempo)
-
-      case _ => null

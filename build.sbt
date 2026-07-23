@@ -1,6 +1,6 @@
 name := "PPS-26-SoundCode"
 
-version := "0.1.0-SNAPSHOT"
+version := "1.0.0"
 
 scalaVersion := "3.8.4"
 
@@ -17,3 +17,19 @@ libraryDependencies ++= Seq(
   "org.scalafx" %% "scalafx" % "21.0.0-R32",
   "org.fxmisc.richtext" % "richtextfx" % "0.11.7"
 )
+
+Compile / mainClass := Some("soundcode.main")
+
+assembly / mainClass := Some("soundcode.main")
+assembly / assemblyJarName := s"soundcode-${version.value}.jar"
+
+assembly / assemblyMergeStrategy := {
+  case "module-info.class" =>
+    MergeStrategy.discard
+  case PathList("META-INF", "substrate", "config", _ @ _*) =>
+    // Metadati per GraalVM Native Image: non servono nell'esecuzione JVM.
+    MergeStrategy.discard
+  case path =>
+    val defaultStrategy = (assembly / assemblyMergeStrategy).value
+    defaultStrategy(path)
+}

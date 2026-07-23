@@ -44,16 +44,15 @@ class AudioPlayer(var tempo: Tempo, backend: AudioBackend, onHighlightChange: Se
     if (!isRunning) {
       isRunning = true
       thread = Some(new Thread(() => {
-        while (true) {
-          val running = lock.synchronized { isRunning }
-          if (!running) return
+        while lock.synchronized(isRunning) do
+          val startedAt = System.currentTimeMillis()
+          tick(AbsoluteTime(startedAt))
 
-          val now = System.currentTimeMillis()
-          tick(AbsoluteTime(now))
+          val sleepTime =
+            loopResolutionMs - (System.currentTimeMillis() - startedAt)
 
-          val sleepTime = loopResolutionMs - (System.currentTimeMillis() - now)
-          if (sleepTime > 0) Thread.sleep(sleepTime)
-        }
+          if sleepTime > 0 then
+            Thread.sleep(sleepTime)
       }))
       thread.get.start()
     }
