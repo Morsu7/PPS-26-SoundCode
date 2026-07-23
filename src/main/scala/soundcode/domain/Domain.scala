@@ -165,7 +165,9 @@ object Pattern:
 // ESECUZIONE E SCHEDULING
 // ==========================================
 
-case class ScheduledEvent[+T](whole: Interval, part: Interval, value: T, appliedExtensions: List[AudioPayload] = Nil):
+case class ScheduledEvent[+T](whole: Interval, part: Interval, value: T,
+                              appliedExtensions: List[AudioPayload] = Nil,
+                              modifierPositions: List[TextPosition] = Nil):
   def mapTime(f: Fraction => Fraction): ScheduledEvent[T] =
     this.copy(whole = whole.map(f), part = part.map(f))
   def clipTo(window: Interval): Option[ScheduledEvent[T]] =
