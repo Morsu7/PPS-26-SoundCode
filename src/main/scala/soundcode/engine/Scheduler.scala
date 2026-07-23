@@ -34,5 +34,7 @@ object SchedulerImpl extends Scheduler:
     def loop(nCycle: Int): LazyList[ScheduledEvent[AudioPayload]] =
       given Interval = Interval(Fraction(nCycle), Fraction(nCycle + 1))
       val cycleEvents = patterns.flatMap(p => p.resolve).sortBy(_.part.start.toDouble)
-      LazyList.from(cycleEvents) #::: loop(nCycle + 1)
+      if cycleEvents.isEmpty 
+        then LazyList.empty
+      else LazyList.from(cycleEvents) #::: loop(nCycle + 1)
     loop(0)
