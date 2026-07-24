@@ -409,33 +409,50 @@ che viene convertito in una richiesta contenente l'identificatore dello stream a
 
 ## Engine — Federico Morsucci
 
-## Modellazione del Pattern e del Dominio Temporale
+## Modellazione del dominio
 
-La scelta fondamentale alla base del dominio è stata quella di rappresentare la struttura musicale come un **Albero Sintattico Astratto (Abstract Syntax Tree, AST)** mediante **Algebraic Data Types (ADT)**. Questa rappresentazione non ha il solo scopo di disaccoppiare il parser dall'engine di scheduling, ma permette di descrivere qualsiasi pattern musicale attraverso una struttura ricorsiva, fortemente tipizzata e facilmente estendibile.
+Invece di considerare la musica come una semplice lista di note da suonare una dopo l'altra, il sistema la descrive come l'insieme di piccoli blocchi che possono essere combinati tra loro. In questo modo anche pattern complessi, poliritmie e variazioni nascono semplicemente dalla composizione di elementi più semplici.
 
-L'intera algebra dei pattern è costruita attorno al trait sigillato e covariante `Pattern[+T]`, i cui costruttori rappresentano le principali operazioni compositive del linguaggio:
+### I pattern
 
-- `Atom[T]` rappresenta un singolo evento atomico (nota, sample o parametro).
-- `Sequence[T]` descrive la composizione sequenziale nel tempo.
-- `Parallel[T]` permette la sovrapposizione polifonica di più pattern.
-- `Alternation[T]` introduce una variazione ciclica selezionando un ramo differente ad ogni ciclo.
-- `TimeWarp[T]` racchiude tutte le trasformazioni geometriche del tempo.
-- `WithExtensions[T]` consente di associare effetti audio e parametri aggiuntivi al pattern.
+Il tipo `Pattern[T]`, che rappresenta un qualsiasi pattern musicale.
 
-L'utilizzo degli `enum` per `Sound`, `AudioEffect` e `PatternModifier` garantisce l'esaustività del *pattern matching* già in fase di compilazione, eliminando la possibilità di casi non gestiti.
+Un pattern può assumere diverse forme, ognuna con un significato preciso:
 
-Per i tipi primitivi del dominio sono stati inoltre utilizzati gli **Opaque Types**. Tipi come `Note`, `Sample` e `AbsoluteTime` risultano quindi completamente distinti dal livello implementativo.
+- **`Atom[T]`**: rappresenta l'elemento più semplice, ad esempio una singola nota, un sample o un valore numerico.
+- **`Sequence[T]`**: esegue più pattern uno dopo l'altro, permettendo di costruire melodie e ritmi.
+- **`Parallel[T]`**: esegue più pattern contemporaneamente, utile per creare accordi o polifonie.
+- **`Alternation[T]`**: alterna pattern diversi a ogni ripetizione del ciclo, rendendo semplice creare variazioni.
+- **`TimeWarp[T]`**: applica modifiche temporali al pattern, come accelerazioni, rallentamenti, ritardi o inversioni.
+- **`WithExtensions`**: aggiunge effetti audio al pattern, mantenendo separata la struttura musicale dagli effetti applicati.
+
+Questa organizzazione rende il codice più semplice da estendere e permette al motore di sapere sempre come interpretare ogni tipo di pattern.
+
+## Tipi del dominio
+
+Anche i concetti fondamentali della musica sono rappresentati con tipi dedicati.
+
+Ad esempio:
+
+- `Note` rappresenta una nota musicale.
+- `Sample` identifica un campione audio.
+- `AbsoluteTime` rappresenta un istante preciso del clock del sistema.
+
+Avere tipi distinti evita molti errori durante lo sviluppo. Ad esempio, non è possibile confondere un istante assoluto del clock con una durata musicale o passare un valore nel formato sbagliato a una funzione.
+
+Internamente questi tipi rimangono molto leggeri e non introducono costi aggiuntivi durante l'esecuzione, ma rendono il codice più leggibile e riducono la possibilità di errori.
 
 ### Il Dominio Temporale
 
-La gestione del tempo rappresenta il motore di scheduling. Per garantire precisione ritmica assoluta ed evitare la propagazione di errori, l'architettura modella il tempo suddividendolo in quattro distinti livelli di astrazione, ognuno con responsabilità e strutture dati dedicate.
+La gestione del tempo è il problema più critico in un software musicale. Affidarsi ai classici numeri con la virgola (Double) per dividere i battiti porterebbe inevitabilmente a errori di arrotondamento (es. dividere un ciclo in terzine creerebbe periodi di **0.3333...** che non si ricongiungono mai esattamente a **1.0**).
+
+Per garantire una precisione ritmica assoluta ed evitare la propagazione di queste deviazioni matematiche, l'architettura modella il tempo suddividendolo in quattro strati di astrazione, ognuno con una precisa responsabilità:
 
 * **Tempo Logico (`Fraction`):** La timeline musicale è calcolata tramite una classe custom implementata come numero razionale. L'uso esclusivo di frazioni esatte evita completamente la deriva aritmetica e i difetti di arrotondamento tipici dei numeri in virgola mobile (`Double`), che altrimenti corromperebbero i calcoli di terzine, tuple irregolari o combinazioni di distorsioni temporali. Ogni frazione viene normalizzata all'istanziazione (denominatore positivo e riduzione matematica tramite Massimo Comune Divisore), garantendo confronti e operazioni algebricamente perfetti.
-* **Tempo Musicale (`Interval`):** Costruito componendo due frazioni (inizio e fine), modella una precisa porzione della timeline. Costituisce la "finestra geometrica" che viene propagata e partizionata ricorsivamente dai resolver durante la discesa lungo l'AST.
-* **Tempo Fisico (`Tempo`):** Rappresenta il livello di traduzione. Terminata la risoluzione logica dell'AST, la classe `Tempo` mappa gli intervalli metrico-frazionari in durate fisiche (millisecondi) applicando il parametro di velocità CPS (*Cycles Per Second*).
+* **Tempo Musicale (`Interval`):** Costruito componendo due frazioni (inizio e fine), modella una precisa porzione della timeline. Costituisce la "finestra geometrica" che viene propagata e partizionata ricorsivamente dai resolver durante la discesa lungo i Pattern.
+* **Tempo Fisico (`Tempo`):** Rappresenta il livello di traduzione. Terminata la risoluzione logica dei Pattern, la classe `Tempo` mappa gli intervalli metrico-frazionari in durate fisiche (millisecondi) applicando il parametro di velocità CPS (*Cycles Per Second*).
 * **Tempo Assoluto (`AbsoluteTime`):** É isolato tramite un *Opaque Type* (`opaque type AbsoluteTime = Long`) che incapsula il valore di `System.currentTimeMillis()`. Questa astrazione *a costo zero* previene, già a tempo di compilazione, la possibilità di mescolare accidentalmente timestamp di sistema con durate relative.
 
-**Vantaggi Architetturali**
 
 Questa stratificazione impone una rigorosa *Separation of Concerns* (separazione delle responsabilità). Il dominio matematico e compositivo (Frazioni e Intervalli) può essere calcolato, testato e manipolato in modo puro, rimanendo totalmente de-contestualizzato sia dalla velocità di riproduzione fisica, sia dalla sincronizzazione con il clock del sistema operativo.
 
@@ -443,7 +460,7 @@ Questa stratificazione impone una rigorosa *Separation of Concerns* (separazione
 
 ## Il Dispatcher e i Pattern di Risoluzione
 
-Invece di implementare la logica di valutazione direttamente all'interno dei nodi dell'AST (violando il principio di singola responsabilità e accoppiando i dati al comportamento), l'algoritmo di risoluzione è centralizzato nel modulo `PatternResolver`, che funge da **dispatcher**.
+Invece di implementare la logica di valutazione direttamente all'interno dei nodi (violando il principio di singola responsabilità e accoppiando i dati al comportamento), l'algoritmo di risoluzione è centralizzato nel modulo `PatternResolver`, che funge da **dispatcher**.
 
 Sfruttando le capacità di pattern matching di Scala su strutture ADT chiuse, il dispatcher instrada l'esecuzione verso resolver specifici. L'utilizzo di parametri contestuali (`using`) consente di propagare in modo trasparente la finestra temporale da analizzare:
 
@@ -525,10 +542,10 @@ Infine, come evidenziato dalla tracciatura delle posizioni, il resolver accumula
 
 #### Composizione e Ricorsione Strutturale (Repetition, Juxtaposition, Offset)
 
-L'eleganza dell'approccio basato su AST si esprime al massimo nei modificatori di natura strutturale, che non applicano semplici deformazioni ma alterano la topologia stessa del pattern:
+Ci sono dei modificatori di natura strutturale, che non applicano semplici deformazioni ma alterano la topologia stessa del pattern:
 
 * **Repetition (`ply`):** Anziché deformare la finestra di interrogazione, intercetta l'evento generato e ne suddivide dinamicamente la durata originale (`whole`) in **n** frammenti equi-spaziati. Il risultato è una sequenza ritmica perfettamente isocrona, incastonata nello spazio logico della nota di partenza.
-* **Juxtaposition (`jux`) e Offset (`off`):** Dimostrano la potenza ricorsiva dell'engine operando attraverso la riscrittura dell'albero sintattico. Anziché manipolare i singoli eventi matematicamente, essi trasformano il pattern a runtime creando nuovi nodi AST. `Offset`, ad esempio, costruisce un nodo `Parallel` che accoppia il pattern originale con una sua versione traslata tramite `Late(offset)`. Delegando ricorsivamente la risoluzione a questo nuovo sotto-albero, il sistema ottiene "gratuitamente" la corretta traslazione geometrica e la propagazione delle `modifierPositions`, garantendo un'assoluta coerenza architetturale senza alcuna duplicazione logica.
+* **Juxtaposition (`jux`) e Offset (`off`):** Dimostrano la potenza ricorsiva dell'engine operando attraverso la riscrittura dell'albero sintattico. Anziché manipolare i singoli eventi matematicamente, essi trasformano il pattern a runtime creando nuovi nodi. `Offset`, ad esempio, costruisce un nodo `Parallel` che accoppia il pattern originale con una sua versione traslata tramite `Late(offset)`. Delegando ricorsivamente la risoluzione a questo nuovo sotto-albero, il sistema ottiene "gratuitamente" la corretta traslazione geometrica e la propagazione delle `modifierPositions`, garantendo un'assoluta coerenza architetturale senza alcuna duplicazione logica.
 
 ### WithExtensionsResolver
 
@@ -546,10 +563,10 @@ In caso di parametri duplicati (ad esempio due effetti `gain` concorrenti nello 
 
 Riprendendo la distinzione tra le modalità di generazione della timeline, l'implementazione tecnica adotta strategie differenti a seconda del contesto d'uso:
 
-### Timeline Limitata (Bounded)
+### 1. Timeline Limitata (Bounded)
 Utilizzata principalmente dalla GUI per la rappresentazione statica, calcola la finestra temporale minima sfruttando il **minimo comune multiplo** delle periodicità dei pattern, restituendo una lista finita di eventi.
 
-### Timeline Infinita (`LazyList`)
+### 2. Timeline Infinita (`LazyList`)
 Per il live coding e la riproduzione in tempo reale, lo scheduler sfrutta la valutazione pigra di Scala per produrre una sequenza infinita valutata un ciclo alla volta:
 
 ```scala
@@ -590,11 +607,11 @@ Questo approccio previene in modo rigoroso qualsiasi **condizione di gara** (*ra
 
 Ad ogni *tick* del player, lo stato viene valutato eseguendo tre macro-operazioni sequenziali.
 
-### Pulizia degli Highlight Scaduti
+### 1. Pulizia degli Highlight Scaduti
 
 Vengono filtrate e rimosse tutte le evidenziazioni testuali il cui termine temporale (`expireAtMs`) è inferiore al tempo corrente (`now`), ripulendo la UI in modo incrementale.
 
-### Consumo degli Eventi e Filtraggio Anti-Duplicazione
+### 2. Consumo degli Eventi e Filtraggio Anti-Duplicazione
 
 Lo stream viene partizionato tramite lo `span` in base al tempo reale calcolato (`firstPerformance + tempo.offsetMs(...)`).
 
@@ -606,7 +623,7 @@ toProcess.filter(e => e.part.start == e.whole.start)
 
 L'evento viene così inviato al backend solamente nell'istante della sua effettiva nascita, pur mantenendo disponibile la sua durata completa (`whole`).
 
-### Dispatch al Backend e Notifica della UI
+### 3. Dispatch al Backend e Notifica della UI
 
 Il player inoltra il payload al generico `AudioBackend`, insieme alla durata calcolata e alle eventuali estensioni.
 
@@ -646,7 +663,7 @@ Il backend dipende dal trait `AudioEngine`, non dal sintetizzatore concreto. Nei
 
 `MidiAudioEngine` usa i canali melodici disponibili escluso l'indice 9, riservato alle percussioni. `ChannelAllocator` identifica una voce mediante programma, pan, riverbero e brightness. Una voce già nota riusa il proprio canale; una nuova voce riceve il canale successivo secondo una politica round-robin. Quando i canali terminano, il più vecchio viene riutilizzato: il sistema degrada con una possibile variazione udibile invece di interrompere la riproduzione.
 
-La velocity non fa parte dell'identità della voce perché è una proprietà della singola nota. Questa scelta permette a note con gain diverso di condividere il canale senza modificarsi reciprocamente.
+La velocity non fa parte dell'identità della voce, essendo una proprietà della singola nota: così note con gain diverso condividono il canale senza modificarsi a vicenda.
 
 L'invio di `noteOn` è sincrono e breve; il corrispondente `noteOff` viene programmato su un `ScheduledExecutorService` daemon. Il thread del player può così continuare a estrarre eventi senza restare bloccato per la durata delle note. Per evitare che una nota ribattuta venga troncata, il motore mantiene un solo `noteOff` pendente per coppia (canale, nota): se la stessa nota riparte prima della fine, il `noteOff` precedente viene annullato e riprogrammato (in MIDI un `noteOff` spegne l'intero numero di nota sul canale). Alla chiusura, executor e sintetizzatore sono rilasciati in modo tollerante agli errori.
 

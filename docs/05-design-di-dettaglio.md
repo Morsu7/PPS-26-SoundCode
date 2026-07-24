@@ -3,9 +3,7 @@ layout: default
 title: Design di dettaglio
 ---
 
-# Desing
-
-## Parser e interprete — Cristian Morbidelli
+# Parser e interprete — Cristian Morbidelli
 
 ## Dalla sintassi alla semantica
 
@@ -36,9 +34,7 @@ L'engine non deve conoscere parole chiave, parentesi, virgolette o altre convenz
 
 Questa separazione rende i due sottosistemi indipendenti e permette di evolvere la sintassi della DSL senza modificare il motore musicale, oppure introdurre nuove primitive musicali mantenendo invariata la grammatica esistente.
 
----
-
-# Il modello sintattico
+## Il modello sintattico
 
 L'AST rappresenta esclusivamente la struttura del programma, senza attribuire alcun significato esecutivo ai nodi.
 
@@ -90,34 +86,7 @@ Questa organizzazione rende l'AST facilmente estendibile: l'introduzione di un n
 
 ---
 
-## Lo stream musicale
-
-Lo stream rappresenta l'unità fondamentale di composizione della DSL. Ogni stream descrive un flusso musicale indipendente, eventualmente riprodotto in parallelo ad altri stream se ve ne sono.
-
-Dal punto di vista strutturale ogni stream è composto da tre sezioni logicamente distinte:
-
-- un **generatore**, che definisce il pattern iniziale base dello stream di cui detta il tempo;
-- una sequenza ordinata di **estensioni**, applicate progressivamente al risultato precedente da sinistra verso destra;
-- un'eventuale **richiesta di visualizzazione** dello stream, possibilmente intercettata da una interfaccia grafica.
-
-```text
-Generatore
-      │
-      ▼
-Estensione
-      │
-      ▼
-Estensione
-      │
-      ▼
-Visualizzatore
-```
-
-Questa organizzazione riflette direttamente la sintassi della DSL, nella quale le operazioni vengono concatenate mediante notazione puntata (**mini-notation**). Ogni estensione riceve implicitamente il risultato prodotto fino a quel punto, modellando una pipeline di trasformazioni facilmente estendibile.
-
----
-
-# Pattern sintattici
+### Pattern sintattici
 
 L'elemento centrale dell'AST è il **Pattern**, scelto come rappresentazione ricorsiva della struttura ritmica del linguaggio.
 
@@ -137,7 +106,8 @@ Pattern
 
 Ogni livello della gerarchia rappresenta un costrutto della DSL con un significato e comportamento ben specifici.
 
-## Pattern
+#### Pattern
+---
 
 Un pattern rappresenta l'intero contenuto di un ciclo musicale, ed occupa quindi interamente la durata del ciclo in cui viene contenuto.
 
@@ -145,9 +115,8 @@ Esso è composto da una o più sequenze. La presenza di più sequenze rappresent
 
 Il pattern costituisce quindi l'unità temporale principale sulla quale operano generatori e trasformazioni.
 
+#### Sequence
 ---
-
-## Sequence
 
 Una sequenza rappresenta una successione ordinata di elementi consecutivi.
 
@@ -155,9 +124,8 @@ La durata del ciclo viene implicitamente suddivisa tra gli elementi appartenenti
 
 La sequenza costituisce quindi la struttura temporale di base del linguaggio.
 
+#### Element
 ---
-
-## Element
 
 L'elemento rappresenta la più piccola unità componibile di una sequenza.
 
@@ -168,9 +136,8 @@ Per evitare duplicazioni strutturali, il modello distingue quattro tipologie:
 - **AlternationElement**, che rappresenta un particolare tipo di pattern in cui gli elementi delle sue sequenze vengono riprodotti alternandosi in ciascun ciclo successivo (con un **round-robin** ordinato);
 - **SpeedModifiedElement**, un elemento che contiene una variazione locale della velocità.
 
+#### Atomi
 ---
-
-# Atomi
 
 Alla base della gerarchia si trovano gli **atomi**, ovvero gli elementi indivisibili riconosciuti dal parser.
 
@@ -191,19 +158,21 @@ Questa uniformità costituisce uno dei principi progettuali dell'interprete, che
 
 ---
 
-# Estensioni
+### Estensioni
 
 Le operazioni applicabili ad uno stream vengono modellate separatamente dal generatore.
 
 Dal punto di vista concettuale il linguaggio distingue due categorie di estensioni.
 
-## Estensioni generative
+#### Estensioni generative
+---
 
 Le estensioni generative introducono nuovi pattern sonori destinati ad essere combinati con il pattern corrente.
 
 Esse rappresentano quindi nuove sorgenti musicali che partecipano alla costruzione del risultato finale.
 
-## Trasformazioni
+#### Trasformazioni
+---
 
 Le trasformazioni modificano invece il comportamento del pattern già esistente.
 
@@ -211,9 +180,7 @@ L'AST distingue numerose trasformazioni (effetti audio, modifiche temporali, rip
 
 Questa distinzione rende esplicito il ruolo di ciascun costrutto della DSL e permette al parser di verificare che soltanto determinate forme sintattiche possano comparire in specifici punti del linguaggio.
 
----
-
-# Conservazione delle informazioni sorgente
+## Conservazione delle informazioni sorgente
 
 Una caratteristica progettuale dell'AST consiste nel mantenere il collegamento con il testo originale.
 
@@ -223,31 +190,7 @@ In questo modo la componente grafica può evidenziare in tempo reale le note o i
 
 L'AST assume quindi anche il ruolo di ponte tra editor ed engine, consentendo la sincronizzazione dell'interfaccia utente con l'esecuzione musicale mantenendo completamente separati gli aspetti grafici da quelli sonori.
 
----
-
-# Interpretazione semantica
-
-L'interpretazione rappresenta il passaggio dall'AST, costruito secondo le esigenze della grammatica, alle strutture utilizzate dal motore musicale.
-
-Mentre l'AST conserva la forma con cui il programma è stato scritto, il modello di dominio descrive esclusivamente il comportamento musicale che dovrà essere eseguito. Durante questa fase vengono quindi eliminate tutte le informazioni sintattiche prive di significato semantico, preservando esclusivamente la struttura temporale e le informazioni necessarie all'esecuzione.
-
-L'interprete non modifica il comportamento espresso dal programma, ma effettua una traduzione strutturale tra due modelli appartenenti a livelli di astrazione differenti giungendo ad una rappresentazione significativa e chiara degli stream musicali descritti nel linguaggio del dominio definito a priori.
-
----
-
-## Separazione tra contenuto musicale e configurazione
-
-Il programma può contenere sia stream musicali sia impostazioni globali.
-
-Queste due categorie vengono interpretate indipendentemente.
-
-Gli stream producono pattern eseguibili, mentre i blocchi di configurazione vengono convertiti in una rappresentazione del tempo globale utilizzata successivamente dal motore di schedulazione.
-
-In questo modo le informazioni relative alla composizione musicale rimangono completamente separate dalla configurazione dell'ambiente di esecuzione.
-
----
-
-# Interpretazione semantica
+## Interpretazione semantica
 
 L'interprete costituisce il collegamento tra il linguaggio e il motore musicale.
 
@@ -261,9 +204,8 @@ L'interprete non esegue direttamente gli stream musicali, ma costruisce un model
 
 Questa separazione mantiene completamente indipendenti il linguaggio, il modello musicale e il motore di esecuzione.
 
+### Separazione delle responsabilità
 ---
-
-## Separazione delle responsabilità
 
 L'AST può contenere tre categorie di informazioni differenti:
 
@@ -281,9 +223,8 @@ Le richieste di visualizzazione vengono invece estratte separatamente e destinat
 
 Questa scelta impedisce che il motore audio debba conoscere aspetti relativi all'interfaccia utente e consente ai due sottosistemi di evolvere indipendentemente.
 
+### Interpretazione ricorsiva dei pattern
 ---
-
-## Interpretazione ricorsiva dei pattern
 
 L'interpretazione dei pattern segue fedelmente la struttura ricorsiva dell'AST.
 
@@ -300,9 +241,8 @@ L'interprete non ricostruisce la struttura del pattern durante questa fase, ma l
 
 Ciò consente di mantenere una corrispondenza diretta tra il modello sintattico e quello di dominio, rendendo il comportamento del linguaggio facilmente prevedibile.
 
+### Uniformità dell'interpretazione
 ---
-
-## Uniformità dell'interpretazione
 
 Una delle principali scelte progettuali consiste nel riutilizzare il medesimo processo di interpretazione per tutte le tipologie di pattern presenti nel linguaggio.
 
@@ -316,9 +256,8 @@ L'aggiunta di nuove tipologie di atomi non richiede quindi modifiche alla logica
 
 Questa scelta riduce la duplicazione di codice e garantisce un comportamento uniforme dell'intero linguaggio.
 
+### Interpretazione degli stream
 ---
-
-## Interpretazione degli stream
 
 Ogni stream viene interpretato a partire dal proprio generatore.
 
@@ -334,9 +273,8 @@ L'interprete distingue infatti tre categorie differenti:
 
 Questa distinzione riflette il diverso significato che tali operazioni assumono nel dominio musicale e costituisce uno dei principi fondamentali del modello adottato.
 
+#### Estensioni generative
 ---
-
-## Estensioni generative
 
 Le estensioni generative introducono nuovi pattern sonori che devono essere riprodotti insieme al pattern principale.
 
@@ -344,9 +282,8 @@ Esse non modificano la struttura temporale dello stream, ma aggiungono nuove sor
 
 Per questo motivo vengono mantenute come componenti indipendenti fino alla costruzione della rappresentazione finale del pattern.
 
+#### Gestione degli effetti audio
 ---
-
-## Gestione degli effetti audio
 
 Gli effetti audio rappresentano proprietà associate agli eventi musicali.
 
@@ -382,9 +319,8 @@ Infine permette al motore audio di elaborare gli effetti come un insieme omogene
 
 L'introduzione di nuovi effetti risulta inoltre particolarmente semplice, poiché richiede esclusivamente l'aggiunta di una nuova tipologia di estensione senza alterare la struttura del modello.
 
+#### Gestione delle trasformazioni temporali
 ---
-
-## Gestione delle trasformazioni temporali
 
 Le trasformazioni temporali seguono una filosofia completamente differente.
 
@@ -411,9 +347,8 @@ Slow
 
 Ogni trasformazione opera quindi sul risultato prodotto dalla precedente, preservando esattamente la semantica della DSL.
 
+#### Trasformazioni composte
 ---
-
-## Trasformazioni composte
 
 Alcune trasformazioni consentono di combinare più operazioni elementari.
 
@@ -423,9 +358,8 @@ L'interprete converte tali costrutti in un'unica struttura del dominio composta 
 
 Questa scelta evita di introdurre casi particolari nel motore di esecuzione, che continua ad elaborare esclusivamente modificatori appartenenti al proprio modello.
 
+#### Combinazione tra effetti e trasformazioni temporali
 ---
-
-## Combinazione tra effetti e trasformazioni temporali
 
 La presenza contemporanea di effetti audio e trasformazioni temporali richiede una specifica strategia di interpretazione.
 
@@ -446,12 +380,11 @@ WithExtensions
 ```
 
 Questa organizzazione garantisce che gli effetti rimangano sempre sincronizzati con il pattern anche in presenza di modifiche della struttura temporale.
-
 La distinzione tra proprietà del suono e trasformazioni del tempo rappresenta uno dei principi fondamentali del modello di dominio e contribuisce a mantenerne la semplicità e l'estendibilità.
 
 ---
 
-## Conservazione del collegamento con il sorgente
+### Conservazione del collegamento con il sorgente
 
 Durante l'intero processo di interpretazione viene mantenuto il collegamento con il programma sorgente.
 
@@ -459,9 +392,7 @@ Le coordinate associate agli atomi dell'AST vengono propagate agli oggetti del d
 
 Questa informazione viene utilizzata dalla componente grafica per sincronizzare l'esecuzione con l'editor, evidenziando in tempo reale gli elementi in riproduzione senza richiedere una nuova analisi sintattica del programma.
 
----
-
-## Risultato dell'interpretazione
+### Risultato dell'interpretazione
 
 Al termine dell'interpretazione il programma viene trasformato in tre insiemi di informazioni indipendenti:
 
@@ -473,12 +404,9 @@ Il modello risultante è completamente indipendente dalla sintassi della DSL e c
 
 ## Engine — Federico Morsucci
 
-# Design di dettaglio
-## Engine e Risoluzione Temporale
+L'engine è strutturato come una semplice pipeline in cui ogni componente ha un compito preciso. L'obiettivo è trasformare il codice scritto dall'utente in una sequenza di suoni, tenendo rigorosamente separati il calcolo matematico della musica dalla riproduzione audio vera e propria.
 
-L'engine è progettato come una pipeline di elaborazione nella quale ogni componente svolge una singola responsabilità. L'obiettivo è trasformare il codice scritto dall'utente in una sequenza temporale di eventi musicali sincronizzati con il tempo reale, mantenendo completamente separati il processo di interpretazione del linguaggio, la pianificazione temporale e la riproduzione audio.
-
-Il flusso di esecuzione del sistema è illustrato in Figura seguente.
+Il flusso di esecuzione del sistema è illustrato nella figura seguente.
 
 ```mermaid
 flowchart LR
@@ -508,13 +436,13 @@ Player
 --> UI["Highlight UI"]
 ```
 
-L'interprete costituisce il punto di ingresso dell'engine. Dopo aver ricevuto il codice sorgente, costruisce la rappresentazione interna della composizione sotto forma di pattern e la passa allo scheduler.
+L'interprete legge il codice sorgente, costruisce la struttura ad albero dei pattern e la passa allo scheduler.
 
-Lo scheduler rappresenta il componente responsabile della costruzione della timeline musicale. Il suo compito non consiste nell'interpretare direttamente i pattern, bensì nel determinare quale intervallo temporale debba essere valutato in ogni istante. Per ciascun ciclo genera quindi una finestra temporale (`Interval`) e delega la risoluzione del pattern al `PatternResolver`.
+A questo prima di assegnare ad ogni evento il suo **tempo fisico**, il sistema separa gli eventi in **tempo logico**.
 
-Il `PatternResolver` percorre ricorsivamente l'albero dei pattern e produce una collezione di oggetti `ScheduledEvent`, ciascuno dei quali rappresenta un evento musicale completo di informazioni temporali, payload sonoro ed eventuali parametri aggiuntivi. Terminata la risoluzione, gli eventi vengono restituiti allo scheduler, che li ordina cronologicamente e costruisce la timeline finale.
+Lo **Scheduler** è il componente che organizza la timeline di eventi, ma lavora esclusivamente in una bolla di tempo relativo e matematico. Lo scheduler non sa nulla di secondi o millisecondi; ragiona solo per *cicli* e *frazioni* (espresse tramite la classe `Fraction` e le finestre `Interval`).
 
-Questo scambio di informazioni è rappresentato nella Figura seguente.
+Per ogni ciclo musicale (ad esempio da `0` a `1`, poi da `1` a `2`), lo scheduler delega il calcolo al **PatternResolver**. Quest'ultimo smonta l'albero dei pattern e restituisce una lista di eventi temporali (`ScheduledEvent`) pronti per essere ordinati sulla timeline logica.
 
 ```mermaid
 sequenceDiagram
@@ -525,7 +453,7 @@ participant PatternResolver
 
 Interpreter->>Scheduler: Pattern
 
-loop Per ogni ciclo
+loop Per ogni ciclo logico (frazioni)
 
 Scheduler->>PatternResolver: resolve(pattern, Interval)
 
@@ -538,19 +466,20 @@ Scheduler-->>Scheduler: Ordina gli eventi
 Scheduler->>AudioPlayer: Timeline
 ```
 
-Lo scheduler espone due differenti modalità di generazione della timeline.
+Lo scheduler può generare questa timeline in due modi diversi:
 
-La prima produce una sequenza finita di eventi, ottenuta determinando la minima durata necessaria affinché il pattern completi un'intera ripetizione. Questa modalità è utilizzata principalmente per la visualizzazione grafica e per l'analisi statica della composizione.
+- **Timeline Limitata (Bounded)**: produce una lista chiusa e finita di eventi. Calcola automaticamente la lunghezza esatta del pattern (tramite il metodo `cycleLength`) ed estrae solo i cicli necessari per formare un loop perfetto. È utilizzata soprattutto per le interfacce statiche o per l'esportazione.
 
-La seconda modalità genera invece una `LazyList`, costruita dinamicamente un ciclo alla volta. In questo caso gli eventi non vengono calcolati anticipatamente, ma soltanto nel momento in cui risultano necessari alla riproduzione. Tale approccio consente di mantenere un consumo di memoria costante anche durante esecuzioni di durata arbitraria.
+- **Timeline Infinita (LazyList)**: rappresenta il cuore del live coding. Utilizza la valutazione *pigra* di Scala (`LazyList`): il motore non calcola tutta la canzone in anticipo, ma genera gli eventi solo per il ciclo corrente nel momento in cui servono (`LazyList.from(cycleEvents) #::: loop(nCycle + 1)`). In questo modo, indipendentemente dal fatto che l'esecuzione duri un minuto o tre ore, il consumo di memoria rimane costante e molto contenuto.
 
-Una volta costruita la timeline, il controllo passa all'`AudioPlayer`, che rappresenta il punto di collegamento tra il dominio logico della composizione e il backend audio.
+Una volta creata la timeline logica infinita, il controllo passa all'**AudioPlayer**.
 
-Il player non interpreta il linguaggio né esegue operazioni di scheduling: il suo unico compito consiste nel consumare progressivamente la timeline prodotta dallo scheduler, sincronizzando gli eventi con il tempo fisico del sistema.
+A differenza dello scheduler, il player lavora con il **tempo fisico assoluto**, cioè il clock del sistema espresso in millisecondi (`System.currentTimeMillis()`). Operando su un thread dedicato, il player consuma gli eventi della timeline uno alla volta, utilizzando la velocità globale (`Tempo`) per convertire le frazioni temporali in millisecondi effettivi.
 
-Per ogni iterazione del proprio ciclo di esecuzione, il player confronta il tempo corrente con l'istante di attivazione degli eventi presenti nella timeline. Quando un evento diventa attivo, esso viene inviato al backend audio insieme alla durata calcolata e agli eventuali parametri applicati. Contestualmente vengono raccolte le posizioni del codice sorgente associate all'evento e notificate all'interfaccia grafica per aggiornare l'highlighting in tempo reale.
+Ad ogni tick, se il tempo logico calcolato ha raggiunto l'istante previsto per l'evento, il player esegue due operazioni in parallelo:
 
-L'interazione tra scheduler e player è riassunta nella Figura seguente.
+- invia il suono all'`AudioBackend` per la riproduzione;
+- raccoglie le coordinate del testo associate a quel suono e notifica la UI affinché evidenzi il codice in tempo reale (`onHighlightChange`).
 
 ```mermaid
 sequenceDiagram
@@ -562,9 +491,9 @@ participant UI
 
 Scheduler->>AudioPlayer: LazyList[ScheduledEvent]
 
-loop Tick del player
+loop Tick del player (millisecondi)
 
-AudioPlayer->>AudioPlayer: Sincronizzazione con Tempo
+AudioPlayer->>AudioPlayer: Sincronizzazione con tempo reale
 
 AudioPlayer->>Backend: triggerSound(...)
 
@@ -573,7 +502,9 @@ AudioPlayer->>UI: updateHighlight(...)
 end
 ```
 
-L'unità di informazione scambiata tra scheduler e player è rappresentata dallo `ScheduledEvent`. Ogni evento descrive completamente un'azione musicale e contiene sia il payload da riprodurre sia tutte le informazioni temporali necessarie alla sua esecuzione.
+## La geometria degli eventi: `whole` e `part`
+
+Per scambiare i dati tra scheduler e player viene utilizzato l'oggetto `ScheduledEvent`. Oltre alle informazioni sul suono (`payload`) e agli effetti, ogni evento contiene due intervalli temporali distinti.
 
 ```mermaid
 flowchart LR
@@ -591,16 +522,24 @@ Extensions --> Event
 Positions --> Event
 ```
 
-Ogni evento temporale è quindi definito da due intervalli distinti:
+- **`whole`** (*intero*): rappresenta la durata logica completa della nota.
+- **`part`** (*parte*): rappresenta esclusivamente la porzione della nota visibile all'interno della finestra temporale elaborata nel ciclo corrente.
 
-* **`whole` (Intero):** rappresenta l'estensione logica originale e completa dell'evento musicale nello spazio temporale assoluto.
-* **`part` (Parte):** rappresenta esclusivamente la porzione dell'evento che risulta effettivamente visibile e attiva all'interno della finestra temporale in fase di elaborazione (il ciclo corrente).
+### Perché questa distinzione è indispensabile?
 
-**Perché questa separazione è necessaria?**
+Senza la separazione tra `whole` e `part`, la gestione degli eventi che attraversano il confine tra due cicli (ad esempio una nota che inizia alla fine del ciclo `0` e termina a metà del ciclo `1`) sarebbe problematica. Il motore sarebbe costretto a trattare la nota come due eventi distinti, con il rischio di ottenere riproduzioni tronche oppure duplicate.
 
-Questa distinzione, definita a livello strutturale, è la chiave architetturale per gestire in modo sicuro gli eventi che attraversano i confini di un ciclo ritmico.
+La presenza di entrambe le coordinate permette invece all'`AudioPlayer` di risolvere il problema con un semplice filtro:
 
-Senza questa separazione, un evento a cavallo tra due cicli verrebbe visto dal motore come due frammenti separati. Grazie alla convivenza di `whole` e `part`, invece, il player può applicare una regola di esecuzione rigorosa: esegue il *triggering* della nota **una sola volta** (nell'istante esatto in cui inizia la sua vita effettiva), ma le assegna la durata totale corretta leggendola dal `whole`. Questo approccio previene in modo matematico l'insorgere di artefatti audio, evitando note troncate prematuramente al cambio di ciclo o, peggio, suonate due volte (*double-triggering*).
+```scala
+toProcess.filter(e => e.part.start == e.whole.start)
+```
+
+In pratica, il player avvia fisicamente il suono soltanto nell'istante in cui la nota nasce realmente, ossia quando `part.start` coincide con `whole.start`, ma comunica al backend audio la durata completa ricavata da `whole`.
+
+Quando lo scheduler elaborerà il ciclo successivo e restituirà la seconda porzione della stessa nota, il filtro la scarterà automaticamente, evitando una seconda attivazione.
+
+Questo semplice accorgimento geometrico garantisce che una nota estesa su più cicli venga riprodotta una sola volta, mantenendo però la durata corretta e impedendo sia troncamenti sia duplicazioni.
 
 ## Audio e MIDI — Tommaso Remedi
 
@@ -616,7 +555,7 @@ flowchart LR
     AE --> SYN[Sintetizzatore MIDI]
 ```
 
-Questa doppia astrazione permette di provare la temporizzazione con un backend controllato e di provare la traduzione MIDI senza avviare l'intera applicazione.
+La doppia astrazione rende testabili separatamente la temporizzazione, con un backend controllato, e la traduzione MIDI, senza avviare l'intera applicazione.
 
 ### Traduzione musicale
 
@@ -628,7 +567,7 @@ Il backend distingue tre casi:
 
 Le estensioni udibili vengono trasformate in parametri della nota o controlli di canale. Il guadagno determina la velocity; pan, riverbero e filtro passa-basso sono approssimati tramite controlli MIDI. Gli effetti privi di una corrispondenza MIDI adeguata (`hpf` e `delay`) restano nel modello, senza introdurre dipendenze nell'engine.
 
-I canali melodici sono assegnati per voce, dove una voce identifica una combinazione compatibile di strumento e controlli. In questo modo note simultanee con configurazioni diverse non si sovrascrivono a vicenda, mentre il canale General MIDI dedicato alle percussioni resta riservato.
+I canali melodici sono assegnati per voce, dove una voce identifica una combinazione compatibile di strumento e controlli, così che note simultanee con configurazioni diverse non si sovrascrivano a vicenda; il canale General MIDI dedicato alle percussioni resta riservato.
 
 L'avvio di una nota è immediato, mentre la sua terminazione è pianificata in modo non bloccante. Se il sintetizzatore non è disponibile, un motore silenzioso mantiene operativo il resto dell'applicazione: parsing, scheduling, interfaccia e test non dipendono quindi dalla presenza di un dispositivo audio.
 

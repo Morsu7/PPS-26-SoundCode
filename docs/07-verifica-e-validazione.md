@@ -36,7 +36,7 @@ Il repository non configura scoverage o un altro misuratore di code coverage. No
 | Infrastruttura audio | `MidiNoteTest`, `GmInstrumentMapTest`, `GmDrumMapTest`, `ChannelAllocatorTest`, `MidiAudioEngineTest` | Medio-alta per la logica, bassa per l'ambiente reale | Conversioni MIDI, lookup, input errati, riuso e overflow dei canali, chiusura idempotente e smoke test del synth. |
 | Editor | `SyntaxHighlighterSpec`, `CompletionProviderSpec`, `AutocompleteSupportSpec`, `AutoPairingSupportSpec`, `BlockEditorViewSpec` | Medio-alta sulla logica locale | Colorazione sintattica, precedenza degli stili, intervalli di riproduzione validi e fuori limite, completamento contestuale e inserimento degli snippet, delimitatori e selezioni, normalizzazione dei fine riga. |
 | Vista principale e animazioni | `MainViewSpec`, `AnimatedViewSpec` | Media | Struttura della vista, configurazione della toolbar e del controllo del volume, messaggi prodotti da pulsanti e scorciatoie, avvio, arresto e idempotenza dell'animazione. |
-| Coordinamento MVU | Nessuna suite diretta; osservato solo ai confini della UI | Bassa | Le suite della vista verificano la produzione di alcuni `Msg`, senza attraversare il ciclo di aggiornamento. |
+| Coordinamento MVU | Suite diretta su `Update.update` (`VolumeUpdateTest`) e verifiche ai confini UI | Media | `VolumeUpdateTest` verifica `Update.update` (messaggio → modello + `Cmd`); le suite della vista controllano la produzione di alcuni `Msg`. |
 
 ### Lettura complessiva
 
@@ -60,7 +60,7 @@ La seguente matrice indica dove ci si aspetta che una modifica venga intercettat
 | Mapping di note, strumenti, drum o effetti MIDI | Suite audio/backend | Alta | Mantenere almeno un test di pipeline dalla DSL. |
 | Allocazione dei canali | `ChannelAllocatorTest` | Alta per l'algoritmo | Provare anche l'integrazione con note simultanee sul synth. |
 | Logica di autocomplete, pairing o highlighting | Suite editor dedicate | Alta | Aggiungere un caso per ogni nuovo contesto editoriale. |
-| Modello o transizione MVU | Copertura indiretta | Bassa | Creare una suite pura per ogni variante di `Msg`. |
+| Modello o transizione MVU | Copertura diretta solo per `VolumeChangeRequested` (`VolumeUpdateTest`) | Bassa | Estendere la suite pura ad altre varianti di `Msg`. |
 | Layout o animazione dei visualizzatori | `AnimatedViewSpec` solo per il ciclo di vita | Bassa | Test JavaFX mirati e scenario manuale con resize, scroll e update. |
 
 Questa matrice deve guidare la manutenzione: una modifica in un'area a confidenza bassa richiede test nuovi nello stesso cambiamento, mentre nelle aree ad alta confidenza occorre comunque aggiornare le aspettative quando il comportamento desiderato cambia intenzionalmente.
@@ -82,38 +82,89 @@ Per ogni passo vanno annotati input, risultato atteso, risultato osservato, revi
 
 # Strategia dei Test Engine
 
-La strategia di testing è stata progettata per validare l'integrità della geometria temporale dell'AST e il corretto consumo della timeline. Per mantenere i test puliti e focalizzati, l'architettura si avvale principalmente di due pattern di testing mirati:
+La verifica dell'engine è stata progettata con l'obiettivo di controllare che la timeline prodotta dal sistema sia sempre corretta dal punto di vista temporale. Poiché il comportamento dell'engine dipende dalla composizione dei pattern e dalle trasformazioni applicate, i test non si limitano a verificare la presenza degli eventi, ma controllano soprattutto la loro geometria nel tempo.
 
-## DSL Dichiarativo per la Verifica dell'AST
+Per mantenere la suite di test leggibile e facilmente estendibile sono state adottate due strategie principali.
 
-Per testare la correttezza geometrica dell'algebra dei pattern senza rumore (*boilerplate*), è stato sviluppato un Domain-Specific Language (DSL) interno basato su `AnyFunSuite`.
+## DSL dichiarativo per la verifica dei pattern
 
-Sfruttando extension methods e la valutazione pigra (`LazyList`), i test valutano lo stesso *execution path* di produzione proiettando i complessi `ScheduledEvent` nel record semplificato `ExpectedEvent`:
+Scrivere test per un motore di scheduling temporale può diventare rapidamente molto complesso. Senza strumenti dedicati sarebbe necessario costruire manualmente l'intero albero dei pattern e confrontare oggetti `ScheduledEvent` ricchi di informazioni, molte delle quali irrilevanti ai fini della verifica.
+
+Per evitare questo problema è stato sviluppato un piccolo **DSL (Domain-Specific Language)** interno, che permette di descrivere i test con una sintassi molto vicina a quella utilizzata dall'utente durante il live coding.
+
+Grazie a questo DSL, i pattern possono essere scritti direttamente in forma compatta, senza dover costruire manualmente l'albero sintattico. Ad esempio, invece di creare esplicitamente tutti i nodi che rappresentano una sequenza, è sufficiente scrivere:
 
 ```scala
-check(seq(bd, hh).late(1\4)).inCycle(0)(
-  ExpectedEvent("bd", part = (1\4) -> (1\2)),
-  ExpectedEvent("hh", part = 0 -> (1\4), whole = (-1\4) -> (1\4))
+val pattern = seq(bd, hh).late(1\4)
+```
+
+Anche la fase di verifica viene semplificata dal metodo check, che esegue esattamente lo stesso percorso utilizzato dall'engine in produzione, consumando la LazyList generata dallo scheduler. Gli eventi prodotti vengono convertiti in un oggetto ExpectedEvent, che mantiene le informazioni rilevanti per il test (part, whole, effetti e suono riprodotto), ma le presenta in una forma molto più leggibile. In questo modo il risultato del test descrive direttamente la "partitura" generata dall'engine, rendendo immediato capire se la geometria temporale è corretta senza dover analizzare la struttura completa di un ScheduledEvent.
+
+Una semplice sequenza ritmica può quindi essere verificata in modo estremamente leggibile:
+
+```scala
+val pattern = seq(bd, hh)
+
+check(pattern).inCycle(0)(
+  ExpectedEvent("bd", part = 0 -> (1\2)),
+  ExpectedEvent("hh", part = (1\2) -> 1)
 )
 ```
 
-Questo approccio verifica in modo sistematico l'invariante fondamentale tra **whole** (durata logica originaria) e **part** (porzione visibile nel ciclo), coprendo scenari di partizionamento, polifonia, estensioni e distorsioni geometriche complesse (*fast*, *slow*, *late* e *reverse*).
+L'obiettivo principale del DSL è verificare che tutte le trasformazioni temporali mantengano corretta la geometria della timeline.
 
-## Controllo Deterministico del Tempo nell'AudioPlayer
+Un caso particolarmente importante riguarda l'operatore `late`, che ritarda gli eventi nel tempo. Quando una nota attraversa il confine tra due cicli, il motore deve dividerne correttamente la parte visibile (`part`), mantenendo però la durata originale (`whole`).
 
-Per testare l'integrazione del player ed evitare test fluttuanti dovuti ai thread asincroni o al clock reale di sistema (`System.currentTimeMillis()`), l'architettura dell'`AudioPlayer` espone esplicitamente il metodo di avanzamento:
+Questo comportamento può essere verificato con un test come il seguente:
+
+```scala
+val pattern = seq(bd, sn).late(1\4)
+
+check(pattern).inCycleUnordered(0)(
+  ExpectedEvent("sn", part = 0 -> (1\4), whole = (-1\4) -> (1\4)),
+  ExpectedEvent("bd", part = (1\4) -> (3\4)),
+  ExpectedEvent("sn", part = (3\4) -> 1, whole = (3\4) -> (5\4))
+)
+```
+
+Il DSL permette inoltre di testare facilmente pattern molto complessi, evitando lunghe fasi di preparazione.
+
+Un esempio è rappresentato dall'operatore `jux`, che duplica un pattern applicando una trasformazione differente ai due canali stereo. Nel test seguente viene verificato che il canale sinistro riproduca la sequenza originale, mentre quello destro esegua la stessa sequenza invertita temporalmente:
+
+```scala
+val pattern = seq(bd, seq(hh, sn)).jux(rev)
+
+check(pattern).inCycleUnordered(0)(
+  // Canale sinistro
+  ExpectedEvent("bd", part = 0 -> (1\2),     effects = List("0.0")),
+  ExpectedEvent("hh", part = (1\2) -> (3\4), effects = List("0.0")),
+  ExpectedEvent("sn", part = (3\4) -> 1,     effects = List("0.0")),
+
+  // Canale destro
+  ExpectedEvent("sn", part = 0 -> (1\4),     effects = List("1.0")),
+  ExpectedEvent("hh", part = (1\4) -> (1\2), effects = List("1.0")),
+  ExpectedEvent("bd", part = (1\2) -> 1,     effects = List("1.0"))
+)
+```
+
+In questo modo i test assumono una forma molto vicina a una vera e propria partitura musicale. La lettura risulta immediata e qualsiasi modifica interna all'engine può essere validata semplicemente verificando che la geometria degli eventi rimanga invariata.
+
+## Controllo deterministico del tempo nell'AudioPlayer
+
+Per verificare il comportamento dell'`AudioPlayer` sarebbe poco affidabile utilizzare direttamente il clock del sistema (`System.currentTimeMillis()`), poiché i test diventerebbero dipendenti dal tempo reale e dall'esecuzione dei thread.
+
+Per questo motivo il player espone il metodo:
 
 ```scala
 tick(now: AbsoluteTime)
 ```
 
-Questo design consente al *test runner* di pilotare manualmente lo scorrere del tempo, millisecondo per millisecondo, in modo completamente deterministico.
+In questo modo il tempo può essere controllato direttamente dal test, avanzandolo manualmente millisecondo per millisecondo.
 
 ```scala
-// Simulazione manuale e deterministica del tempo nel test runner
 for (t <- startMs to endMs) {
   audioPlayer.tick(AbsoluteTime(t))
 }
 ```
 
-In questo modo è possibile ispezionare direttamente il backend audio e validare con assoluta precisione la sequenza, il *timing* e la durata degli eventi emessi, garantendo la massima robustezza dell'intera suite di test.
+Questa soluzione rende i test completamente deterministici e riproducibili. È possibile verificare con precisione il momento in cui ogni evento viene riprodotto, la durata dei suoni emessi e la corretta sincronizzazione tra timeline logica, backend audio e aggiornamento dell'interfaccia.

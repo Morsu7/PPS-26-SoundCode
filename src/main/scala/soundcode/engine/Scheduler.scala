@@ -33,7 +33,7 @@ object SchedulerImpl extends Scheduler:
   def generateInfiniteTimeline(patterns: List[Pattern[AudioPayload]]): LazyList[ScheduledEvent[AudioPayload]] =
     def loop(nCycle: Int): LazyList[ScheduledEvent[AudioPayload]] =
       given Interval = Interval(Fraction(nCycle), Fraction(nCycle + 1))
-      val cycleEvents = patterns.flatMap(p => p.resolve).sortBy(_.part.start.toDouble)
+      val cycleEvents = patterns.flatMap(p => p.resolve).sortBy(_.part.start)
       if cycleEvents.isEmpty 
         then LazyList.empty
       else LazyList.from(cycleEvents) #::: loop(nCycle + 1)
