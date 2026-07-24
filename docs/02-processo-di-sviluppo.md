@@ -11,7 +11,7 @@ La metodologia di sviluppo applicata al progetto è stata di tipo *Agile*; in pa
 
 Scrum è un processo *iterativo* e *incrementale*, nel quale ogni iterazione aggiunge nuove funzionalità al sistema o perfeziona quelle esistenti.
 
-All'inizio del progetto è stato redatto il *Product Backlog*, contenente le funzionalità da realizzare, organizzate in *item*.
+All'inizio del progetto è stato redatto il *Product Backlog*, contenente le funzionalità da realizzare, organizzate in *item*. Per ogni item è stata registrata una stima iniziale e, al termine di ciascuno sprint, una nuova stima del lavoro residuo. I valori nelle colonne degli sprint non rappresentano quindi i punti consumati durante l'iterazione. Il residuo può diminuire quando il lavoro procede, ma anche aumentare quando il refinement fa emergere complessità, dipendenze o lavoro aggiuntivo non considerato nella stima precedente. `DONE` equivale a lavoro residuo nullo, mentre `-` indica che l'item non era ancora stato preso in carico oppure che era già stato completato in uno sprint precedente. La versione finale del backlog è disponibile nel file [`product-backlog.csv`](product-backlog.csv).
 
 Le iterazioni del processo, chiamate *sprint*, sono state svolte settimanalmente. Ogni sprint ha previsto le seguenti attività:
 

@@ -23,4 +23,5 @@ Corso di Paradigmi di Programmazione e Sviluppo — A.A. 2025/2026.
 5. [Design di dettaglio](05-design-di-dettaglio.md)
 6. [Implementazione](06-implementazione.md)
 7. [Verifica e validazione](07-verifica-e-validazione.md)
-8. [Conclusioni](08-conclusioni.md)
+8. [Retrospettiva](08-retrospettiva.md)
+9. [Product Backlog](product-backlog.csv)

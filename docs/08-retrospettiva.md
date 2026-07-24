@@ -25,6 +25,20 @@ L'andamento complessivo può essere ricondotto alle seguenti fasi:
 
 Il Product Backlog non è rimasto invariato durante il progetto. Alcune attività inizialmente considerate secondarie, come la propagazione delle posizioni nel testo o il controllo deterministico del tempo nei test, sono diventate necessarie per integrare correttamente editor, engine e visualizzazioni. Al contrario, funzionalità più ampie — persistenza dei progetti, esportazione, collaborazione remota e compatibilità completa con Strudel — sono rimaste fuori dallo scope. Anche alcuni effetti riconosciuti dalla DSL non hanno una resa sonora completa nel backend MIDI. La revisione continua delle priorità ha evitato che questi obiettivi estendessero eccessivamente il progetto, consentendo di concentrare il lavoro su una pipeline utilizzabile dall'inizio alla fine.
 
+### Definition of Done
+
+Un item è stato marcato `DONE` soltanto quando il suo risultato era integrato nel ramo principale e soddisfaceva i criteri applicabili fra i seguenti:
+
+- il comportamento richiesto era implementato e coerente con i requisiti e con i contratti dei componenti coinvolti;
+- il codice compilava con la versione di JDK e Scala stabilita dal progetto, senza introdurre errori nelle altre componenti;
+- erano presenti test automatici significativi per il comportamento nuovo o modificato e l'intera suite risultava verde localmente;
+- il workflow di Continuous Integration completava con successo build e test, inclusi quelli JavaFX eseguiti tramite display virtuale;
+- documentazione, grammatica, esempi e diagrammi interessati dal cambiamento erano stati aggiornati;
+- gli errori conosciuti e i limiti intenzionali erano esplicitati, senza presentare come supportato un comportamento disponibile soltanto nel modello o nella sintassi;
+- per le proprietà non verificabili in modo affidabile automaticamente, come resa MIDI, sincronizzazione percepita e comportamento grafico, era stato eseguito uno scenario manuale ripetibile.
+
+Per gli item puramente documentali non erano richiesti test software, mentre per refactoring privi di cambiamenti osservabili era necessario mantenere verde la suite esistente. La Review verificava infine che il risultato fosse dimostrabile come incremento del prodotto; il solo completamento del codice non era sufficiente per assegnare lo stato `DONE`.
+
 ## Valutazione del processo
 
 L'approccio incrementale è stato efficace perché ha reso disponibile molto presto una struttura eseguibile sulla quale integrare le diverse parti. La presenza della CI su Ubuntu e l'esecuzione locale dei test su Windows hanno aiutato a individuare problemi legati all'ambiente grafico e alla portabilità. L'introduzione di Xvfb ha inoltre reso possibile eseguire in CI i test che richiedono JavaFX.
