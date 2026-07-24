@@ -36,7 +36,7 @@ Il repository non configura scoverage o un altro misuratore di code coverage. No
 | Infrastruttura audio | `MidiNoteTest`, `GmInstrumentMapTest`, `GmDrumMapTest`, `ChannelAllocatorTest`, `MidiAudioEngineTest` | Medio-alta per la logica, bassa per l'ambiente reale | Conversioni MIDI, lookup, input errati, riuso e overflow dei canali, chiusura idempotente e smoke test del synth. |
 | Editor | `SyntaxHighlighterSpec`, `CompletionProviderSpec`, `AutocompleteSupportSpec`, `AutoPairingSupportSpec`, `BlockEditorViewSpec` | Medio-alta sulla logica locale | Colorazione sintattica, precedenza degli stili, intervalli di riproduzione validi e fuori limite, completamento contestuale e inserimento degli snippet, delimitatori e selezioni, normalizzazione dei fine riga. |
 | Vista principale e animazioni | `MainViewSpec`, `AnimatedViewSpec` | Media | Struttura della vista, configurazione della toolbar e del controllo del volume, messaggi prodotti da pulsanti e scorciatoie, avvio, arresto e idempotenza dell'animazione. |
-| Coordinamento MVU | Nessuna suite diretta; osservato solo ai confini della UI | Bassa | Le suite della vista verificano la produzione di alcuni `Msg`, senza attraversare il ciclo di aggiornamento. |
+| Coordinamento MVU | Suite diretta su `Update.update` (`VolumeUpdateTest`) e verifiche ai confini UI | Media | `VolumeUpdateTest` verifica `Update.update` (messaggio → modello + `Cmd`); le suite della vista controllano la produzione di alcuni `Msg`. |
 
 ### Lettura complessiva
 
@@ -60,7 +60,7 @@ La seguente matrice indica dove ci si aspetta che una modifica venga intercettat
 | Mapping di note, strumenti, drum o effetti MIDI | Suite audio/backend | Alta | Mantenere almeno un test di pipeline dalla DSL. |
 | Allocazione dei canali | `ChannelAllocatorTest` | Alta per l'algoritmo | Provare anche l'integrazione con note simultanee sul synth. |
 | Logica di autocomplete, pairing o highlighting | Suite editor dedicate | Alta | Aggiungere un caso per ogni nuovo contesto editoriale. |
-| Modello o transizione MVU | Copertura indiretta | Bassa | Creare una suite pura per ogni variante di `Msg`. |
+| Modello o transizione MVU | Copertura diretta solo per `VolumeChangeRequested` (`VolumeUpdateTest`) | Bassa | Estendere la suite pura ad altre varianti di `Msg`. |
 | Layout o animazione dei visualizzatori | `AnimatedViewSpec` solo per il ciclo di vita | Bassa | Test JavaFX mirati e scenario manuale con resize, scroll e update. |
 
 Questa matrice deve guidare la manutenzione: una modifica in un'area a confidenza bassa richiede test nuovi nello stesso cambiamento, mentre nelle aree ad alta confidenza occorre comunque aggiornare le aspettative quando il comportamento desiderato cambia intenzionalmente.

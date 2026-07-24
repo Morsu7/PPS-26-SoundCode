@@ -528,7 +528,7 @@ flowchart LR
     AE --> SYN[Sintetizzatore MIDI]
 ```
 
-Questa doppia astrazione permette di provare la temporizzazione con un backend controllato e di provare la traduzione MIDI senza avviare l'intera applicazione.
+La doppia astrazione rende testabili separatamente la temporizzazione, con un backend controllato, e la traduzione MIDI, senza avviare l'intera applicazione.
 
 ### Traduzione musicale
 
@@ -540,7 +540,7 @@ Il backend distingue tre casi:
 
 Le estensioni udibili vengono trasformate in parametri della nota o controlli di canale. Il guadagno determina la velocity; pan, riverbero e filtro passa-basso sono approssimati tramite controlli MIDI. Gli effetti privi di una corrispondenza MIDI adeguata (`hpf` e `delay`) restano nel modello, senza introdurre dipendenze nell'engine.
 
-I canali melodici sono assegnati per voce, dove una voce identifica una combinazione compatibile di strumento e controlli. In questo modo note simultanee con configurazioni diverse non si sovrascrivono a vicenda, mentre il canale General MIDI dedicato alle percussioni resta riservato.
+I canali melodici sono assegnati per voce, dove una voce identifica una combinazione compatibile di strumento e controlli, così che note simultanee con configurazioni diverse non si sovrascrivano a vicenda; il canale General MIDI dedicato alle percussioni resta riservato.
 
 L'avvio di una nota è immediato, mentre la sua terminazione è pianificata in modo non bloccante. Se il sintetizzatore non è disponibile, un motore silenzioso mantiene operativo il resto dell'applicazione: parsing, scheduling, interfaccia e test non dipendono quindi dalla presenza di un dispositivo audio.
 
