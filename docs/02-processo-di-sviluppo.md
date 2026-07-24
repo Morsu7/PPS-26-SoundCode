@@ -7,34 +7,34 @@ In questa sezione si descriverà l'organizzazione del team di sviluppo.
 
 ## Scrum
 
-La metodologia di sviluppo applicata su questo progetto è di tipo *Agile*, in particolare si è adottata la variante *Scrum*.
+La metodologia di sviluppo applicata al progetto è stata di tipo *Agile*; in particolare, è stato adottato *Scrum*.
 
-Il processo di sviluppo Scrum è un processo *iterativo* e *incrementale*, in cui a ogni iterazione si aggiungono nuove funzionalità al sistema o si raffinano delle funzionalità pre-esistenti.
+Scrum è un processo *iterativo* e *incrementale*, nel quale ogni iterazione aggiunge nuove funzionalità al sistema o perfeziona quelle esistenti.
 
-La prima attività all'interno del processo di sviluppo Scrum è quella di redarre il *Product Backlog*, ovvero una lista di funzionalità, dette *items*.
+All'inizio del progetto è stato redatto il *Product Backlog*, contenente le funzionalità da realizzare, organizzate in *item*.
 
-Le iterazioni del processo, chiamate *sprint*, saranno svolte settimanalmente. Ogni sprint prevede le seguenti attività:
+Le iterazioni del processo, chiamate *sprint*, sono state svolte settimanalmente. Ogni sprint ha previsto le seguenti attività:
 
-- *Sprint Planning*: riunione iniziale in cui si selezionano gli item da implementare durante lo sprint e si scompongono in sotto-funzionalità, di cui il team di sviluppo fornisce stime sulla loro complessità e alcuni design di dettaglio. Al termine dello Sprint Planning si produce uno *Sprint Backlog* che assegna a ogni membro del team dei *task* da eseguire.
-- *Daily Scrum*: una breve riunione giornaliera, in cui il team di sviluppo si aggiorna sul progresso del progetto, riadattando lo Sprint Backlog.
+- *Sprint Planning*: riunione iniziale in cui sono stati selezionati gli item da implementare durante lo sprint e sono stati scomposti in attività più piccole. Il team ne ha stimato la complessità e ha definito, quando necessario, il design di dettaglio. Il risultato è stato lo *Sprint Backlog*, utilizzato per organizzare e distribuire le attività.
+- *Daily Scrum*: breve riunione giornaliera in cui il team si è aggiornato sul progresso del progetto e ha adattato lo Sprint Backlog.
 
-Al termine dello sprint si prevedono tre ulteriori attività:
+Al termine di ogni sprint sono state svolte tre ulteriori attività:
 
-- *Product Backlog Refinement*: una riunione in cui il team di sviluppo si accorda sulle migliorie che devono essere apportate al Product Backlog.
-- *Sprint Review*: si valuta il progresso del progetto ottenuto al termine dello sprint, verificando che sia un *PSPI (Potentially Shippable Product Increment)*.
-- *Sprint Retrospective*: si valuta il processo di sviluppo adottato, discutendo possibili cambiamenti che potrebbero aumentare l'efficacia del team.
+- *Product Backlog Refinement*: il team ha riesaminato gli item e concordato gli aggiornamenti da apportare al Product Backlog.
+- *Sprint Review*: è stato valutato l'incremento ottenuto al termine dello sprint rispetto agli obiettivi stabiliti.
+- *Sprint Retrospective*: è stato valutato il processo di sviluppo, discutendo i cambiamenti utili a migliorare l'efficacia del team.
 
-L'organizzazione del personale all'interno del processo Scrum prevede tre ruoli:
+L'organizzazione del team ha previsto tre ruoli:
 
-- *Product Owner*: si occupa di redarre il *Product Backlog* e di verificare l'adeguatezza del sistema realizzato;
-- *Scrum Master*: agisce da esperto del processo Scrum e da mediatore tra gli altri due ruoli;
-- *Development Team*: si occupa di progettare soluzioni adeguate ai task definiti dal Product Owner, stimando tempi di realizzazione e proponendo modifiche sul sistema al Product Owner. Il team di sviluppo sarà composto da:
+- *Product Owner*: si è occupato di redigere il *Product Backlog* e di verificare l'adeguatezza del sistema realizzato;
+- *Scrum Master*: ha supportato l'applicazione del processo Scrum e il coordinamento del team;
+- *Development Team*: si è occupato di progettare soluzioni adeguate ai task definiti dal Product Owner, stimando i tempi di realizzazione e proponendo modifiche al sistema. Il team di sviluppo era composto da:
   - Remedi Tommaso
   - Biagioni Giacomo
   - Morsucci Federico
   - Morbidelli Cristian
 
-Le riunioni saranno svolte periodicamente su *Microsoft Teams*, mentre l'organizzazione delle funzionalità del progetto sarà tenuta su [*Trello*](https://trello.com/b/2mgr8e1j/pps).
+Le riunioni sono state svolte periodicamente su *Microsoft Teams*, mentre le funzionalità e le attività del progetto sono state organizzate su Trello.
 
 ## Test-Driven Development
 
@@ -46,27 +46,23 @@ Il processo seguito durante il TDD è un processo iterativo chiamato *Red-Green-
 2. *Green*: scrivere il codice di produzione che soddisfi il test definito precedentemente.
 3. *Refactor*: ristrutturare sia il codice di testing che quello di produzione.
 
-A supporto di questo processo, è stato adottato *ScalaTest* come strumento per la definizione di unit test per Scala.
+A supporto di questo processo è stato adottato *ScalaTest* per la definizione dei test automatici.
 
-Poiché si è deciso di utilizzare il testing solo per quanto riguarda il modello, è stato scelto di utilizzare lo stile di testing *FlatSpec*, in quanto questo stile è un buon compromesso rispetto alla semplicità di *FunSuite* e alla organizzazione dei test di *FunSpec*. Inoltre, permette di realizzare dei test in modo dichiarativo e quindi più vicini all'utente finale.
+Le suite utilizzano lo stile *AnyFunSuite*. I test coprono le principali componenti del progetto, tra cui parser, interprete, motore di esecuzione, sottosistema audio, aggiornamento del modello MVU e interfaccia grafica. Per i test dei componenti JavaFX viene inizializzato l'ambiente grafico necessario all'esecuzione.
 
 ## Build Automation
 
-Il progetto utilizza **SBT (Scala Build Tool)** per rendere ripetibili le attività di compilazione, verifica ed assemblaggio. La configurazione è dichiarata in `build.sbt`, mentre `project/build.properties` fissa la versione di SBT impiegata: in questo modo gli sviluppatori e l'ambiente di Continuous Integration eseguono gli stessi task con la medesima configurazione.
+Il progetto utilizza **sbt** per rendere ripetibili le attività di compilazione, verifica e assemblaggio. La configurazione è dichiarata in `build.sbt`, mentre `project/build.properties` fissa la versione di sbt impiegata: in questo modo gli sviluppatori e l'ambiente di Continuous Integration eseguono gli stessi task con la medesima configurazione.
 
-Per l'esecuzione e la build è richiesto **JDK 21**. Le librerie necessarie, tra cui ScalaTest, FastParse, ScalaFX e RichTextFX, sono dichiarate esplicitamente nel file di build e vengono risolte automaticamente da SBT. Ciò evita configurazioni manuali delle dipendenze e rende possibile ricostruire il progetto a partire dal repository.
+Per l'esecuzione e la build è richiesto **JDK 21**. Le librerie necessarie, tra cui ScalaTest, FastParse, ScalaFX e RichTextFX, sono dichiarate esplicitamente nel file di build e vengono risolte automaticamente da sbt. Ciò evita configurazioni manuali delle dipendenze e rende possibile ricostruire il progetto a partire dal repository.
 
-La generazione del pacchetto è affidata al plugin **sbt-assembly**, che produce un unico JAR eseguibile contenente il codice dell'applicazione e le dipendenze necessarie. Il task assegna come entry point `soundcode.main`, genera un file con nome `soundcode-<versione>.jar` e applica strategie di fusione esplicite per i metadati che potrebbero entrare in conflitto durante l'assemblaggio.
+Per la generazione del pacchetto è configurato il plugin **sbt-assembly**, che permette di produrre un unico JAR eseguibile contenente il codice dell'applicazione e le dipendenze necessarie. Il task assegna come entry point `soundcode.main`, genera un file con nome `soundcode-<versione>.jar` e applica strategie di fusione esplicite per i metadati che potrebbero entrare in conflitto durante l'assemblaggio.
 
-L'automazione della build costituisce anche il confine tra sviluppo locale e Continuous Integration: il workflow remoto non introduce una procedura di compilazione alternativa, ma prepara JDK e SBT e richiama gli stessi task disponibili agli sviluppatori. In particolare, i test sono eseguiti con `sbt test` all'interno di un display virtuale, necessario per rendere verificabili su Ubuntu anche i componenti che dipendono da JavaFX.
+L'automazione della build costituisce anche il confine tra sviluppo locale e Continuous Integration: il workflow remoto non introduce una procedura di compilazione alternativa, ma prepara JDK e sbt e richiama gli stessi task disponibili agli sviluppatori. In particolare, i test sono eseguiti con `sbt test` all'interno di un display virtuale, necessario per rendere verificabili su Ubuntu anche i componenti che dipendono da JavaFX.
 
 ## Continuous Integration
 
-Per fare in modo che il codice rimanga integro e corretto durante lo sviluppo, è stato utilizzato un workflow che attraverso *GitHub Actions* permette di eseguire i test del progetto su diverse configurazioni di sistemi operativi, a ogni aggiornamento del progetto.
-
-## Continuous Delivery
-
-Analogamente, un altro workflow permette di automatizzare la release su *GitHub Releases*.
+Per verificare l'integrità del codice a ogni aggiornamento del progetto è stato configurato un workflow di *GitHub Actions*. La CI viene eseguita su `ubuntu-latest`, prepara JDK 21 e sbt e avvia la suite con `xvfb-run -a sbt test`; il display virtuale consente di eseguire in modalità headless anche i test che dipendono da JavaFX. La suite viene inoltre eseguita localmente su Windows dagli sviluppatori, fornendo una verifica aggiuntiva del comportamento del progetto sui due sistemi operativi.
 
 ## Versioning
 
@@ -76,4 +72,4 @@ Per il versionamento del sistema, è stato adottato lo standard *Semantic Versio
 - *Minor*: numero identificativo da aggiornare a ogni aggiunta o modifica retrocompatibile di una funzionalità del sistema.
 - *Patch*: numero identificativo da aggiornare a ogni correzione dei difetti del sistema.
 
-Adottando lo standard *Conventional Commits* durante lo sviluppo tramite DVCS, è stato possibile automatizzare l'assegnamento della versione al sistema sulla base dei commit effettuati. Per fare ciò, è stato sfruttato *Semantic Release Bot* per GitHub.
+Il numero di versione segue il formato `MAJOR.MINOR.PATCH` ed è dichiarato manualmente in `build.sbt`.
