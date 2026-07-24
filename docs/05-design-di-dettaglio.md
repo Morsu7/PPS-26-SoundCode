@@ -468,9 +468,10 @@ Scheduler->>AudioPlayer: Timeline
 
 Lo scheduler può generare questa timeline in due modi diversi:
 
-- **Timeline Limitata (Bounded)**: produce una lista chiusa e finita di eventi. Calcola automaticamente la lunghezza esatta del pattern (tramite il metodo `cycleLength`) ed estrae solo i cicli necessari per formare un loop perfetto. È utilizzata soprattutto per le interfacce statiche o per l'esportazione.
+- **Timeline Limitata (Bounded)**
 
-- **Timeline Infinita (LazyList)**: rappresenta il cuore del live coding. Utilizza la valutazione *pigra* di Scala (`LazyList`): il motore non calcola tutta la canzone in anticipo, ma genera gli eventi solo per il ciclo corrente nel momento in cui servono (`LazyList.from(cycleEvents) #::: loop(nCycle + 1)`). In questo modo, indipendentemente dal fatto che l'esecuzione duri un minuto o tre ore, il consumo di memoria rimane costante e molto contenuto.
+- **Timeline Infinita (LazyList)**
+
 
 Una volta creata la timeline logica infinita, il controllo passa all'**AudioPlayer**.
 
