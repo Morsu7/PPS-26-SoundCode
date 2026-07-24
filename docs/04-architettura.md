@@ -44,7 +44,7 @@ Il flusso principale procede dal testo scritto dall'utente verso il backend audi
 | Audio player | Gestisce play, stop, sostituzione della timeline e riproduzione temporizzata degli eventi. |
 | Backend audio | Traduce i payload del dominio in operazioni eseguibili dal motore audio. |
 | Motore MIDI | Produce concretamente note e percussioni tramite Java MIDI. |
-| Visualizzazioni | Rappresentano graficamente gli eventi mediante piano roll e oscilloscopio. |
+| Visualizzazioni | Rappresentano graficamente gli eventi mediante piano roll. |
 
 ## Pattern architetturali
 
