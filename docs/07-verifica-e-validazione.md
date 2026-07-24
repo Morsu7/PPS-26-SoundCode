@@ -23,7 +23,7 @@ La pipeline `.github/workflows/scala.yml` esegue `xvfb-run -a sbt test` su Ubunt
 
 ## Stima della copertura per area
 
-Il repository non configura scoverage o un altro misuratore di code coverage. Non è quindi possibile riportare onestamente percentuali di line o branch coverage. La valutazione seguente è **qualitativa** e deriva dal confronto tra casi implementati e comportamenti esplicitamente esercitati dalle suite.
+La valutazione seguente è **qualitativa** e deriva dal confronto tra casi implementati e comportamenti esplicitamente esercitati dalle suite.
 
 | Area | Suite principali | Copertura stimata | Comportamenti coperti |
 |---|---|---|---|
