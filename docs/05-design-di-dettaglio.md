@@ -476,7 +476,7 @@ Una volta creata la timeline logica infinita, il controllo passa all'**AudioPlay
 
 A differenza dello scheduler, il player lavora con il **tempo fisico assoluto**, cioè il clock del sistema espresso in millisecondi (`System.currentTimeMillis()`). Operando su un thread dedicato, il player consuma gli eventi della timeline uno alla volta, utilizzando la velocità globale (`Tempo`) per convertire le frazioni temporali in millisecondi effettivi.
 
-Ad ogni tick, se il tempo logico calcolato ha raggiunto l'istante previsto per l'evento, il player esegue due operazioni in parallelo:
+Ad ogni tick, se il tempo fisico calcolato ha raggiunto l'istante previsto per l'evento, il player esegue due operazioni in parallelo:
 
 - invia il suono all'`AudioBackend` per la riproduzione;
 - raccoglie le coordinate del testo associate a quel suono e notifica la UI affinché evidenzi il codice in tempo reale (`onHighlightChange`).
@@ -540,7 +540,6 @@ In pratica, il player avvia fisicamente il suono soltanto nell'istante in cui la
 Quando lo scheduler elaborerà il ciclo successivo e restituirà la seconda porzione della stessa nota, il filtro la scarterà automaticamente, evitando una seconda attivazione.
 
 Questo semplice accorgimento geometrico garantisce che una nota estesa su più cicli venga riprodotta una sola volta, mantenendo però la durata corretta e impedendo sia troncamenti sia duplicazioni.
-
 ## Audio e MIDI — Tommaso Remedi
 
 ### Separazione tra scheduling e produzione sonora
