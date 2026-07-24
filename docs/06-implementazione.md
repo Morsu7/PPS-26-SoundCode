@@ -564,7 +564,7 @@ In caso di parametri duplicati (ad esempio due effetti `gain` concorrenti nello 
 Riprendendo la distinzione tra le modalità di generazione della timeline, l'implementazione tecnica adotta strategie differenti a seconda del contesto d'uso:
 
 ### 1. Timeline Limitata (Bounded)
-Utilizzata principalmente dalla GUI per la rappresentazione statica, calcola la finestra temporale minima sfruttando il **minimo comune multiplo** delle periodicità dei pattern, restituendo una lista finita di eventi.
+Utilizzata principalmente dalla GUI per la rappresentazione statica, calcola la finestra temporale minima sfruttando il **prodotto delle periodicità** dei pattern, restituendo una lista finita di eventi.
 
 ### 2. Timeline Infinita (`LazyList`)
 Per il live coding e la riproduzione in tempo reale, lo scheduler sfrutta la valutazione pigra di Scala per produrre una sequenza infinita valutata un ciclo alla volta:
