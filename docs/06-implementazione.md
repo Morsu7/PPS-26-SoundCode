@@ -415,7 +415,7 @@ Invece di considerare la musica come una semplice lista di note da suonare una d
 
 ### I pattern
 
-Il tipo `Pattern[T]`, che rappresenta un qualsiasi pattern musicale.
+Il tipo `Pattern[+T]`, che rappresenta un qualsiasi pattern musicale.
 
 Un pattern può assumere diverse forme, ognuna con un significato preciso:
 
