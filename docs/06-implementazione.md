@@ -597,6 +597,8 @@ Tutti i dati critici di riproduzione (la `LazyList` degli eventi, il timestamp d
 private case class PlayerState(
     eventStream: LazyList[ScheduledEvent[AudioPayload]] = LazyList.empty,
     firstTickTimeMs: Option[AbsoluteTime] = None,
+    pausedDurationMs: Long = 0L,
+    pausedAtMs: Option[Long] = None,
     activeHighlights: Map[TextPosition, AbsoluteTime] = Map.empty,
     currentHighlightSet: Set[TextPosition] = Set.empty
 )
@@ -605,18 +607,17 @@ private case class PlayerState(
 
 Questo approccio previene in modo rigoroso qualsiasi **condizione di gara** (*race condition*) tra il thread che ricompila il codice (`updateTimeline`) e il thread che consuma gli eventi audio.
 
-Ad ogni *tick* del player, lo stato viene valutato eseguendo tre macro-operazioni sequenziali.
+Ad ogni *tick* del player, lo stato viene valutato eseguendo tre macro-operazioni sequenziali:
 
 ### 1. Pulizia degli Highlight Scaduti
 
-Vengono filtrate e rimosse tutte le evidenziazioni testuali il cui termine temporale (`expireAtMs`) è inferiore al tempo corrente (`now`), ripulendo la UI in modo incrementale.
+Vengono filtrate e rimosse tutte le evidenziazioni testuali il cui termine temporale (`expireAtMs`) è inferiore al **tempo logico effettivo** (`effectiveNowMs`). Utilizzare il tempo effettivo (calcolato sottraendo la durata delle pause dal tempo reale) assicura che gli highlight non scadano prematuramente mentre il player è sospeso, ripulendo la UI in modo incrementale e coerente.
 
 ### 2. Consumo degli Eventi e Filtraggio Anti-Duplicazione
 
-Lo stream viene partizionato tramite lo `span` in base al tempo reale calcolato (`firstPerformance + tempo.offsetMs(...)`).
+Lo stream viene partizionato tramite lo `span` confrontando il tempo logico effettivo con il momento di innesco atteso dell'evento (`effectiveNowMs >= expectedTriggerMs`).
 
 Per impedire che una nota venga riprodotta due volte quando attraversa il confine tra due cicli consecutivi, viene applicato il seguente filtro strutturale:
-
 ```scala
 toProcess.filter(e => e.part.start == e.whole.start)
 ```
