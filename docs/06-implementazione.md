@@ -515,17 +515,17 @@ for
   // 1. Calcola il valore puntuale del modificatore (es. la velocità corrente)
   paramEvent <- parameter.resolve
   currentValue = Fraction(paramEvent.value)
-  
+
   // 2. Proiezione: deforma la finestra temporale di esplorazione
   warpedWindow = zoomIn(timeWindow, currentValue)
-  
+
   // 3. Risoluzione: valuta il pattern figlio nello spazio temporale alterato
   innerEvent <- innerPattern.resolve(using warpedWindow)
-  
+
 yield
   // 4. Ripristino: riallinea l'evento prodotto sulla timeline globale
   val finalEvent = zoomOut(innerEvent, currentValue)
-  
+
   // 5. Traccia l'origine testuale per l'highlighting dinamico
   finalEvent.trackModifierPositions(paramEvent)
 ```
@@ -575,13 +575,13 @@ def generateInfiniteTimeline(...): LazyList[...] =
     given Interval = Interval(Fraction(nCycle), Fraction(nCycle + 1))
     val cycleEvents =patterns
         .flatMap(_.resolve)
-        .sortBy(_.part.start.toDouble)
+        .sortBy(_.part.start)
     LazyList.from(cycleEvents) #::: loop(nCycle + 1)
 
   loop(0)
 ```
 
-Grazie alla concatenazione differita (`#:::`), in memoria risiede unicamente il ciclo corrente, garantendo un'occupazione di memoria costante anche durante sessioni di riproduzione prolungate.
+In questo caso gli eventi non vengono calcolati anticipatamente, ma soltanto nel momento in cui risultano necessari alla riproduzione.
 
 ## L'AudioPlayer e la Sincronizzazione in Tempo Reale
 
@@ -589,7 +589,7 @@ L'`AudioPlayer` rappresenta il componente incaricato dell'esecuzione effettiva d
 
 ### Gestione dello Stato e Thread Safety
 
-Per supportare il *live coding* (ovvero la sostituzione a caldo dei pattern in esecuzione senza interrompere o bloccare il flusso audio) l'architettura adotta un pattern di **stato immutabile racchiuso in un blocco di sincronizzazione (`lock.synchronized`)**.
+Per supportare il live coding, l'architettura adotta un pattern di stato immutabile racchiuso in un blocco di sincronizzazione (`lock.synchronized`). L'uso del lock non serve a proteggere l'oggetto di stato in sé (che, essendo immutabile, è già thread-safe), bensì a garantire l'aggiornamento atomico e la visibilità della variabile (`var state`) che punta allo stato corrente. Questo previene in modo rigoroso qualsiasi condizione di gara (race condition).
 
 Tutti i dati critici di riproduzione (la `LazyList` degli eventi, il timestamp di avvio, la mappa degli highlight attivi) sono racchiusi all'interno di una case class privata (`PlayerState`) e aggiornati in modo atomico:
 
@@ -622,26 +622,6 @@ toProcess.filter(e => e.part.start == e.whole.start)
 ```
 
 L'evento viene così inviato al backend solamente nell'istante della sua effettiva nascita, pur mantenendo disponibile la sua durata completa (`whole`).
-
-### 3. Dispatch al Backend e Notifica della UI
-
-Il player inoltra il payload al generico `AudioBackend`, insieme alla durata calcolata e alle eventuali estensioni.
-
-Parallelamente:
-
-- raccoglie tutte le posizioni testuali associate (`position` dei payload e `modifierPositions`);
-- calcola la scadenza temporale degli highlight;
-- notifica asincronamente la GUI tramite la callback `onHighlightChange` soltanto quando il set delle evidenziazioni risulta effettivamente modificato.
-
-## Disaccoppiamento Architetturale
-
-Questa organizzazione garantisce un isolamento completo tra:
-
-- l'engine di scheduling e calcolo logico;
-- il backend di sintesi e riproduzione audio;
-- il livello di presentazione e interazione grafica.
-
-La logica musicale risulta così completamente indipendente sia dalla tecnologia audio sottostante sia dal framework grafico impiegato.
 
 ## Audio e MIDI — Tommaso Remedi
 
