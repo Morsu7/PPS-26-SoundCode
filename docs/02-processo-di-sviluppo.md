@@ -64,9 +64,13 @@ Per il controllo della qualità del sistema sono stati adottati i seguenti strum
 
 ## Build Automation
 
-Per automatizzare i processi di compilazione, testing e release del codice sviluppato si è deciso di utilizzare *Gradle* come strumento di *Build Automation*.
+Il progetto utilizza **SBT (Scala Build Tool)** per rendere ripetibili le attività di compilazione, verifica ed assemblaggio. La configurazione è dichiarata in `build.sbt`, mentre `project/build.properties` fissa la versione di SBT impiegata: in questo modo gli sviluppatori e l'ambiente di Continuous Integration eseguono gli stessi task con la medesima configurazione.
 
-È stato preferito Gradle al posto di Sbt, perché è una tecnologia più matura e gli sviluppatori hanno più esperienza con tale strumento.
+Per l'esecuzione e la build è richiesto **JDK 21**. Le librerie necessarie, tra cui ScalaTest, FastParse, ScalaFX e RichTextFX, sono dichiarate esplicitamente nel file di build e vengono risolte automaticamente da SBT. Ciò evita configurazioni manuali delle dipendenze e rende possibile ricostruire il progetto a partire dal repository.
+
+La generazione del pacchetto è affidata al plugin **sbt-assembly**, che produce un unico JAR eseguibile contenente il codice dell'applicazione e le dipendenze necessarie. Il task assegna come entry point `soundcode.main`, genera un file con nome `soundcode-<versione>.jar` e applica strategie di fusione esplicite per i metadati che potrebbero entrare in conflitto durante l'assemblaggio.
+
+L'automazione della build costituisce anche il confine tra sviluppo locale e Continuous Integration: il workflow remoto non introduce una procedura di compilazione alternativa, ma prepara JDK e SBT e richiama gli stessi task disponibili agli sviluppatori. In particolare, i test sono eseguiti con `sbt test` all'interno di un display virtuale, necessario per rendere verificabili su Ubuntu anche i componenti che dipendono da JavaFX.
 
 ## Continuous Integration
 

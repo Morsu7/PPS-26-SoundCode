@@ -168,3 +168,28 @@ for (t <- startMs to endMs) {
 ```
 
 Questa soluzione rende i test completamente deterministici e riproducibili. È possibile verificare con precisione il momento in cui ogni evento viene riprodotto, la durata dei suoni emessi e la corretta sincronizzazione tra timeline logica, backend audio e aggiornamento dell'interfaccia.
+
+## Strategia dei test UI
+
+I test della UI usano ScalaTest e condividono il supporto `UITestSupport`.
+Poiché i componenti JavaFX possono essere creati e interrogati soltanto sul
+JavaFX Application Thread, il metodo `onFxThread` avvia il toolkit quando
+necessario, accoda il corpo del test tramite `Platform.runLater` e ne attende il
+completamento. Il risultato o l'eventuale eccezione vengono quindi riportati
+al thread che esegue la suite.
+
+I componenti verificati sono istanze reali dei controlli JavaFX, mentre vengono
+simulati gli input dell'utente e osservati gli effetti prodotti. Nei test di
+`MainView`, per esempio, i pulsanti della toolbar vengono attivati tramite
+`fire()` e una funzione di dispatch registra i messaggi emessi; sono inoltre
+verificati lo slider del volume e gli shortcut installati nella scena. Per le
+funzionalità di editing, helper locali come `installedEditor` costruiscono una
+`InlineCssTextArea`, installano il comportamento da verificare e impostano testo
+e cursore iniziali.
+
+`InlineCssTextArea` è una specializzazione di `GenericStyledArea` e ne conserva
+l'API e i comportamenti rilevanti per l'editing, utilizzando stringhe CSS inline
+come rappresentazione degli stili. Può quindi sostituire l'editor configurato
+dall'applicazione nei test isolati, senza richiedere la costruzione dell'intera
+vista. L'autopairing viene esercitato tramite eventi di tastiera sintetici,
+mentre il completamento viene invocato direttamente sull'editor.

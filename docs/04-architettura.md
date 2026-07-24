@@ -106,6 +106,7 @@ La separazione permette di modificare e verificare ciascuna fase con un impatto 
 | Tecnologia o scelta | Ruolo | Rilevanza architetturale |
 |---|---|---|
 | Scala 3 | Linguaggio principale | Tipi algebrici, pattern matching e strutture immutabili favoriscono la modellazione del dominio e le transizioni MVU. |
+| FastParse | Parsing della DSL | I parser combinator permettono di esprimere la grammatica direttamente in Scala e di costruire l'AST mantenendo il parsing confinato nel relativo componente. |
 | ScalaFX e JavaFX | Interfaccia desktop | Permettono una GUI locale reattiva e impongono un modello di threading specifico per gli aggiornamenti grafici. |
 | RichTextFX | Editor della DSL | Supporta evidenziazione sintattica, numeri di riga e associazione tra testo ed errori o eventi. |
 | Java MIDI | Produzione audio | Mantiene l'esecuzione locale e non richiede servizi o runtime audio esterni. |
@@ -113,4 +114,4 @@ La separazione permette di modificare e verificare ciascuna fase con un impatto 
 | Tempo razionale | Modello temporale | Evita l'accumulo degli errori di approssimazione nelle composizioni e trasformazioni annidate. |
 | Strutture immutabili | Stato e dominio | Rendono prevedibili le trasformazioni e semplificano la verifica delle funzioni pure. |
 
-ScalaFX, RichTextFX e Java MIDI sono confinati ai livelli di presentazione e infrastruttura e non contaminano il modello del dominio.
+FastParse, ScalaFX, RichTextFX e Java MIDI sono confinati ai rispettivi livelli di parsing, presentazione e infrastruttura e non contaminano il modello del dominio.
