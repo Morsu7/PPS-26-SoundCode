@@ -648,16 +648,17 @@ La velocity non fa parte dell'identità della voce, essendo una proprietà della
 
 L'invio di `noteOn` è sincrono e breve; il corrispondente `noteOff` viene programmato su un `ScheduledExecutorService` daemon. Il thread del player può così continuare a estrarre eventi senza restare bloccato per la durata delle note. Per evitare che una nota ribattuta venga troncata, il motore mantiene un solo `noteOff` pendente per coppia (canale, nota): se la stessa nota riparte prima della fine, il `noteOff` precedente viene annullato e riprogrammato (in MIDI un `noteOff` spegne l'intero numero di nota sul canale). Alla chiusura, executor e sintetizzatore sono rilasciati in modo tollerante agli errori.
 
-# Interfaccia utente — Giacomo Biagioni
+# Runtime MVU e interfaccia utente — Giacomo Biagioni
 
 ## Contributo personale e collaborazioni
 
-La progettazione e l'implementazione dell'interfaccia utente sono state curate
-principalmente da Giacomo Biagioni. Il contributo comprende la struttura delle
-viste, l'editor basato su RichTextFX, gli strumenti di assistenza alla
-scrittura, la gestione del tema, il feedback degli errori, gli highlight
-durante la riproduzione e l'integrazione dei visualizzatori nell'editor, insieme
-ai relativi test della UI.
+La progettazione e l'implementazione del runtime MVU e dell'interfaccia utente
+sono state curate principalmente da Giacomo Biagioni. Il contributo comprende
+il ciclo dei messaggi, le transizioni e i comandi applicativi, oltre alla
+struttura delle viste, all'editor basato su RichTextFX, agli strumenti di
+assistenza alla scrittura, alla gestione del tema, al feedback degli errori,
+agli highlight durante la riproduzione e all'integrazione dei visualizzatori
+nell'editor, insieme ai relativi test.
 
 Le parti di collegamento con gli altri sottosistemi sono state realizzate in
 collaborazione con i rispettivi responsabili: con Cristian Morbidelli per
@@ -665,14 +666,64 @@ l'integrazione di parser e interprete, con Federico Morsucci per timeline,
 scheduling e notifiche degli elementi in esecuzione, e con Tommaso Remedi per
 il collegamento del controllo del volume al backend MIDI.
 
+## Implementazione del runtime MVU
+
+Il package `soundcode.mvu` traduce direttamente gli elementi del design in tipi
+Scala distinti. `AppModel` è una case class immutabile; `Msg` è un'enumerazione
+dei possibili ingressi; `Update.update` è una funzione che restituisce la coppia
+formata da modello successivo e `Cmd`. I comandi costituiscono una gerarchia
+chiusa e ricevono soltanto la funzione di dispatch e il player necessari a
+eseguire l'effetto.
+
+`SoundCodeRuntime` conserva l'unico riferimento mutabile al modello corrente e
+possiede l'`AudioPlayer`. Il metodo `dispatch` non elabora direttamente il
+messaggio ricevuto: lo accoda sotto mutua esclusione e, se nessun altro ciclo è
+attivo, avvia lo svuotamento della coda. Il flag di elaborazione evita che un
+comando che esegue a sua volta `dispatch` apra un ciclo annidato.
+
+Per ogni messaggio il runtime:
+
+1. invoca `Update.update` con il modello corrente;
+2. sostituisce il modello e richiama `render` soltanto se lo stato è cambiato;
+3. esegue il comando, che può interagire con parser, scheduler o player;
+4. accoda gli eventuali messaggi prodotti dal comando.
+
+La coda è protetta durante inserimento ed estrazione, ma la transizione, il
+rendering e gli effetti vengono eseguiti fuori dalla sezione sincronizzata.
+Questo mantiene breve la regione critica e consente alle callback del player di
+accodare nuove notifiche senza modificare concorrentemente il modello.
+`shutdown` completa infine il ciclo di vita del runtime arrestando il player e
+chiudendo il backend anche se l'arresto non termina regolarmente.
+
+### Realizzazione delle transizioni e dei comandi
+
+Le transizioni semplici modificano il modello tramite `copy`: play e stop
+aggiornano `isPlaying`, il volume aggiorna `volume`, le posizioni sostituiscono
+l'insieme degli highlight e una nuova timeline incrementa
+`timelineRevision`. Alle transizioni che richiedono infrastruttura viene
+associato un comando.
+
+`ParseAndInterpret` traduce il risultato del parser e dell'interprete in
+`CodeParsed`. In caso di successo, `UpdateTimeline` genera sia la timeline
+infinita destinata al player sia le timeline finite destinate ai
+visualizzatori, quindi invia `UpdateTimelines`. In caso di errore non viene
+prodotto alcun comando di aggiornamento: la timeline già in riproduzione rimane
+invariata. `StartPlayback`, `StopPlayback` e `SetVolume` delegano infine le
+operazioni al player senza introdurre riferimenti all'infrastruttura nella
+funzione di aggiornamento.
+
+## Implementazione dell'interfaccia utente
+
 La UI aggiorna i visualizzatori soltanto quando l'analisi del codice termina con
 successo. Il valore `timelineRevision` consente di riconoscere una nuova
 timeline, evitando sia rendering duplicati sia il ripristino di una
 visualizzazione precedente. Durante la riproduzione, le callback del player
-possono provenire dal thread audio; `SoundCodeFrame` le trasferisce quindi sul
-thread JavaFX tramite `Platform.runLater`, così che i nodi grafici siano
-modificati in sicurezza. `SoundCodeFrame` gestisce inoltre l'avvio e l'arresto
-del backend insieme al ciclo di vita dell'applicazione.
+possono produrre messaggi da un thread audio e determinare un nuovo stato del
+runtime. Quando questo stato richiede un aggiornamento della vista,
+`SoundCodeFrame` trasferisce il rendering sul thread JavaFX tramite
+`Platform.runLater`, così che i nodi grafici siano modificati in sicurezza.
+`SoundCodeFrame` gestisce inoltre l'avvio e l'arresto del backend insieme al
+ciclo di vita dell'applicazione.
 
 ## Editor e operazioni di modifica
 

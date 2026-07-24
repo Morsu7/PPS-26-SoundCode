@@ -571,16 +571,80 @@ I canali melodici sono assegnati per voce, dove una voce identifica una combinaz
 
 L'avvio di una nota è immediato, mentre la sua terminazione è pianificata in modo non bloccante. Se il sintetizzatore non è disponibile, un motore silenzioso mantiene operativo il resto dell'applicazione: parsing, scheduling, interfaccia e test non dipendono quindi dalla presenza di un dispositivo audio.
 
-# Interfaccia utente — Giacomo Biagioni
+# Runtime applicativo e Interfaccia utente — Giacomo Biagioni
 
-## Coordinamento tramite Model–View–Update
+## Design del runtime Model–View–Update
 
-La UI è organizzata secondo il modello MVU. Le azioni dell'utente, come
-l'aggiornamento del codice o il controllo della riproduzione, vengono
-trasformate in messaggi. La stessa modalità viene usata per comunicare alla UI
-i risultati del parser e l'avanzamento della riproduzione. La funzione di
-aggiornamento modifica quindi lo stato dell'interfaccia, dal quale viene
-generata la nuova vista.
+Il runtime MVU coordina l'intera applicazione e non appartiene alla sola vista.
+Riceve infatti sia le azioni dell'utente sia le notifiche dei sottosistemi,
+come i risultati dell'analisi del codice e le posizioni prodotte durante la
+riproduzione. Ogni evento viene rappresentato da un messaggio e attraversa lo
+stesso ciclo di aggiornamento.
+
+Il sottosistema è suddiviso in cinque responsabilità:
+
+| Elemento | Responsabilità |
+|---|---|
+| Modello applicativo | Conserva lo stato osservabile da cui deriva la vista. |
+| Messaggio | Rappresenta un evento già avvenuto o una richiesta dell'utente. |
+| Funzione di aggiornamento | Calcola in modo sincrono il nuovo modello e il comando da eseguire. |
+| Comando | Descrive un effetto collaterale senza eseguirlo durante la transizione. |
+| Runtime | Serializza i messaggi, applica le transizioni, richiede il rendering e interpreta i comandi. |
+
+```mermaid
+sequenceDiagram
+    participant S as UI o sottosistema
+    participant R as Runtime
+    participant U as Update
+    participant V as Vista
+    participant E as Effetto
+
+    S->>R: Msg
+    R->>U: modello corrente + Msg
+    U-->>R: nuovo modello + Cmd
+    opt modello modificato
+        R->>V: render(nuovo modello)
+    end
+    R->>E: esecuzione Cmd
+    opt effetto con risultato
+        E->>R: nuovo Msg
+    end
+```
+
+### Serializzazione delle transizioni
+
+Le richieste della GUI e le callback del player possono arrivare da thread
+diversi oppure durante l'esecuzione di un comando. Il runtime le inserisce
+quindi in una coda e ne elabora una alla volta. Questa scelta impedisce
+transizioni concorrenti sul modello e garantisce che anche un messaggio
+prodotto da un comando venga elaborato soltanto dopo il completamento della
+transizione corrente.
+
+Il rendering è richiesto solo quando la transizione produce un modello diverso
+dal precedente. Gli effetti vengono invece eseguiti dopo l'eventuale rendering:
+la vista osserva così lo stato deciso dalla transizione prima che il comando
+possa produrre ulteriori messaggi.
+
+### Stato applicativo ed effetti
+
+Il modello raccoglie esclusivamente informazioni osservabili e necessarie alla
+vista: stato di riproduzione, volume, tempo, diagnostica, timeline finite,
+visualizzatori e posizioni attive. Il player e il backend audio non fanno parte
+del modello perché hanno identità e ciclo di vita propri e vengono posseduti
+dal runtime.
+
+La funzione di aggiornamento non invoca direttamente parser, scheduler o
+player. Restituisce invece un comando che rappresenta una delle operazioni
+ammesse: analizzare il codice, sostituire la timeline, avviare o arrestare la
+riproduzione e regolare il volume. Un comando può concludersi inviando un nuovo
+messaggio, mantenendo tutti i cambiamenti del modello nel percorso controllato
+dalla funzione di aggiornamento.
+
+### Principali transizioni
+
+Le azioni dell'utente, come l'aggiornamento del codice o il controllo della
+riproduzione, vengono trasformate in messaggi. La stessa modalità viene usata
+per comunicare i risultati dell'analisi e l'avanzamento della riproduzione.
 
 I casi principali sono:
 
@@ -597,9 +661,10 @@ Il testo presente nell'editor non coincide necessariamente con lo stato
 musicale in esecuzione. L'utente può continuare a scrivere, ma timeline e
 visualizzazioni vengono sostituite solo quando preme Update e il nuovo codice è
 valido. Se il parsing fallisce viene mostrato l'errore e la timeline precedente
-rimane disponibile. Il modello contiene anche un numero di revisione, utile
-alla vista per capire che è arrivato un nuovo aggiornamento anche quando le
-timeline ottenute sono uguali alle precedenti.
+rimane disponibile: la transizione aggiorna soltanto la diagnostica e non
+produce il comando di sostituzione della timeline. Il modello contiene anche un
+numero di revisione, utile alla vista per capire che è arrivato un nuovo
+aggiornamento anche quando le timeline ottenute sono uguali alle precedenti.
 
 ## Editor come composizione di responsabilità
 

@@ -50,7 +50,7 @@ Il flusso principale procede dal testo scritto dall'utente verso il backend audi
 
 ### Model-View-Update
 
-La gestione dell'interfaccia segue il pattern architetturale **Model-View-Update (MVU)**. I suoi elementi principali sono:
+Il coordinamento dello stato applicativo e dell’interfaccia segue il pattern architetturale **Model-View-Update (MVU)**. I suoi elementi principali sono:
 
 - **Model:** `AppModel` contiene lo stato osservabile dell'applicazione, come riproduzione, errori, timeline, visualizzatori e posizioni da evidenziare;
 - **View:** la GUI ScalaFX viene aggiornata a partire dal modello;
@@ -67,7 +67,12 @@ flowchart LR
     EFFECTS --> MSG
 ```
 
-Le interazioni dell'utente e le notifiche del motore sono rappresentate come messaggi. La funzione di aggiornamento decide la transizione di stato e descrive gli effetti da eseguire tramite un comando; il runtime applica il nuovo modello, aggiorna la vista ed esegue il comando. Il risultato dell'effetto può rientrare nel ciclo sotto forma di un nuovo messaggio.
+Le interazioni dell'utente e le notifiche dei sottosistemi sono rappresentate
+come messaggi. La funzione di aggiornamento decide la transizione di stato e
+descrive gli effetti da eseguire tramite un comando. Il runtime costituisce il
+punto di coordinamento del ciclo: serializza i messaggi, applica il nuovo
+modello, aggiorna la vista ed esegue il comando. Il risultato dell'effetto può
+rientrare nel ciclo sotto forma di un nuovo messaggio.
 
 MVU centralizza lo stato, rende esplicite le transizioni e separa la logica applicativa dagli effetti collaterali. Nel contesto del live coding, questa separazione consente di segnalare gli errori del nuovo programma senza sostituire una timeline valida già in esecuzione.
 
@@ -76,8 +81,10 @@ richiesti da una transizione, come il parsing, l'aggiornamento della timeline e
 l'avvio o l'arresto della riproduzione. La funzione di aggiornamento non esegue
 direttamente queste operazioni, ma restituisce una descrizione dell'effetto al
 runtime, che la interpreta e ne reinserisce l'esito nel flusso sotto forma di
-messaggio. `Cmd` completa quindi la separazione fra la decisione applicativa e
-l'interazione concreta con i sottosistemi.
+messaggio. La serializzazione stabilisce inoltre un ordine totale fra le
+transizioni quando le notifiche provengono da thread differenti. `Cmd`
+completa quindi la separazione fra la decisione applicativa e l'interazione
+concreta con i sottosistemi.
 
 ### Architettura a livelli e pipeline
 
