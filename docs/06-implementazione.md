@@ -650,7 +650,22 @@ La velocity non fa parte dell'identità della voce perché è una proprietà del
 
 L'invio di `noteOn` è sincrono e breve; il corrispondente `noteOff` viene programmato su un `ScheduledExecutorService` daemon. Il thread del player può così continuare a estrarre eventi senza restare bloccato per la durata delle note. Per evitare che una nota ribattuta venga troncata, il motore mantiene un solo `noteOff` pendente per coppia (canale, nota): se la stessa nota riparte prima della fine, il `noteOff` precedente viene annullato e riprogrammato (in MIDI un `noteOff` spegne l'intero numero di nota sul canale). Alla chiusura, executor e sintetizzatore sono rilasciati in modo tollerante agli errori.
 
-## Interfaccia utente — Giacomo Biagioni
+# Interfaccia utente — Giacomo Biagioni
+
+## Contributo personale e collaborazioni
+
+La progettazione e l'implementazione dell'interfaccia utente sono state curate
+principalmente da Giacomo Biagioni. Il contributo comprende la struttura delle
+viste, l'editor basato su RichTextFX, gli strumenti di assistenza alla
+scrittura, la gestione del tema, il feedback degli errori, gli highlight
+durante la riproduzione e l'integrazione dei visualizzatori nell'editor, insieme
+ai relativi test della UI.
+
+Le parti di collegamento con gli altri sottosistemi sono state realizzate in
+collaborazione con i rispettivi responsabili: con Cristian Morbidelli per
+l'integrazione di parser e interprete, con Federico Morsucci per timeline,
+scheduling e notifiche degli elementi in esecuzione, e con Tommaso Remedi per
+il collegamento del controllo del volume al backend MIDI.
 
 La UI aggiorna i visualizzatori soltanto quando l'analisi del codice termina con
 successo. Il valore `timelineRevision` consente di riconoscere una nuova
@@ -661,7 +676,7 @@ thread JavaFX tramite `Platform.runLater`, così che i nodi grafici siano
 modificati in sicurezza. `SoundCodeFrame` gestisce inoltre l'avvio e l'arresto
 del backend insieme al ciclo di vita dell'applicazione.
 
-### Editor e operazioni di modifica
+## Editor e operazioni di modifica
 
 `BlockEditorView` si basa su una singola `GenericStyledArea` di RichTextFX e ne
 riutilizza le funzionalità native per annullamento, ripristino, copia, taglio e
@@ -678,15 +693,28 @@ Attorno all'area di testo sono integrate alcune funzionalità aggiuntive:
   `IntFunction[Node]` necessaria per generare, su richiesta, il numero associato
   a ciascuna riga;
 - `SyntaxHighlighter` riconosce stringhe e chiamate tramite espressioni regolari
-  e combina la colorazione sintattica con le evidenziazioni ricevute dal player.
-  Gli intervalli vengono limitati alla lunghezza corrente del documento, così
-  da gestire in sicurezza posizioni riferite a una versione precedente del
-  testo;
+  e applica al testo esclusivamente la relativa colorazione;
 - le richieste di ricolorazione prodotte da modifiche ravvicinate vengono
   accorpate e una sola operazione viene inserita nella coda degli eventi
   JavaFX;
 - prima di essere inviato al parser, il testo viene normalizzato per mantenere
   coerenti le posizioni dei caratteri sulle diverse piattaforme.
+
+## Highlight degli elementi in esecuzione
+
+`PlaybackHighlightOverlayManager` traduce ogni `TextPosition` ricevuta dal
+player in un rettangolo collocato nell'overlay dell'editor. Posizione e
+dimensioni sono calcolate a partire dai bounds forniti da RichTextFX; durante
+scroll, resize e modifiche del layout i rettangoli vengono riposizionati
+rispetto alle nuove coordinate dell'editor.
+
+Ogni aggiornamento confronta il nuovo insieme di posizioni con quello già
+visualizzato, aggiungendo e rimuovendo solamente le differenze. I rettangoli
+rimossi vengono conservati in un pool e riutilizzati per gli highlight
+successivi, evitando continue allocazioni durante la riproduzione. Quando
+l'utente modifica il testo dopo un aggiornamento valido, gli highlight sono
+temporaneamente disabilitati perché le coordinate ricevute dal player fanno
+riferimento alla precedente versione del sorgente.
 
 `AutoPairingSupport` gestisce l'inserimento dei delimitatori. Parentesi tonde,
 quadre e angolari, insieme alle virgolette, vengono completate automaticamente;
@@ -705,14 +733,27 @@ codice provengono da `SoundCodeLanguage`, condiviso con il parser.
 tastiera o mouse, sostituisce soltanto il prefisso corrente e usa il marcatore
 `$0` per collocare il cursore nel punto previsto dal frammento inserito.
 
-### Visualizzazioni incorporate
+## Visualizzazioni incorporate
 
 Le visualizzazioni condividono il trait `AnimatedView`, che espone solamente il
 nodo radice e i controlli `play`/`stop`. `CanvasAnimatedView` implementa la
-parte comune: canvas responsivo, pulizia del frame e `AnimationTimer`. Il tempo
-trascorso viene misurato in nanosecondi tramite il clock di `AnimationTimer`,
-che non risente delle modifiche all'orologio di sistema, e convertito in cicli
-tramite `Tempo.cps`; le sottoclassi devono implementare soltanto `draw`.
+parte comune: canvas responsivo, pulizia del frame e registrazione presso un
+timer condiviso. Un unico `AnimationTimer` mantiene l'insieme delle
+`CanvasAnimatedView` in esecuzione e, a ogni frame, inoltra a ciascuna lo stesso
+timestamp. Il timer viene avviato quando si registra la prima vista e arrestato
+quando l'insieme torna vuoto.
+
+Ogni visualizzatore conserva autonomamente il tempo accumulato. `stop` mette in
+pausa l'animazione e il successivo `play` la fa riprendere dal punto in cui era
+stata interrotta, senza influenzare le altre viste. Quando viene aggiornata la
+timeline, invece, i visualizzatori vengono ricreati e le animazioni ripartono
+da zero.
+
+Il tempo trascorso viene misurato in nanosecondi tramite `System.nanoTime()`,
+un clock monotono che non risente delle modifiche all'orologio di sistema, e
+convertito in cicli tramite `Tempo.cps`. Il timestamp fornito da
+`AnimationTimer` viene utilizzato per limitare la frequenza di ridisegno; le
+sottoclassi devono implementare soltanto `draw`.
 `VisualizerViewFactory` effettua il pattern matching sul `VisualizerKind` e
 isola così dall'editor la scelta della vista concreta.
 
@@ -733,7 +774,7 @@ scroll e resize. In questo modo i visualizzatori sembrano appartenere
 all'editor senza essere caratteri del documento e senza interferire con
 selezione, copia-incolla o undo.
 
-### Vista principale, feedback e tema
+## Vista principale, feedback e tema
 
 `MainView` compone toolbar, editor ed `ErrorBanner` e traduce pulsanti e
 scorciatoie (`Shortcut+Enter`, `Shortcut+.` e `Shortcut+U`) in messaggi, senza
@@ -743,7 +784,38 @@ valore cambia. Il banner degli errori gestisce visibilità e layout insieme e
 usa transizioni di fade; la chiusura genera un messaggio solo al termine
 dell'animazione.
 
-Colori, tipografia, dimensioni e stringhe CSS sono raccolti in `UITheme`. Oltre
-a mantenere coerenti editor, gutter, popup, scrollbar, visualizzatori ed
-errori, questa centralizzazione evita che le classi comportamentali conoscano
-valori grafici specifici.
+Il controllo del volume è realizzato con uno `Slider` compreso fra 0 e 100. Per
+evitare aggiornamenti ridondanti durante il trascinamento, `MainView` invia la
+richiesta quando l'utente rilascia il mouse; il comando `SetVolume` inoltra
+quindi il valore ad `AudioPlayer`, che lo propaga al backend audio.
+
+Colori, tipografia, dimensioni e stringhe CSS sono raccolti in `UITheme`. Dal
+punto di vista implementativo, il tema carica `CascadiaCode-Regular.ttf` dalle
+risorse e ne inserisce la famiglia nelle regole CSS. Se il caricamento fallisce
+viene selezionata la famiglia di sistema `Monospaced`.
+
+## Test dell'interfaccia
+
+I test della UI usano ScalaTest e condividono il supporto `UITestSupport`.
+Poiché i componenti JavaFX possono essere creati e interrogati soltanto sul
+JavaFX Application Thread, il metodo `onFxThread` avvia il toolkit quando
+necessario, accoda il corpo del test tramite `Platform.runLater` e ne attende il
+completamento. Il risultato o l'eventuale eccezione vengono quindi riportati
+al thread che esegue la suite.
+
+I componenti verificati sono istanze reali dei controlli JavaFX, mentre vengono
+simulati gli input dell'utente e osservati gli effetti prodotti. Nei test di
+`MainView`, per esempio, i pulsanti della toolbar vengono attivati tramite
+`fire()` e una funzione di dispatch registra i messaggi emessi; sono inoltre
+verificati lo slider del volume e gli shortcut installati nella scena. Per le
+funzionalità di editing, helper locali come `installedEditor` costruiscono una
+`InlineCssTextArea`, installano il comportamento da verificare e impostano testo
+e cursore iniziali. 
+
+`InlineCssTextArea` è una specializzazione di
+`GenericStyledArea` e ne conserva l'API e i comportamenti rilevanti per
+l'editing, utilizzando stringhe CSS inline come rappresentazione degli stili.
+Può quindi sostituire l'editor configurato dall'applicazione nei test isolati,
+senza richiedere la costruzione dell'intera vista. L'autopairing viene
+esercitato tramite eventi di tastiera sintetici, mentre il completamento viene
+invocato direttamente sull'editor.
