@@ -473,12 +473,9 @@ Il modello risultante è completamente indipendente dalla sintassi della DSL e c
 
 ## Engine — Federico Morsucci
 
-# Design di dettaglio
-## Engine e Risoluzione Temporale
+L'engine è strutturato come una semplice pipeline in cui ogni componente ha un compito preciso. L'obiettivo è trasformare il codice scritto dall'utente in una sequenza di suoni, tenendo rigorosamente separati il calcolo matematico della musica dalla riproduzione audio vera e propria.
 
-L'engine è progettato come una pipeline di elaborazione nella quale ogni componente svolge una singola responsabilità. L'obiettivo è trasformare il codice scritto dall'utente in una sequenza temporale di eventi musicali sincronizzati con il tempo reale, mantenendo completamente separati il processo di interpretazione del linguaggio, la pianificazione temporale e la riproduzione audio.
-
-Il flusso di esecuzione del sistema è illustrato in Figura seguente.
+Il flusso di esecuzione del sistema è illustrato nella figura seguente.
 
 ```mermaid
 flowchart LR
@@ -508,13 +505,13 @@ Player
 --> UI["Highlight UI"]
 ```
 
-L'interprete costituisce il punto di ingresso dell'engine. Dopo aver ricevuto il codice sorgente, costruisce la rappresentazione interna della composizione sotto forma di pattern e la passa allo scheduler.
+L'interprete legge il codice sorgente, costruisce la struttura ad albero dei pattern e la passa allo scheduler.
 
-Lo scheduler rappresenta il componente responsabile della costruzione della timeline musicale. Il suo compito non consiste nell'interpretare direttamente i pattern, bensì nel determinare quale intervallo temporale debba essere valutato in ogni istante. Per ciascun ciclo genera quindi una finestra temporale (`Interval`) e delega la risoluzione del pattern al `PatternResolver`.
+A questo prima di assegnare ad ogni evento il suo **tempo fisico**, il sistema separa gli eventi in **tempo logico**.
 
-Il `PatternResolver` percorre ricorsivamente l'albero dei pattern e produce una collezione di oggetti `ScheduledEvent`, ciascuno dei quali rappresenta un evento musicale completo di informazioni temporali, payload sonoro ed eventuali parametri aggiuntivi. Terminata la risoluzione, gli eventi vengono restituiti allo scheduler, che li ordina cronologicamente e costruisce la timeline finale.
+Lo **Scheduler** è il componente che organizza la timeline di eventi, ma lavora esclusivamente in una bolla di tempo relativo e matematico. Lo scheduler non sa nulla di secondi o millisecondi; ragiona solo per *cicli* e *frazioni* (espresse tramite la classe `Fraction` e le finestre `Interval`).
 
-Questo scambio di informazioni è rappresentato nella Figura seguente.
+Per ogni ciclo musicale (ad esempio da `0` a `1`, poi da `1` a `2`), lo scheduler delega il calcolo al **PatternResolver**. Quest'ultimo smonta l'albero dei pattern e restituisce una lista di eventi temporali (`ScheduledEvent`) pronti per essere ordinati sulla timeline logica.
 
 ```mermaid
 sequenceDiagram
@@ -525,7 +522,7 @@ participant PatternResolver
 
 Interpreter->>Scheduler: Pattern
 
-loop Per ogni ciclo
+loop Per ogni ciclo logico (frazioni)
 
 Scheduler->>PatternResolver: resolve(pattern, Interval)
 
@@ -538,19 +535,20 @@ Scheduler-->>Scheduler: Ordina gli eventi
 Scheduler->>AudioPlayer: Timeline
 ```
 
-Lo scheduler espone due differenti modalità di generazione della timeline.
+Lo scheduler può generare questa timeline in due modi diversi:
 
-La prima produce una sequenza finita di eventi, ottenuta determinando la minima durata necessaria affinché il pattern completi un'intera ripetizione. Questa modalità è utilizzata principalmente per la visualizzazione grafica e per l'analisi statica della composizione.
+- **Timeline Limitata (Bounded)**: produce una lista chiusa e finita di eventi. Calcola automaticamente la lunghezza esatta del pattern (tramite il metodo `cycleLength`) ed estrae solo i cicli necessari per formare un loop perfetto. È utilizzata soprattutto per le interfacce statiche o per l'esportazione.
 
-La seconda modalità genera invece una `LazyList`, costruita dinamicamente un ciclo alla volta. In questo caso gli eventi non vengono calcolati anticipatamente, ma soltanto nel momento in cui risultano necessari alla riproduzione. Tale approccio consente di mantenere un consumo di memoria costante anche durante esecuzioni di durata arbitraria.
+- **Timeline Infinita (LazyList)**: rappresenta il cuore del live coding. Utilizza la valutazione *pigra* di Scala (`LazyList`): il motore non calcola tutta la canzone in anticipo, ma genera gli eventi solo per il ciclo corrente nel momento in cui servono (`LazyList.from(cycleEvents) #::: loop(nCycle + 1)`). In questo modo, indipendentemente dal fatto che l'esecuzione duri un minuto o tre ore, il consumo di memoria rimane costante e molto contenuto.
 
-Una volta costruita la timeline, il controllo passa all'`AudioPlayer`, che rappresenta il punto di collegamento tra il dominio logico della composizione e il backend audio.
+Una volta creata la timeline logica infinita, il controllo passa all'**AudioPlayer**.
 
-Il player non interpreta il linguaggio né esegue operazioni di scheduling: il suo unico compito consiste nel consumare progressivamente la timeline prodotta dallo scheduler, sincronizzando gli eventi con il tempo fisico del sistema.
+A differenza dello scheduler, il player lavora con il **tempo fisico assoluto**, cioè il clock del sistema espresso in millisecondi (`System.currentTimeMillis()`). Operando su un thread dedicato, il player consuma gli eventi della timeline uno alla volta, utilizzando la velocità globale (`Tempo`) per convertire le frazioni temporali in millisecondi effettivi.
 
-Per ogni iterazione del proprio ciclo di esecuzione, il player confronta il tempo corrente con l'istante di attivazione degli eventi presenti nella timeline. Quando un evento diventa attivo, esso viene inviato al backend audio insieme alla durata calcolata e agli eventuali parametri applicati. Contestualmente vengono raccolte le posizioni del codice sorgente associate all'evento e notificate all'interfaccia grafica per aggiornare l'highlighting in tempo reale.
+Ad ogni tick, se il tempo logico calcolato ha raggiunto l'istante previsto per l'evento, il player esegue due operazioni in parallelo:
 
-L'interazione tra scheduler e player è riassunta nella Figura seguente.
+- invia il suono all'`AudioBackend` per la riproduzione;
+- raccoglie le coordinate del testo associate a quel suono e notifica la UI affinché evidenzi il codice in tempo reale (`onHighlightChange`).
 
 ```mermaid
 sequenceDiagram
@@ -562,9 +560,9 @@ participant UI
 
 Scheduler->>AudioPlayer: LazyList[ScheduledEvent]
 
-loop Tick del player
+loop Tick del player (millisecondi)
 
-AudioPlayer->>AudioPlayer: Sincronizzazione con Tempo
+AudioPlayer->>AudioPlayer: Sincronizzazione con tempo reale
 
 AudioPlayer->>Backend: triggerSound(...)
 
@@ -573,7 +571,9 @@ AudioPlayer->>UI: updateHighlight(...)
 end
 ```
 
-L'unità di informazione scambiata tra scheduler e player è rappresentata dallo `ScheduledEvent`. Ogni evento descrive completamente un'azione musicale e contiene sia il payload da riprodurre sia tutte le informazioni temporali necessarie alla sua esecuzione.
+## La geometria degli eventi: `whole` e `part`
+
+Per scambiare i dati tra scheduler e player viene utilizzato l'oggetto `ScheduledEvent`. Oltre alle informazioni sul suono (`payload`) e agli effetti, ogni evento contiene due intervalli temporali distinti.
 
 ```mermaid
 flowchart LR
@@ -591,16 +591,24 @@ Extensions --> Event
 Positions --> Event
 ```
 
-Ogni evento temporale è quindi definito da due intervalli distinti:
+- **`whole`** (*intero*): rappresenta la durata logica completa della nota.
+- **`part`** (*parte*): rappresenta esclusivamente la porzione della nota visibile all'interno della finestra temporale elaborata nel ciclo corrente.
 
-* **`whole` (Intero):** rappresenta l'estensione logica originale e completa dell'evento musicale nello spazio temporale assoluto.
-* **`part` (Parte):** rappresenta esclusivamente la porzione dell'evento che risulta effettivamente visibile e attiva all'interno della finestra temporale in fase di elaborazione (il ciclo corrente).
+### Perché questa distinzione è indispensabile?
 
-**Perché questa separazione è necessaria?**
+Senza la separazione tra `whole` e `part`, la gestione degli eventi che attraversano il confine tra due cicli (ad esempio una nota che inizia alla fine del ciclo `0` e termina a metà del ciclo `1`) sarebbe problematica. Il motore sarebbe costretto a trattare la nota come due eventi distinti, con il rischio di ottenere riproduzioni tronche oppure duplicate.
 
-Questa distinzione, definita a livello strutturale, è la chiave architetturale per gestire in modo sicuro gli eventi che attraversano i confini di un ciclo ritmico.
+La presenza di entrambe le coordinate permette invece all'`AudioPlayer` di risolvere il problema con un semplice filtro:
 
-Senza questa separazione, un evento a cavallo tra due cicli verrebbe visto dal motore come due frammenti separati. Grazie alla convivenza di `whole` e `part`, invece, il player può applicare una regola di esecuzione rigorosa: esegue il *triggering* della nota **una sola volta** (nell'istante esatto in cui inizia la sua vita effettiva), ma le assegna la durata totale corretta leggendola dal `whole`. Questo approccio previene in modo matematico l'insorgere di artefatti audio, evitando note troncate prematuramente al cambio di ciclo o, peggio, suonate due volte (*double-triggering*).
+```scala
+toProcess.filter(e => e.part.start == e.whole.start)
+```
+
+In pratica, il player avvia fisicamente il suono soltanto nell'istante in cui la nota nasce realmente, ossia quando `part.start` coincide con `whole.start`, ma comunica al backend audio la durata completa ricavata da `whole`.
+
+Quando lo scheduler elaborerà il ciclo successivo e restituirà la seconda porzione della stessa nota, il filtro la scarterà automaticamente, evitando una seconda attivazione.
+
+Questo semplice accorgimento geometrico garantisce che una nota estesa su più cicli venga riprodotta una sola volta, mantenendo però la durata corretta e impedendo sia troncamenti sia duplicazioni.
 
 ## Audio e MIDI — Tommaso Remedi
 

@@ -409,33 +409,50 @@ che viene convertito in una richiesta contenente l'identificatore dello stream a
 
 ## Engine — Federico Morsucci
 
-## Modellazione del Pattern e del Dominio Temporale
+## Modellazione del dominio
 
-La scelta fondamentale alla base del dominio è stata quella di rappresentare la struttura musicale come un **Albero Sintattico Astratto (Abstract Syntax Tree, AST)** mediante **Algebraic Data Types (ADT)**. Questa rappresentazione non ha il solo scopo di disaccoppiare il parser dall'engine di scheduling, ma permette di descrivere qualsiasi pattern musicale attraverso una struttura ricorsiva, fortemente tipizzata e facilmente estendibile.
+Invece di considerare la musica come una semplice lista di note da suonare una dopo l'altra, il sistema la descrive come l'insieme di piccoli blocchi che possono essere combinati tra loro. In questo modo anche pattern complessi, poliritmie e variazioni nascono semplicemente dalla composizione di elementi più semplici.
 
-L'intera algebra dei pattern è costruita attorno al trait sigillato e covariante `Pattern[+T]`, i cui costruttori rappresentano le principali operazioni compositive del linguaggio:
+### I pattern
 
-- `Atom[T]` rappresenta un singolo evento atomico (nota, sample o parametro).
-- `Sequence[T]` descrive la composizione sequenziale nel tempo.
-- `Parallel[T]` permette la sovrapposizione polifonica di più pattern.
-- `Alternation[T]` introduce una variazione ciclica selezionando un ramo differente ad ogni ciclo.
-- `TimeWarp[T]` racchiude tutte le trasformazioni geometriche del tempo.
-- `WithExtensions[T]` consente di associare effetti audio e parametri aggiuntivi al pattern.
+Il tipo `Pattern[T]`, che rappresenta un qualsiasi pattern musicale.
 
-L'utilizzo degli `enum` per `Sound`, `AudioEffect` e `PatternModifier` garantisce l'esaustività del *pattern matching* già in fase di compilazione, eliminando la possibilità di casi non gestiti.
+Un pattern può assumere diverse forme, ognuna con un significato preciso:
 
-Per i tipi primitivi del dominio sono stati inoltre utilizzati gli **Opaque Types**. Tipi come `Note`, `Sample` e `AbsoluteTime` risultano quindi completamente distinti dal livello implementativo.
+- **`Atom[T]`**: rappresenta l'elemento più semplice, ad esempio una singola nota, un sample o un valore numerico.
+- **`Sequence[T]`**: esegue più pattern uno dopo l'altro, permettendo di costruire melodie e ritmi.
+- **`Parallel[T]`**: esegue più pattern contemporaneamente, utile per creare accordi o polifonie.
+- **`Alternation[T]`**: alterna pattern diversi a ogni ripetizione del ciclo, rendendo semplice creare variazioni.
+- **`TimeWarp[T]`**: applica modifiche temporali al pattern, come accelerazioni, rallentamenti, ritardi o inversioni.
+- **`WithExtensions`**: aggiunge effetti audio al pattern, mantenendo separata la struttura musicale dagli effetti applicati.
+
+Questa organizzazione rende il codice più semplice da estendere e permette al motore di sapere sempre come interpretare ogni tipo di pattern.
+
+## Tipi del dominio
+
+Anche i concetti fondamentali della musica sono rappresentati con tipi dedicati.
+
+Ad esempio:
+
+- `Note` rappresenta una nota musicale.
+- `Sample` identifica un campione audio.
+- `AbsoluteTime` rappresenta un istante preciso del clock del sistema.
+
+Avere tipi distinti evita molti errori durante lo sviluppo. Ad esempio, non è possibile confondere un istante assoluto del clock con una durata musicale o passare un valore nel formato sbagliato a una funzione.
+
+Internamente questi tipi rimangono molto leggeri e non introducono costi aggiuntivi durante l'esecuzione, ma rendono il codice più leggibile e riducono la possibilità di errori.
 
 ### Il Dominio Temporale
 
-La gestione del tempo rappresenta il motore di scheduling. Per garantire precisione ritmica assoluta ed evitare la propagazione di errori, l'architettura modella il tempo suddividendolo in quattro distinti livelli di astrazione, ognuno con responsabilità e strutture dati dedicate.
+La gestione del tempo è il problema più critico in un software musicale. Affidarsi ai classici numeri con la virgola (Double) per dividere i battiti porterebbe inevitabilmente a errori di arrotondamento (es. dividere un ciclo in terzine creerebbe periodi di **0.3333...** che non si ricongiungono mai esattamente a **1.0**).
+
+Per garantire una precisione ritmica assoluta ed evitare la propagazione di queste deviazioni matematiche, l'architettura modella il tempo suddividendolo in quattro strati di astrazione, ognuno con una precisa responsabilità:
 
 * **Tempo Logico (`Fraction`):** La timeline musicale è calcolata tramite una classe custom implementata come numero razionale. L'uso esclusivo di frazioni esatte evita completamente la deriva aritmetica e i difetti di arrotondamento tipici dei numeri in virgola mobile (`Double`), che altrimenti corromperebbero i calcoli di terzine, tuple irregolari o combinazioni di distorsioni temporali. Ogni frazione viene normalizzata all'istanziazione (denominatore positivo e riduzione matematica tramite Massimo Comune Divisore), garantendo confronti e operazioni algebricamente perfetti.
-* **Tempo Musicale (`Interval`):** Costruito componendo due frazioni (inizio e fine), modella una precisa porzione della timeline. Costituisce la "finestra geometrica" che viene propagata e partizionata ricorsivamente dai resolver durante la discesa lungo l'AST.
-* **Tempo Fisico (`Tempo`):** Rappresenta il livello di traduzione. Terminata la risoluzione logica dell'AST, la classe `Tempo` mappa gli intervalli metrico-frazionari in durate fisiche (millisecondi) applicando il parametro di velocità CPS (*Cycles Per Second*).
+* **Tempo Musicale (`Interval`):** Costruito componendo due frazioni (inizio e fine), modella una precisa porzione della timeline. Costituisce la "finestra geometrica" che viene propagata e partizionata ricorsivamente dai resolver durante la discesa lungo i Pattern.
+* **Tempo Fisico (`Tempo`):** Rappresenta il livello di traduzione. Terminata la risoluzione logica dei Pattern, la classe `Tempo` mappa gli intervalli metrico-frazionari in durate fisiche (millisecondi) applicando il parametro di velocità CPS (*Cycles Per Second*).
 * **Tempo Assoluto (`AbsoluteTime`):** É isolato tramite un *Opaque Type* (`opaque type AbsoluteTime = Long`) che incapsula il valore di `System.currentTimeMillis()`. Questa astrazione *a costo zero* previene, già a tempo di compilazione, la possibilità di mescolare accidentalmente timestamp di sistema con durate relative.
 
-**Vantaggi Architetturali**
 
 Questa stratificazione impone una rigorosa *Separation of Concerns* (separazione delle responsabilità). Il dominio matematico e compositivo (Frazioni e Intervalli) può essere calcolato, testato e manipolato in modo puro, rimanendo totalmente de-contestualizzato sia dalla velocità di riproduzione fisica, sia dalla sincronizzazione con il clock del sistema operativo.
 
@@ -443,7 +460,7 @@ Questa stratificazione impone una rigorosa *Separation of Concerns* (separazione
 
 ## Il Dispatcher e i Pattern di Risoluzione
 
-Invece di implementare la logica di valutazione direttamente all'interno dei nodi dell'AST (violando il principio di singola responsabilità e accoppiando i dati al comportamento), l'algoritmo di risoluzione è centralizzato nel modulo `PatternResolver`, che funge da **dispatcher**.
+Invece di implementare la logica di valutazione direttamente all'interno dei nodi (violando il principio di singola responsabilità e accoppiando i dati al comportamento), l'algoritmo di risoluzione è centralizzato nel modulo `PatternResolver`, che funge da **dispatcher**.
 
 Sfruttando le capacità di pattern matching di Scala su strutture ADT chiuse, il dispatcher instrada l'esecuzione verso resolver specifici. L'utilizzo di parametri contestuali (`using`) consente di propagare in modo trasparente la finestra temporale da analizzare:
 
@@ -525,10 +542,10 @@ Infine, come evidenziato dalla tracciatura delle posizioni, il resolver accumula
 
 #### Composizione e Ricorsione Strutturale (Repetition, Juxtaposition, Offset)
 
-L'eleganza dell'approccio basato su AST si esprime al massimo nei modificatori di natura strutturale, che non applicano semplici deformazioni ma alterano la topologia stessa del pattern:
+Ci sono dei modificatori di natura strutturale, che non applicano semplici deformazioni ma alterano la topologia stessa del pattern:
 
 * **Repetition (`ply`):** Anziché deformare la finestra di interrogazione, intercetta l'evento generato e ne suddivide dinamicamente la durata originale (`whole`) in **n** frammenti equi-spaziati. Il risultato è una sequenza ritmica perfettamente isocrona, incastonata nello spazio logico della nota di partenza.
-* **Juxtaposition (`jux`) e Offset (`off`):** Dimostrano la potenza ricorsiva dell'engine operando attraverso la riscrittura dell'albero sintattico. Anziché manipolare i singoli eventi matematicamente, essi trasformano il pattern a runtime creando nuovi nodi AST. `Offset`, ad esempio, costruisce un nodo `Parallel` che accoppia il pattern originale con una sua versione traslata tramite `Late(offset)`. Delegando ricorsivamente la risoluzione a questo nuovo sotto-albero, il sistema ottiene "gratuitamente" la corretta traslazione geometrica e la propagazione delle `modifierPositions`, garantendo un'assoluta coerenza architetturale senza alcuna duplicazione logica.
+* **Juxtaposition (`jux`) e Offset (`off`):** Dimostrano la potenza ricorsiva dell'engine operando attraverso la riscrittura dell'albero sintattico. Anziché manipolare i singoli eventi matematicamente, essi trasformano il pattern a runtime creando nuovi nodi. `Offset`, ad esempio, costruisce un nodo `Parallel` che accoppia il pattern originale con una sua versione traslata tramite `Late(offset)`. Delegando ricorsivamente la risoluzione a questo nuovo sotto-albero, il sistema ottiene "gratuitamente" la corretta traslazione geometrica e la propagazione delle `modifierPositions`, garantendo un'assoluta coerenza architetturale senza alcuna duplicazione logica.
 
 ### WithExtensionsResolver
 
@@ -542,25 +559,25 @@ In caso di parametri duplicati (ad esempio due effetti `gain` concorrenti nello 
 
 ---
 
-### Scheduling e Concorrenza nel Player
+## Scheduling e Concorrenza nel Player
 
 Riprendendo la distinzione tra le modalità di generazione della timeline, l'implementazione tecnica adotta strategie differenti a seconda del contesto d'uso:
 
-#### Timeline Limitata (Bounded)
+### 1. Timeline Limitata (Bounded)
 Utilizzata principalmente dalla GUI per la rappresentazione statica, calcola la finestra temporale minima sfruttando il **minimo comune multiplo** delle periodicità dei pattern, restituendo una lista finita di eventi.
 
-#### Timeline Infinita (`LazyList`)
+### 2. Timeline Infinita (`LazyList`)
 Per il live coding e la riproduzione in tempo reale, lo scheduler sfrutta la valutazione pigra di Scala per produrre una sequenza infinita valutata un ciclo alla volta:
 
 ```scala
 def generateInfiniteTimeline(...): LazyList[...] =
   def loop(nCycle: Int): LazyList[....] =
     given Interval = Interval(Fraction(nCycle), Fraction(nCycle + 1))
-    val cycleEvents = patterns
-            .flatMap(_.resolve)
-            .sortBy(_.part.start.toDouble)
+    val cycleEvents =patterns
+        .flatMap(_.resolve)
+        .sortBy(_.part.start.toDouble)
     LazyList.from(cycleEvents) #::: loop(nCycle + 1)
-  
+
   loop(0)
 ```
 
@@ -568,50 +585,35 @@ Grazie alla concatenazione differita (`#:::`), in memoria risiede unicamente il 
 
 ## L'AudioPlayer e la Sincronizzazione in Tempo Reale
 
-L'`AudioPlayer` rappresenta il componente incaricato dell'esecuzione effettiva della timeline. L'esecuzione avviene su un thread in background a bassa latenza che esegue un ciclo di polling continuo, invocando a ogni iterazione il metodo `tick` con risoluzione nominale al millisecondo.
+L'`AudioPlayer` rappresenta il componente incaricato dell'esecuzione effettiva della timeline. L'esecuzione avviene su un thread in background a bassa latenza che esegue un ciclo di polling continuo, invocando ad ogni iterazione il metodo `tick` con risoluzione al millisecondo.
 
-## Gestione dello Stato e Thread Safety
+### Gestione dello Stato e Thread Safety
 
-Per supportare il *live coding* — ovvero la sostituzione a caldo o la modifica dei pattern in esecuzione senza interrompere o bloccare il flusso audio — l'architettura adotta un pattern di stato immutabile protetto da sincronizzazione esplicita (`lock.synchronized`).
+Per supportare il *live coding* (ovvero la sostituzione a caldo dei pattern in esecuzione senza interrompere o bloccare il flusso audio) l'architettura adotta un pattern di **stato immutabile racchiuso in un blocco di sincronizzazione (`lock.synchronized`)**.
 
-Tutti i dati critici di riproduzione (la `LazyList` degli eventi, il timestamp di avvio, le durate di pausa e la mappa degli highlight attivi) sono racchiusi all'interno della `case class` privata `PlayerState` e aggiornati in modo atomico.
+Tutti i dati critici di riproduzione (la `LazyList` degli eventi, il timestamp di avvio, la mappa degli highlight attivi) sono racchiusi all'interno di una case class privata (`PlayerState`) e aggiornati in modo atomico:
 
 ```scala
 private case class PlayerState(
     eventStream: LazyList[ScheduledEvent[AudioPayload]] = LazyList.empty,
     firstTickTimeMs: Option[AbsoluteTime] = None,
-    pausedDurationMs: Long = 0L,
-    pausedAtMs: Option[Long] = None,
     activeHighlights: Map[TextPosition, AbsoluteTime] = Map.empty,
     currentHighlightSet: Set[TextPosition] = Set.empty
 )
 ```
+## Il Ciclo di Elaborazione (*tick*)
 
 Questo approccio previene in modo rigoroso qualsiasi **condizione di gara** (*race condition*) tra il thread che ricompila il codice (`updateTimeline`) e il thread che consuma gli eventi audio.
-
-## Semantica di Pausa e Ripresa (*Pause/Resume*)
-
-Il player implementa una gestione nativa della pausa. Quando viene invocato `stop()`, la riproduzione viene sospesa preservando lo stream degli eventi rimanenti e registrando l'istante di interruzione (`pausedAtMs`).
-
-Alla ripresa (`start()`), il sistema calcola la durata della pausa trascorsa e la accumula in `pausedDurationMs`. Questo permette di definire un tempo logico effettivo (`effectiveNowMs`).
-
-```scala
-val effectiveNowMs = now - currentState.pausedDurationMs
-```
-
-Sottraendo il tempo trascorso in pausa dal clock di sistema, la timeline non subisce salti in avanti, gli eventi non vengono scartati per fittizi ritardi temporali e gli highlight testuali non scadono prematuramente durante i momenti di sospensione.
-
-## Il Ciclo di Elaborazione (*tick*)
 
 Ad ogni *tick* del player, lo stato viene valutato eseguendo tre macro-operazioni sequenziali.
 
 ### 1. Pulizia degli Highlight Scaduti
 
-Vengono filtrate e rimosse tutte le evidenziazioni testuali il cui termine temporale (`expireAtMs`) è inferiore al tempo logico corrente (`effectiveNowMs`), ripulendo la UI in modo incrementale.
+Vengono filtrate e rimosse tutte le evidenziazioni testuali il cui termine temporale (`expireAtMs`) è inferiore al tempo corrente (`now`), ripulendo la UI in modo incrementale.
 
 ### 2. Consumo degli Eventi e Filtraggio Anti-Duplicazione
 
-Lo stream viene partizionato tramite lo `span`, confrontando il tempo logico calcolato con il tempo atteso di esecuzione (`effectiveNowMs >= expectedTriggerMs`).
+Lo stream viene partizionato tramite lo `span` in base al tempo reale calcolato (`firstPerformance + tempo.offsetMs(...)`).
 
 Per impedire che una nota venga riprodotta due volte quando attraversa il confine tra due cicli consecutivi, viene applicato il seguente filtro strutturale:
 
@@ -628,8 +630,8 @@ Il player inoltra il payload al generico `AudioBackend`, insieme alla durata cal
 Parallelamente:
 
 - raccoglie tutte le posizioni testuali associate (`position` dei payload e `modifierPositions`);
-- calcola la scadenza temporale degli highlight sommando la durata al tempo logico (`effectiveNowMs + durationMs`);
-- notifica asincronicamente la GUI tramite la callback `onHighlightChange` soltanto quando il set delle evidenziazioni risulta effettivamente modificato.
+- calcola la scadenza temporale degli highlight;
+- notifica asincronamente la GUI tramite la callback `onHighlightChange` soltanto quando il set delle evidenziazioni risulta effettivamente modificato.
 
 ## Disaccoppiamento Architetturale
 
