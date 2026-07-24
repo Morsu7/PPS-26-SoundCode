@@ -34,7 +34,7 @@ Non fanno parte della versione descritta:
 - compatibilità completa con Strudel o TidalCycles;
 - salvataggio e caricamento di file di progetto;
 - esportazione MIDI, audio o JSON;
-- modifica del tempo dalla GUI o dalla DSL;
+- modifica del tempo dalla GUI;
 - campioni audio registrati esternamente;
 - collaborazione remota;
 - oscilloscopio richiamabile dalla DSL;

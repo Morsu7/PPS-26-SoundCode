@@ -661,7 +661,7 @@ Il backend dipende dal trait `AudioEngine`, non dal sintetizzatore concreto. Nei
 
 `MidiAudioEngine` usa i canali melodici disponibili escluso l'indice 9, riservato alle percussioni. `ChannelAllocator` identifica una voce mediante programma, pan, riverbero e brightness. Una voce già nota riusa il proprio canale; una nuova voce riceve il canale successivo secondo una politica round-robin. Quando i canali terminano, il più vecchio viene riutilizzato: il sistema degrada con una possibile variazione udibile invece di interrompere la riproduzione.
 
-La velocity non fa parte dell'identità della voce perché è una proprietà della singola nota. Questa scelta permette a note con gain diverso di condividere il canale senza modificarsi reciprocamente.
+La velocity non fa parte dell'identità della voce, essendo una proprietà della singola nota: così note con gain diverso condividono il canale senza modificarsi a vicenda.
 
 L'invio di `noteOn` è sincrono e breve; il corrispondente `noteOff` viene programmato su un `ScheduledExecutorService` daemon. Il thread del player può così continuare a estrarre eventi senza restare bloccato per la durata delle note. Per evitare che una nota ribattuta venga troncata, il motore mantiene un solo `noteOff` pendente per coppia (canale, nota): se la stessa nota riparte prima della fine, il `noteOff` precedente viene annullato e riprogrammato (in MIDI un `noteOff` spegne l'intero numero di nota sul canale). Alla chiusura, executor e sintetizzatore sono rilasciati in modo tollerante agli errori.
 
