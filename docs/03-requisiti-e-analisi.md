@@ -496,10 +496,8 @@ La relazione finale deve riportare la copertura automatizzata separando almeno p
 
 **RI-02 — Build.** Il progetto deve usare SBT e JDK 21.
 
-**RI-03 — Parser.** La grammatica deve essere implementata tramite FastParse e deve restituire `Either[String, ProgramAST]` al proprio confine pubblico.
+**RI-03 — Isolamento del dominio.** Gli elementi del dominio applicativo non devono dipendere da ScalaFX, JavaFX, Java MIDI o altre tecnologie puramente implementative.
 
-**RI-04 — Isolamento del dominio.** Frazioni, intervalli, pattern, payload ed eventi non devono dipendere da ScalaFX, JavaFX, RichTextFX o Java MIDI.
+**RI-04 — Interfaccia.** La GUI desktop deve usare ScalaFX/JavaFX.
 
-**RI-05 — Interfaccia.** La GUI desktop deve usare ScalaFX/JavaFX; l'editor strutturato deve essere basato su RichTextFX.
-
-**RI-06 — Audio.** L'uscita concreta deve essere adattata a `javax.sound.midi` dietro le astrazioni `AudioBackend` e `AudioEngine`.
+**RI-05 — Audio.** L'uscita concreta deve essere adattata a `javax.sound.midi`.

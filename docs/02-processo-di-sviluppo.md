@@ -46,21 +46,9 @@ Il processo seguito durante il TDD è un processo iterativo chiamato *Red-Green-
 2. *Green*: scrivere il codice di produzione che soddisfi il test definito precedentemente.
 3. *Refactor*: ristrutturare sia il codice di testing che quello di produzione.
 
-A supporto di questo processo, sono stati adottati i seguenti strumenti:
-
-- *ScalaTest*: framework per la definizione di unit test per Scala.
-- *SCoverage*: strumento per valutare la qualità dei test come percentuale di codice di produzione analizzato.
+A supporto di questo processo, è stato adottato *ScalaTest* come strumento per la definizione di unit test per Scala.
 
 Poiché si è deciso di utilizzare il testing solo per quanto riguarda il modello, è stato scelto di utilizzare lo stile di testing *FlatSpec*, in quanto questo stile è un buon compromesso rispetto alla semplicità di *FunSuite* e alla organizzazione dei test di *FunSpec*. Inoltre, permette di realizzare dei test in modo dichiarativo e quindi più vicini all'utente finale.
-
-## Quality Assurance
-
-Per il controllo della qualità del sistema sono stati adottati i seguenti strumenti:
-
-- *Scala Formatter*: controlla lo stile del codice Scala.
-- *Wart Remover*: individua possibili difetti nel codice Scala.
-- *Ktlint*: controlla lo stile del codice Kotlin.
-- *Detekt*: individua possibili difetti nel codice Kotlin.
 
 ## Build Automation
 
@@ -78,11 +66,7 @@ Per fare in modo che il codice rimanga integro e corretto durante lo sviluppo, �
 
 ## Continuous Delivery
 
-Analogamente, un altro workflow permette di automatizzare la release su *GitHub Releases* e *Maven Central*.
-
-## Automated Evolution
-
-Per mantenere aggiornate le dipendenze del progetto in maniera automatica è stato utilizzato *Renovate Bot*, che osserva le dipendenze del progetto e in caso di necessità apre delle *pull request* sul repository GitHub per aggiornarle.
+Analogamente, un altro workflow permette di automatizzare la release su *GitHub Releases*.
 
 ## Versioning
 
