@@ -31,7 +31,7 @@ L'approccio incrementale è stato efficace perché ha reso disponibile molto pre
 
 La strategia di testing è stata particolarmente utile nell'engine. L'impiego di tempo razionale, intervalli espliciti e un DSL interno per descrivere gli eventi attesi ha consentito di verificare la geometria temporale dei pattern senza dipendere dal tempo reale. Anche la separazione dell'AudioPlayer dal backend concreto ha permesso di controllare in modo deterministico l'ordine e il momento di emissione degli eventi.
 
-La principale difficoltà organizzativa è derivata dalle dipendenze tra attività sviluppate in parallelo. Modifiche al dominio hanno richiesto adattamenti coordinati in interprete, scheduler, audio, UI e test; alcune integrazioni hanno prodotto temporaneamente inconsistenze o funzionalità incomplete. In prospettiva, sarebbe stato utile stabilizzare prima le interfacce fondamentali e accompagnare ogni modifica strutturale con una descrizione esplicita dell'impatto sugli altri sottosistemi. Anche aggiornare requisiti e documentazione alla fine di ogni sprint, anziché soprattutto nella fase conclusiva, avrebbe ridotto il lavoro di riallineamento finale.
+La principale difficoltà organizzativa è derivata dalle dipendenze tra attività sviluppate in parallelo. Modifiche al dominio hanno richiesto adattamenti coordinati in interprete, scheduler, audio, UI e test.
 
 ## Limiti e sviluppi futuri
 
@@ -43,8 +43,6 @@ La versione realizzata privilegia la correttezza del modello e l'esecuzione loca
 - backend audio più ricco, capace di rendere tutti gli effetti descritti dal modello;
 - controllo più completo di tempo e parametri musicali dall'interfaccia;
 - ulteriori visualizzazioni e miglioramento delle prestazioni grafiche;
-- test più approfonditi sul ciclo MVU, sulla concorrenza e sul comportamento dell'applicazione completa;
-- distribuzione automatizzata dell'applicazione sulle piattaforme supportate.
 
 Queste estensioni possono essere introdotte senza modificare il principio fondamentale dell'architettura: mantenere separati linguaggio, semantica dei pattern, scheduling, riproduzione e presentazione.
 
@@ -52,4 +50,4 @@ Queste estensioni possono essere introdotte senza modificare il principio fondam
 
 Il progetto ha mostrato come un dominio apparentemente immediato, quale la riproduzione di brevi pattern musicali, richieda decisioni precise su grammatica, composizione, rappresentazione del tempo, concorrenza e sincronizzazione dell'interfaccia. Le revisioni affrontate durante gli sprint non sono state soltanto correzioni, ma hanno contribuito a rendere più chiari i confini del sistema e le responsabilità dei componenti.
 
-Il risultato più rilevante non è quindi soltanto l'applicazione finale, ma la costruzione di un modello nel quale le espressioni musicali possono essere combinate e trasformate in modo dichiarativo, mantenendo separata la loro semantica dall'esecuzione MIDI concreta. SoundCode costituisce una base funzionante ed estendibile per ulteriori esperimenti di composizione algoritmica e rappresenta l'esito di un processo nel quale backlog, test e refactoring hanno guidato progressivamente il passaggio dall'idea iniziale a un sistema integrato.
+ SoundCode costituisce una base funzionante ed estendibile per ulteriori esperimenti di composizione algoritmica e rappresenta l'esito di un processo nel quale backlog, test e refactoring hanno guidato progressivamente il passaggio dall'idea iniziale a un sistema integrato.
