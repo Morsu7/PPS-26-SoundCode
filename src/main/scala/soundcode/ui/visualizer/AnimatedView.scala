@@ -11,6 +11,7 @@ import scalafx.application.Platform
 import scalafx.scene.layout.Pane
 import soundcode.ui.theme.UITheme
 import soundcode.domain.Tempo
+import scala.collection.mutable.LinkedHashSet
 
 private case class VisualEvent(
     label: String,
@@ -24,6 +25,19 @@ trait AnimatedView:
   def root: Node
   def play(): Unit
   def stop(): Unit
+
+private object SharedAnimationTicker:
+  private val views = LinkedHashSet.empty[CanvasAnimatedView]
+
+  private val timer = AnimationTimer { now =>
+    views.foreach(_.onAnimationFrame(now))
+  }
+
+  def add(view: CanvasAnimatedView): Unit =
+    if views.add(view) && views.size == 1 then timer.start()
+
+  def remove(view: CanvasAnimatedView): Unit =
+    if views.remove(view) && views.isEmpty then timer.stop()
 
 abstract class CanvasAnimatedView(
     protected val tempo: Tempo
@@ -65,7 +79,8 @@ abstract class CanvasAnimatedView(
   override val root: Node = view
 
   private var running = false
-  private var startNano: Long = 0L
+  private var resumedAtNano = 0L
+  private var elapsedBeforePauseNano = 0L
   private var lastFrameNano: Long = 0L
   private var lastCycle = 0.0
   private val frameIntervalNanos = 1_000_000_000L / 60L
@@ -99,26 +114,29 @@ abstract class CanvasAnimatedView(
     redraw(0.0)
   }
 
-  private val timer = AnimationTimer { now =>
-    if startNano == 0L then startNano = now
-
+  private[visualizer] def onAnimationFrame(now: Long): Unit =
     if lastFrameNano == 0L || now - lastFrameNano >= frameIntervalNanos then
       lastFrameNano = now
 
-      val elapsedSeconds = (now - startNano) / 1e9
+      val elapsedNano =
+        elapsedBeforePauseNano + (System.nanoTime() - resumedAtNano)
+
+      val elapsedSeconds = elapsedNano / 1e9
       val currentCycle = elapsedSeconds * tempo.cps
 
       redraw(currentCycle)
-  }
 
   override def play(): Unit =
     if !running then
       running = true
-      startNano = 0L
+      resumedAtNano = System.nanoTime()
       lastFrameNano = 0L
-      timer.start()
+
+      SharedAnimationTicker.add(this)
 
   override def stop(): Unit =
     if running then
+      elapsedBeforePauseNano += System.nanoTime() - resumedAtNano
       running = false
-      timer.stop()
+
+      SharedAnimationTicker.remove(this)

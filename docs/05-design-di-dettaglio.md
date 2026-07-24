@@ -570,9 +570,9 @@ I canali melodici sono assegnati per voce, dove una voce identifica una combinaz
 
 L'avvio di una nota è immediato, mentre la sua terminazione è pianificata in modo non bloccante. Se il sintetizzatore non è disponibile, un motore silenzioso mantiene operativo il resto dell'applicazione: parsing, scheduling, interfaccia e test non dipendono quindi dalla presenza di un dispositivo audio.
 
-## Interfaccia utente — Giacomo Biagioni
+# Interfaccia utente — Giacomo Biagioni
 
-### Coordinamento tramite Model–View–Update
+## Coordinamento tramite Model–View–Update
 
 La UI è organizzata secondo il modello MVU. Le azioni dell'utente, come
 l'aggiornamento del codice o il controllo della riproduzione, vengono
@@ -600,7 +600,7 @@ rimane disponibile. Il modello contiene anche un numero di revisione, utile
 alla vista per capire che è arrivato un nuovo aggiornamento anche quando le
 timeline ottenute sono uguali alle precedenti.
 
-### Editor come composizione di responsabilità
+## Editor come composizione di responsabilità
 
 L'editor è il componente principale della UI, ma non contiene direttamente
 tutte le funzionalità. La parte di base gestisce testo, cursore, selezione e
@@ -636,7 +636,36 @@ l'ultimo aggiornamento del codice e l'indicazione degli elementi in esecuzione
 segue l'avanzamento della riproduzione. Il piano roll, invece, visualizza la
 timeline prodotta dall'engine senza modificarne il contenuto.
 
-### Coerenza del feedback visivo
+## Separazione degli highlight di riproduzione
+
+L'evidenziazione degli elementi attivi è concettualmente distinta dalla
+colorazione sintattica: la prima rappresenta uno stato temporaneo prodotto
+dall'esecuzione, mentre la seconda è una proprietà del testo sorgente. Per
+evitare che questi due tipi di feedback si sovrascrivano o introducano
+modifiche nella cronologia dell'editor, gli highlight di riproduzione sono
+collocati in un livello grafico separato, sovrapposto al testo. Il contenuto
+dell'editor rimane così responsabile soltanto della scrittura e della
+colorazione della sintassi.
+
+## Tipografia indipendente dalla piattaforma
+
+La tipografia è considerata parte del tema dell'applicazione e viene definita
+in un unico punto. L'editor richiede inoltre un font monospaziato stabile,
+affinché l'allineamento del codice e la resa delle diverse componenti non
+dipendano dai caratteri installati nel sistema. Per questo il font principale
+è distribuito insieme all'applicazione, mantenendo comunque un'alternativa di
+sistema nel caso in cui la risorsa non possa essere caricata.
+
+## Sorgente temporale condivisa dai visualizzatori
+
+Le viste animate seguono tutte lo stesso stato di riproduzione e non
+necessitano di cicli di animazione indipendenti. Il design prevede quindi
+un'unica sorgente temporale condivisa, incaricata di aggiornare a ogni frame
+tutti i visualizzatori attivi. Oltre a mantenerne coerente l'avanzamento,
+questa scelta evita di moltiplicare i timer al crescere del numero di
+visualizzazioni incorporate.
+
+## Coerenza del feedback visivo
 
 Il parser associa a ogni elemento la sua posizione nel codice sorgente e
 propaga questa informazione fino alla UI. In questo modo l'editor può
