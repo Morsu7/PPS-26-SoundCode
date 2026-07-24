@@ -253,7 +253,7 @@ Sono validi, per esempio, `c`, `C4`, `f#5`, `fs5` e `bb3`. I numeri MIDI scritti
 | `ht` | High Tom | 50 |
 | `rd` | Ride Cymbal 1 | 51 |
 
-![Legenda drum sound](source/drumSound.png)
+![Legenda drum sound](source/drumSound.png)     
 
 Un identificatore sintatticamente valido ma non presente nella tabella viene mantenuto nella timeline e nel piano roll, ma il backend MIDI non produce audio.
 
