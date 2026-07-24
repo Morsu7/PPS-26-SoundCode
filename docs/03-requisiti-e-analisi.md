@@ -253,6 +253,8 @@ Sono validi, per esempio, `c`, `C4`, `f#5`, `fs5` e `bb3`. I numeri MIDI scritti
 | `ht` | High Tom | 50 |
 | `rd` | Ride Cymbal 1 | 51 |
 
+![Legenda drum sound](source/drumSound.png)
+
 Un identificatore sintatticamente valido ma non presente nella tabella viene mantenuto nella timeline e nel piano roll, ma il backend MIDI non produce audio.
 
 ### RF-12 — Selezione dello strumento
@@ -382,6 +384,8 @@ Un aggiornamento non valido deve mostrare l'errore e non sostituire timeline e v
 Ogni nota, sample e silenzio deve conservare gli indici del token sorgente. Quando il player raggiunge l'inizio ideale di un evento, l'editor deve evidenziarne l'intervallo fino alla scadenza della durata teorica. Eventi simultanei possono produrre più intervalli evidenziati.
 
 La modifica manuale del testo disabilita gli highlight di riproduzione, perché le posizioni appartengono alla revisione precedente. Un Update valido li riabilita.
+
+![Esempio di highlight](source/patternColorati.png)
 
 ## 10. Riproduzione MIDI
 
