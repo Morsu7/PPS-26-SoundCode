@@ -542,25 +542,25 @@ In caso di parametri duplicati (ad esempio due effetti `gain` concorrenti nello 
 
 ---
 
-## Scheduling e Concorrenza nel Player
+### Scheduling e Concorrenza nel Player
 
 Riprendendo la distinzione tra le modalità di generazione della timeline, l'implementazione tecnica adotta strategie differenti a seconda del contesto d'uso:
 
-### Timeline Limitata (Bounded)
+#### Timeline Limitata (Bounded)
 Utilizzata principalmente dalla GUI per la rappresentazione statica, calcola la finestra temporale minima sfruttando il **minimo comune multiplo** delle periodicità dei pattern, restituendo una lista finita di eventi.
 
-### Timeline Infinita (`LazyList`)
+#### Timeline Infinita (`LazyList`)
 Per il live coding e la riproduzione in tempo reale, lo scheduler sfrutta la valutazione pigra di Scala per produrre una sequenza infinita valutata un ciclo alla volta:
 
 ```scala
 def generateInfiniteTimeline(...): LazyList[...] =
   def loop(nCycle: Int): LazyList[....] =
     given Interval = Interval(Fraction(nCycle), Fraction(nCycle + 1))
-    val cycleEvents =patterns
-        .flatMap(_.resolve)
-        .sortBy(_.part.start.toDouble)
+    val cycleEvents = patterns
+            .flatMap(_.resolve)
+            .sortBy(_.part.start.toDouble)
     LazyList.from(cycleEvents) #::: loop(nCycle + 1)
-
+  
   loop(0)
 ```
 
@@ -568,35 +568,50 @@ Grazie alla concatenazione differita (`#:::`), in memoria risiede unicamente il 
 
 ## L'AudioPlayer e la Sincronizzazione in Tempo Reale
 
-L'`AudioPlayer` rappresenta il componente incaricato dell'esecuzione effettiva della timeline. L'esecuzione avviene su un thread in background a bassa latenza che esegue un ciclo di polling continuo, invocando ad ogni iterazione il metodo `tick` con risoluzione al millisecondo.
+L'`AudioPlayer` rappresenta il componente incaricato dell'esecuzione effettiva della timeline. L'esecuzione avviene su un thread in background a bassa latenza che esegue un ciclo di polling continuo, invocando a ogni iterazione il metodo `tick` con risoluzione nominale al millisecondo.
 
-### Gestione dello Stato e Thread Safety
+## Gestione dello Stato e Thread Safety
 
-Per supportare il *live coding* (ovvero la sostituzione a caldo dei pattern in esecuzione senza interrompere o bloccare il flusso audio) l'architettura adotta un pattern di **stato immutabile racchiuso in un blocco di sincronizzazione (`lock.synchronized`)**.
+Per supportare il *live coding* — ovvero la sostituzione a caldo o la modifica dei pattern in esecuzione senza interrompere o bloccare il flusso audio — l'architettura adotta un pattern di stato immutabile protetto da sincronizzazione esplicita (`lock.synchronized`).
 
-Tutti i dati critici di riproduzione (la `LazyList` degli eventi, il timestamp di avvio, la mappa degli highlight attivi) sono racchiusi all'interno di una case class privata (`PlayerState`) e aggiornati in modo atomico:
+Tutti i dati critici di riproduzione (la `LazyList` degli eventi, il timestamp di avvio, le durate di pausa e la mappa degli highlight attivi) sono racchiusi all'interno della `case class` privata `PlayerState` e aggiornati in modo atomico.
 
 ```scala
 private case class PlayerState(
     eventStream: LazyList[ScheduledEvent[AudioPayload]] = LazyList.empty,
     firstTickTimeMs: Option[AbsoluteTime] = None,
+    pausedDurationMs: Long = 0L,
+    pausedAtMs: Option[Long] = None,
     activeHighlights: Map[TextPosition, AbsoluteTime] = Map.empty,
     currentHighlightSet: Set[TextPosition] = Set.empty
 )
 ```
-## Il Ciclo di Elaborazione (*tick*)
 
 Questo approccio previene in modo rigoroso qualsiasi **condizione di gara** (*race condition*) tra il thread che ricompila il codice (`updateTimeline`) e il thread che consuma gli eventi audio.
 
+## Semantica di Pausa e Ripresa (*Pause/Resume*)
+
+Il player implementa una gestione nativa della pausa. Quando viene invocato `stop()`, la riproduzione viene sospesa preservando lo stream degli eventi rimanenti e registrando l'istante di interruzione (`pausedAtMs`).
+
+Alla ripresa (`start()`), il sistema calcola la durata della pausa trascorsa e la accumula in `pausedDurationMs`. Questo permette di definire un tempo logico effettivo (`effectiveNowMs`).
+
+```scala
+val effectiveNowMs = now - currentState.pausedDurationMs
+```
+
+Sottraendo il tempo trascorso in pausa dal clock di sistema, la timeline non subisce salti in avanti, gli eventi non vengono scartati per fittizi ritardi temporali e gli highlight testuali non scadono prematuramente durante i momenti di sospensione.
+
+## Il Ciclo di Elaborazione (*tick*)
+
 Ad ogni *tick* del player, lo stato viene valutato eseguendo tre macro-operazioni sequenziali.
 
-### Pulizia degli Highlight Scaduti
+### 1. Pulizia degli Highlight Scaduti
 
-Vengono filtrate e rimosse tutte le evidenziazioni testuali il cui termine temporale (`expireAtMs`) è inferiore al tempo corrente (`now`), ripulendo la UI in modo incrementale.
+Vengono filtrate e rimosse tutte le evidenziazioni testuali il cui termine temporale (`expireAtMs`) è inferiore al tempo logico corrente (`effectiveNowMs`), ripulendo la UI in modo incrementale.
 
-### Consumo degli Eventi e Filtraggio Anti-Duplicazione
+### 2. Consumo degli Eventi e Filtraggio Anti-Duplicazione
 
-Lo stream viene partizionato tramite lo `span` in base al tempo reale calcolato (`firstPerformance + tempo.offsetMs(...)`).
+Lo stream viene partizionato tramite lo `span`, confrontando il tempo logico calcolato con il tempo atteso di esecuzione (`effectiveNowMs >= expectedTriggerMs`).
 
 Per impedire che una nota venga riprodotta due volte quando attraversa il confine tra due cicli consecutivi, viene applicato il seguente filtro strutturale:
 
@@ -606,15 +621,15 @@ toProcess.filter(e => e.part.start == e.whole.start)
 
 L'evento viene così inviato al backend solamente nell'istante della sua effettiva nascita, pur mantenendo disponibile la sua durata completa (`whole`).
 
-### Dispatch al Backend e Notifica della UI
+### 3. Dispatch al Backend e Notifica della UI
 
 Il player inoltra il payload al generico `AudioBackend`, insieme alla durata calcolata e alle eventuali estensioni.
 
 Parallelamente:
 
 - raccoglie tutte le posizioni testuali associate (`position` dei payload e `modifierPositions`);
-- calcola la scadenza temporale degli highlight;
-- notifica asincronamente la GUI tramite la callback `onHighlightChange` soltanto quando il set delle evidenziazioni risulta effettivamente modificato.
+- calcola la scadenza temporale degli highlight sommando la durata al tempo logico (`effectiveNowMs + durationMs`);
+- notifica asincronicamente la GUI tramite la callback `onHighlightChange` soltanto quando il set delle evidenziazioni risulta effettivamente modificato.
 
 ## Disaccoppiamento Architetturale
 
